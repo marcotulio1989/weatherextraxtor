@@ -1,0 +1,128 @@
+import requests
+import pandas as pd
+import datetime
+import os
+
+# --- CONFIGURAÇÕES DA OPERAÇÃO ---
+# Local: Bacia de Campos (Centro Aproximado)
+LAT = -22.46
+LON = -40.54
+TIMEZONE = "America/Sao_Paulo"
+DATA_HOJE = datetime.date.today()
+NOME_ARQUIVO = f"Bacia_Campos_CONSOLIDADO_{DATA_HOJE}.csv"
+
+print(f"--- INICIANDO SISTEMA DE DADOS METEOROLÓGICOS OFFSHORE ---")
+print(f"Alvo: Lat {LAT} / Lon {LON}")
+print(f"Intervalo de Dados: 15 minutos")
+print("Modelos: ECMWF (Europa), ICON (Alemanha), GFS (EUA), MARINE (Oceano)")
+print("-" * 60)
+
+# Função auxiliar para baixar dados e tratar erros
+def baixar_dados(url, params, nome_etapa):
+    print(f"[{nome_etapa}] Solicitando dados...")
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status() # Garante que deu certo (código 200)
+        dados = response.json()
+       
+        # O Open-Meteo retorna os dados dentro da chave 'minutely_15'
+        if 'minutely_15' in dados:
+            return pd.DataFrame(dados['minutely_15'])
+        else:
+            print(f"ERRO: Chave 'minutely_15' não encontrada na resposta de {nome_etapa}.")
+            return pd.DataFrame()
+           
+    except Exception as e:
+        print(f"ERRO CRÍTICO em {nome_etapa}: {e}")
+        return pd.DataFrame()
+
+# -------------------------------------------------------------------------
+# ETAPA 1: DADOS DE MAR (Ondas e Correnteza)
+# -------------------------------------------------------------------------
+# Fonte: Marine API (Melhor mix global para oceano)
+url_marine = "https://marine-api.open-meteo.com/v1/marine"
+params_marine = {
+    "latitude": LAT, "longitude": LON, "timezone": TIMEZONE,
+    "minutely_15": ",".join([
+        "wave_height", "wave_direction", "wave_period",                # Onda Total
+        "wind_wave_height", "wind_wave_direction", "wind_wave_period", # Mar de Vento
+        "swell_wave_height", "swell_wave_direction", "swell_wave_period", # Swell
+        "ocean_current_velocity", "ocean_current_direction"            # Correnteza
+    ])
+}
+df_marine = baixar_dados(url_marine, params_marine, "1/3 Oceanografia")
+
+# -------------------------------------------------------------------------
+# ETAPA 2: COMPARATIVO DE VENTO E PRESSÃO (Tira-Teima)
+# -------------------------------------------------------------------------
+# Fonte: Forecast API (Comparando ECMWF, ICON e GFS na mesma chamada)
+url_compare = "https://api.open-meteo.com/v1/forecast"
+params_compare = {
+    "latitude": LAT, "longitude": LON, "timezone": TIMEZONE,
+    "models": "ecmwf_ifs04,icon_global,gfs_seamless", # <--- OS 3 GIGANTES
+    "minutely_15": ",".join([
+        "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", # Vento
+        "pressure_msl", "weather_code"                            # Pressão
+    ])
+}
+# Nota: Quando pedimos vários modelos, a API retorna colunas como 'wind_speed_10m_ecmwf_ifs04'
+df_compare = baixar_dados(url_compare, params_compare, "2/3 Atmosfera (Comparativo)")
+
+# -------------------------------------------------------------------------
+# ETAPA 3: DADOS DE AVIAÇÃO E HELIDECK (GFS)
+# -------------------------------------------------------------------------
+# Fonte: GFS (Usado para preencher Visibilidade e Teto, onde outros falham)
+url_extras = "https://api.open-meteo.com/v1/forecast"
+params_extras = {
+    "latitude": LAT, "longitude": LON, "timezone": TIMEZONE,
+    "models": "gfs_seamless",
+    "minutely_15": ",".join([
+        "visibility",           # Visibilidade (m)
+        "cloud_base_height",    # Teto de Nuvens (m)
+        "lifted_index",         # Índice de Tempestade
+        "cape",                 # Energia de Convecção
+        "temperature_2m"        # Temperatura
+    ])
+}
+df_extras = baixar_dados(url_extras, params_extras, "3/3 Aviação (Extras GFS)")
+
+# Renomeando colunas do GFS Extras para não confundir
+if not df_extras.empty:
+    suffix = "_GFS_Aviação"
+    cols_rename = {col: f"{col}{suffix}" for col in df_extras.columns if col != 'time'}
+    df_extras.rename(columns=cols_rename, inplace=True)
+
+# -------------------------------------------------------------------------
+# CONSOLIDAÇÃO (MERGE)
+# -------------------------------------------------------------------------
+print("-" * 60)
+print("Consolidando bases de dados...")
+
+if df_marine.empty or df_compare.empty:
+    print("ERRO: Uma das bases principais veio vazia. Abortando.")
+else:
+    # 1. Junta Mar com Comparativo de Vento (usando a hora 'time' como chave)
+    df_final = pd.merge(df_marine, df_compare, on='time', how='inner')
+   
+    # 2. Junta com os Extras de Aviação (se existirem)
+    if not df_extras.empty:
+        df_final = pd.merge(df_final, df_extras, on='time', how='inner')
+
+    # Salvando o arquivo
+    try:
+        df_final.to_csv(NOME_ARQUIVO, index=False)
+        caminho_completo = os.path.abspath(NOME_ARQUIVO)
+       
+        print("\n" + "="*60)
+        print(f"SUCESSO! DADOS EXTRAÍDOS.")
+        print(f"Arquivo gerado: {NOME_ARQUIVO}")
+        print(f"Local: {caminho_completo}")
+        print(f"Total de linhas (intervalos de 15min): {len(df_final)}")
+        print("="*60)
+        print("\nCOMO LER O ARQUIVO:")
+        print(" -> Compare 'wind_speed_10m_ecmwf_ifs04' (Europeu) com 'wind_speed_10m_icon_global' (Alemão).")
+        print(" -> Para Helideck, use as colunas terminadas em '_GFS_Aviação'.")
+        print(" -> 'swell_wave_height' é a ondulação de fundo (perigo para Roll).")
+       
+    except Exception as e:
+        print(f"Erro ao salvar arquivo CSV: {e}")
