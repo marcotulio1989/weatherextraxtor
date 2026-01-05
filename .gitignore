@@ -9,3 +9,4 @@ venv/
 output/
 output2/
 *.csv
+!docs/*.csv
