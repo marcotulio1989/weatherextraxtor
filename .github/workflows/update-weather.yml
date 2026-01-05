@@ -46,6 +46,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add docs/
           git diff --staged --quiet || git commit -m "🌊 Atualização automática - $(date +'%Y-%m-%d %H:%M UTC')"
+          git pull --rebase
           git push
           
   deploy:
