@@ -138,15 +138,17 @@ def baixar_dados(url, params, nome_etapa, chave="minutely_15", delay=2):
 
 def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_hours=24, generate_html=False):
     """Executa a extração completa com múltiplos modelos."""
-    DATA_HOJE = datetime.date.today()
-    NOME_ARQUIVO = f"OpenMeteo_MULTIMODEL_{DATA_HOJE}.csv"
+    # Calcular período de tempo: 24h antes e 24h depois
+    tz = pytz.timezone(timezone)
+    agora = datetime.datetime.now(tz)
+    
+    # Nome do arquivo com data e hora de extração
+    DATA_HORA = agora.strftime("%Y-%m-%d_%H%M")
+    NOME_ARQUIVO = f"OpenMeteo_MULTIMODEL_{DATA_HORA}.csv"
     if outdir:
         os.makedirs(outdir, exist_ok=True)
         NOME_ARQUIVO = os.path.join(outdir, NOME_ARQUIVO)
 
-    # Calcular período de tempo: 24h antes e 24h depois
-    tz = pytz.timezone(timezone)
-    agora = datetime.datetime.now(tz)
     inicio = agora - datetime.timedelta(hours=past_hours)
     fim = agora + datetime.timedelta(hours=future_hours)
     
@@ -335,7 +337,7 @@ def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_
         
         # Gerar HTML se solicitado
         if generate_html:
-            html_file = gerar_html(df_final, agora, timezone, lat, lon, outdir)
+            html_file = gerar_html(df_final, agora, timezone, lat, lon, outdir, NOME_ARQUIVO)
             print(f"  HTML gerado: {html_file}")
         
         return 0
@@ -347,8 +349,15 @@ def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_
         return 1
 
 
-def gerar_html(df, agora, timezone, lat, lon, outdir=None):
+def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None):
     """Gera um arquivo HTML com a tabela de dados, destacando a hora atual."""
+    
+    # Listar todos os CSVs disponíveis na pasta
+    csv_files = []
+    if outdir and os.path.exists(outdir):
+        for f in sorted(os.listdir(outdir), reverse=True):
+            if f.endswith('.csv') and f.startswith('OpenMeteo_MULTIMODEL_'):
+                csv_files.append(f)
     
     # Identificar a linha mais próxima da hora atual
     df['time_dt'] = pd.to_datetime(df['time'])
@@ -523,6 +532,32 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None):
             transform: translateY(-3px);
             box-shadow: 0 10px 30px rgba(0,212,255,0.4);
         }
+        .csv-list {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .csv-list h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+        .csv-list ul {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .csv-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .csv-list a {
+            color: #e0e0e0;
+            text-decoration: none;
+        }
+        .csv-list a:hover {
+            color: #00d4ff;
+        }
     </style>
 </head>
 <body>
@@ -538,9 +573,18 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None):
             </div>
             <p class="update-time">🕐 Última atualização: {{ update_time }}</p>
             <p style="margin-top: 15px;">
-                <a href="OpenMeteo_MULTIMODEL_{{ date }}.csv" class="download-btn">📥 Download CSV</a>
+                <a href="{{ csv_filename }}" class="download-btn">📥 Download CSV Atual</a>
             </p>
         </header>
+        
+        <div class="csv-list">
+            <h3>📂 Histórico de Arquivos CSV</h3>
+            <ul>
+                {% for csv in csv_files %}
+                <li><a href="{{ csv }}">📄 {{ csv }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
         
         <div class="legend">
             <div class="legend-item">
@@ -617,6 +661,9 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None):
         
         rows.append({'row_class': row_class, 'cells': values})
     
+    # Extrair apenas o nome do arquivo CSV
+    csv_basename = os.path.basename(csv_filename) if csv_filename else ""
+    
     template = Template(html_template)
     html_content = template.render(
         lat=lat,
@@ -624,7 +671,8 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None):
         timezone=timezone,
         total_rows=len(df),
         update_time=agora.strftime("%Y-%m-%d %H:%M:%S"),
-        date=agora.strftime("%Y-%m-%d"),
+        csv_filename=csv_basename,
+        csv_files=csv_files,
         columns=columns,
         rows=rows
     )
