@@ -474,16 +474,10 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
     df_chart = df.iloc[::4].reset_index(drop=True)
     chart_current_idx = len(df_chart[df_chart['time_dt'] <= agora_naive]) - 1
     
-    # Fator de conversão km/h para knots
-    KMH_TO_KNOTS = 0.539957
-    
     # Preparar JSON para Chart.js
+    # NOTA: Os dados do CSV já estão em knots, não precisa conversão
     def safe_list(series):
         return [round(float(x), 2) if pd.notna(x) else None for x in series]
-    
-    def safe_list_knots(series):
-        """Converte km/h para knots"""
-        return [round(float(x) * KMH_TO_KNOTS, 1) if pd.notna(x) else None for x in series]
     
     chart_data = {
         'time': df_chart['time'].str.replace('T', ' ').str[:16].tolist(),
@@ -534,19 +528,19 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
         # Pressão de Superfície
         'surface_pressure': safe_list(df_chart.get('surface_pressure_best_match', pd.Series())),
         
-        # Vento 80m
-        'wind_speed_80m': safe_list_knots(df_chart.get('wind_speed_80m_best_match', pd.Series())),
+        # Vento 80m (já em knots no CSV)
+        'wind_speed_80m': safe_list(df_chart.get('wind_speed_80m_best_match', pd.Series())),
         'wind_dir_80m': safe_list(df_chart.get('wind_direction_80m_best_match', pd.Series())),
         
         # Weather Code
         'weather_code': safe_list(df_chart.get('weather_code_best_match', pd.Series())),
         
-        # Velocidade do Vento - TODOS OS MODELOS (em KNOTS)
-        'wind_speed_ecmwf': safe_list_knots(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
-        'wind_speed_icon': safe_list_knots(df_chart.get('wind_speed_10m_icon_seamless', pd.Series())),
-        'wind_speed_gfs': safe_list_knots(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
-        'wind_speed_meteofrance': safe_list_knots(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
-        'wind_speed_jma': safe_list_knots(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
+        # Velocidade do Vento - TODOS OS MODELOS (já em knots no CSV)
+        'wind_speed_ecmwf': safe_list(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
+        'wind_speed_icon': safe_list(df_chart.get('wind_speed_10m_icon_seamless', pd.Series())),
+        'wind_speed_gfs': safe_list(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
+        'wind_speed_meteofrance': safe_list(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
+        'wind_speed_jma': safe_list(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
         
         # Direção do Vento - TODOS OS MODELOS
         'wind_dir_ecmwf': safe_list(df_chart.get('wind_direction_10m_ecmwf_ifs025', pd.Series())),
@@ -555,12 +549,12 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
         'wind_dir_meteofrance': safe_list(df_chart.get('wind_direction_10m_meteofrance_seamless', pd.Series())),
         'wind_dir_jma': safe_list(df_chart.get('wind_direction_10m_jma_seamless', pd.Series())),
         
-        # Rajadas - TODOS OS MODELOS (em KNOTS)
-        'wind_gusts_ecmwf': safe_list_knots(df_chart.get('wind_gusts_10m_ecmwf_ifs025', pd.Series())),
-        'wind_gusts_icon': safe_list_knots(df_chart.get('wind_gusts_10m_icon_seamless', pd.Series())),
-        'wind_gusts_gfs': safe_list_knots(df_chart.get('wind_gusts_10m_gfs_seamless', pd.Series())),
-        'wind_gusts_meteofrance': safe_list_knots(df_chart.get('wind_gusts_10m_meteofrance_seamless', pd.Series())),
-        'wind_gusts_jma': safe_list_knots(df_chart.get('wind_gusts_10m_jma_seamless', pd.Series())),
+        # Rajadas - TODOS OS MODELOS (já em knots no CSV)
+        'wind_gusts_ecmwf': safe_list(df_chart.get('wind_gusts_10m_ecmwf_ifs025', pd.Series())),
+        'wind_gusts_icon': safe_list(df_chart.get('wind_gusts_10m_icon_seamless', pd.Series())),
+        'wind_gusts_gfs': safe_list(df_chart.get('wind_gusts_10m_gfs_seamless', pd.Series())),
+        'wind_gusts_meteofrance': safe_list(df_chart.get('wind_gusts_10m_meteofrance_seamless', pd.Series())),
+        'wind_gusts_jma': safe_list(df_chart.get('wind_gusts_10m_jma_seamless', pd.Series())),
         
         # Temperatura - TODOS OS MODELOS
         'temp_ecmwf': safe_list(df_chart.get('temperature_2m_ecmwf_ifs025', pd.Series())),
@@ -576,15 +570,15 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
         'pressure_meteofrance': safe_list(df_chart.get('pressure_msl_meteofrance_seamless', pd.Series())),
         'pressure_jma': safe_list(df_chart.get('pressure_msl_jma_seamless', pd.Series())),
         
-        # Aliases para compatibilidade (em KNOTS)
-        'wind_speed': safe_list_knots(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
-        'wind_gusts': safe_list_knots(df_chart.get('wind_gusts_10m_ecmwf_ifs025', pd.Series())),
+        # Aliases para compatibilidade (já em knots no CSV)
+        'wind_speed': safe_list(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
+        'wind_gusts': safe_list(df_chart.get('wind_gusts_10m_ecmwf_ifs025', pd.Series())),
         'wind_direction': safe_list(df_chart.get('wind_direction_10m_ecmwf_ifs025', pd.Series())),
-        'wind_ecmwf': safe_list_knots(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
-        'wind_icon': safe_list_knots(df_chart.get('wind_speed_10m_icon_seamless', pd.Series())),
-        'wind_gfs': safe_list_knots(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
-        'wind_meteofrance': safe_list_knots(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
-        'wind_jma': safe_list_knots(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
+        'wind_ecmwf': safe_list(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
+        'wind_icon': safe_list(df_chart.get('wind_speed_10m_icon_seamless', pd.Series())),
+        'wind_gfs': safe_list(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
+        'wind_meteofrance': safe_list(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
+        'wind_jma': safe_list(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
     }
     
     # Valores atuais
