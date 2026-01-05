@@ -286,6 +286,10 @@
             .card-value { font-size: 1.8em; }
         }
         
+        /* Toggle Button Styles */
+        .toggle-label { color: #666; font-size: 0.9em; }
+        .toggle-label.active { background: #00d4ff; color: #000; font-weight: bold; }
+        
         /* Download Section */
         .download-section {
             display: flex;
@@ -664,6 +668,16 @@
     <div id="tab-models" class="tab-content">
         <h2 style="color: #00d4ff; margin-bottom: 20px;">🔬 Comparativo Multi-Modelo</h2>
         
+        <!-- Toggle Absoluto / Variação Percentual -->
+        <div class="chart-mode-toggle" style="margin-bottom: 25px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <span style="color: #888; font-weight: bold;">📊 Modo de Visualização:</span>
+            <div class="toggle-container" onclick="toggleChartMode()" style="cursor: pointer; display: flex; align-items: center; background: rgba(0,0,0,0.3); border-radius: 25px; padding: 5px;">
+                <span id="labelAbsolute" class="toggle-label active" style="padding: 8px 16px; border-radius: 20px; transition: all 0.3s;">📈 Valores Absolutos</span>
+                <span id="labelVariation" class="toggle-label" style="padding: 8px 16px; border-radius: 20px; transition: all 0.3s;">📉 Variação %</span>
+            </div>
+            <span id="modeDescription" style="color: #666; font-size: 0.85em;">Mostrando valores originais de cada modelo</span>
+        </div>
+        
         <!-- Cards com valores atuais de cada modelo -->
         <h3 style="color: #888; margin-bottom: 15px;">💨 Velocidade do Vento (10m) - Agora</h3>
         <div class="model-grid">
@@ -867,6 +881,123 @@
         // Load data from JSON script tags
         const chartData = JSON.parse(document.getElementById('chart-data').textContent);
         const currentTimeIndex = JSON.parse(document.getElementById('current-time-idx').textContent);
+        
+        // ===== FUNÇÃO DE MÉDIA CIRCULAR (para direções em graus) =====
+        // Resolve o problema de ângulos próximos a 0°/360°
+        // Ex: mediaCircular([1, 359]) = 0° (não 180°)
+        function mediaCircular(angulos) {
+            const validos = angulos.filter(a => a !== null && a !== undefined && !isNaN(a));
+            if (validos.length === 0) return null;
+            
+            let xSum = 0, ySum = 0;
+            validos.forEach(a => {
+                const rad = a * Math.PI / 180;
+                xSum += Math.cos(rad);
+                ySum += Math.sin(rad);
+            });
+            
+            const mediaRad = Math.atan2(ySum / validos.length, xSum / validos.length);
+            let mediaGraus = mediaRad * 180 / Math.PI;
+            if (mediaGraus < 0) mediaGraus += 360;
+            
+            return Math.round(mediaGraus * 10) / 10;
+        }
+        
+        // ===== TOGGLE VALORES ABSOLUTOS / VARIAÇÃO PERCENTUAL =====
+        let isVariationMode = false;
+        
+        // Referências aos gráficos comparativos para atualização
+        let modelsWindChartRef = null;
+        let modelsWindDirChartRef = null;
+        let modelsGustsChartRef = null;
+        let modelsTempChartRef = null;
+        let modelsPressureChartRef = null;
+        
+        // Função para calcular variação percentual entre leituras consecutivas
+        function calcPercentVariation(data) {
+            if (!data || data.length === 0) return data;
+            const result = [null];
+            for (let i = 1; i < data.length; i++) {
+                const prev = data[i - 1];
+                const curr = data[i];
+                if (prev !== null && curr !== null && prev !== 0) {
+                    result.push(((curr - prev) / Math.abs(prev)) * 100);
+                } else if (prev === 0 && curr !== null) {
+                    result.push(curr > 0 ? 100 : (curr < 0 ? -100 : 0));
+                } else {
+                    result.push(null);
+                }
+            }
+            return result;
+        }
+        
+        // Armazenar dados originais e variação para cada série
+        const originalData = {};
+        const variationData = {};
+        
+        // Pré-calcular dados de variação para todas as séries dos modelos
+        const modelKeys = [
+            'wind_speed_ecmwf', 'wind_speed_icon', 'wind_speed_gfs', 'wind_speed_meteofrance', 'wind_speed_jma',
+            'wind_dir_ecmwf', 'wind_dir_icon', 'wind_dir_gfs', 'wind_dir_meteofrance', 'wind_dir_jma',
+            'wind_gusts_ecmwf', 'wind_gusts_icon', 'wind_gusts_gfs', 'wind_gusts_meteofrance', 'wind_gusts_jma',
+            'temp_ecmwf', 'temp_icon', 'temp_gfs', 'temp_meteofrance', 'temp_jma',
+            'pressure_ecmwf', 'pressure_icon', 'pressure_gfs', 'pressure_meteofrance', 'pressure_jma'
+        ];
+        
+        modelKeys.forEach(key => {
+            const data = chartData[key] || chartData[key.replace('wind_speed_', 'wind_')];
+            if (data) {
+                originalData[key] = data;
+                variationData[key] = calcPercentVariation(data);
+            }
+        });
+        
+        // Função para alternar modo
+        function toggleChartMode() {
+            isVariationMode = !isVariationMode;
+            
+            // Atualizar visual do toggle
+            document.getElementById('labelAbsolute').classList.toggle('active', !isVariationMode);
+            document.getElementById('labelVariation').classList.toggle('active', isVariationMode);
+            document.getElementById('modeDescription').textContent = isVariationMode 
+                ? 'Mostrando variação percentual entre leituras consecutivas'
+                : 'Mostrando valores originais de cada modelo';
+            
+            // Atualizar todos os gráficos comparativos
+            updateComparisonCharts();
+        }
+        
+        // Função para atualizar gráficos com o modo atual
+        function updateComparisonCharts() {
+            const charts = [
+                { ref: modelsWindChartRef, keys: ['wind_speed_ecmwf', 'wind_speed_icon', 'wind_speed_gfs', 'wind_speed_meteofrance', 'wind_speed_jma'], unit: isVariationMode ? '%' : 'kt' },
+                { ref: modelsWindDirChartRef, keys: ['wind_dir_ecmwf', 'wind_dir_icon', 'wind_dir_gfs', 'wind_dir_meteofrance', 'wind_dir_jma', 'wind_dir_media_circular'], unit: isVariationMode ? '%' : '°' },
+                { ref: modelsGustsChartRef, keys: ['wind_gusts_ecmwf', 'wind_gusts_icon', 'wind_gusts_gfs', 'wind_gusts_meteofrance', 'wind_gusts_jma'], unit: isVariationMode ? '%' : 'kt' },
+                { ref: modelsTempChartRef, keys: ['temp_ecmwf', 'temp_icon', 'temp_gfs', 'temp_meteofrance', 'temp_jma'], unit: isVariationMode ? '%' : '°C' },
+                { ref: modelsPressureChartRef, keys: ['pressure_ecmwf', 'pressure_icon', 'pressure_gfs', 'pressure_meteofrance', 'pressure_jma'], unit: isVariationMode ? '%' : 'hPa' }
+            ];
+            
+            charts.forEach(chart => {
+                if (!chart.ref) return;
+                chart.ref.data.datasets.forEach((dataset, i) => {
+                    const key = chart.keys[i];
+                    if (key && originalData[key]) {
+                        dataset.data = isVariationMode ? variationData[key] : originalData[key];
+                    }
+                });
+                // Atualizar título do eixo Y
+                if (chart.ref.options.scales.y) {
+                    const baseTitle = chart.ref.options.scales.y.title.text.replace(' (%)', '').replace(/ \(.*\)/, '');
+                    chart.ref.options.scales.y.title.text = isVariationMode ? 'Variação (%)' : baseTitle + ' (' + chart.unit + ')';
+                    // Remover limites fixos em modo variação
+                    if (isVariationMode) {
+                        delete chart.ref.options.scales.y.min;
+                        delete chart.ref.options.scales.y.max;
+                    }
+                }
+                chart.ref.update('none');
+            });
+        }
         
         // Overview Chart
         const overviewCtx = document.getElementById('overviewChart').getContext('2d');
@@ -1072,7 +1203,7 @@
         
         // Models Wind Chart - 5 Modelos
         const modelsWindCtx = document.getElementById('modelsWindChart').getContext('2d');
-        new Chart(modelsWindCtx, {
+        modelsWindChartRef = new Chart(modelsWindCtx, {
             type: 'line',
             data: {
                 labels: chartData.time,
@@ -1130,10 +1261,10 @@
             }
         });
         
-        // Models Wind Direction Chart - 5 Modelos
+        // Models Wind Direction Chart - 5 Modelos + Média Circular
         const modelsWindDirCanvas = document.getElementById('modelsWindDirChart');
         if (modelsWindDirCanvas) {
-            new Chart(modelsWindDirCanvas.getContext('2d'), {
+            modelsWindDirChartRef = new Chart(modelsWindDirCanvas.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: chartData.time,
@@ -1142,7 +1273,8 @@
                         { label: 'ICON', data: chartData.wind_dir_icon, borderColor: '#9b59b6', tension: 0.2, borderWidth: 2, pointRadius: 0 },
                         { label: 'GFS', data: chartData.wind_dir_gfs, borderColor: '#e74c3c', tension: 0.2, borderWidth: 2, pointRadius: 0 },
                         { label: 'Météo-France', data: chartData.wind_dir_meteofrance, borderColor: '#2ecc71', tension: 0.2, borderWidth: 2, pointRadius: 0 },
-                        { label: 'JMA', data: chartData.wind_dir_jma, borderColor: '#f39c12', tension: 0.2, borderWidth: 2, pointRadius: 0 }
+                        { label: 'JMA', data: chartData.wind_dir_jma, borderColor: '#f39c12', tension: 0.2, borderWidth: 2, pointRadius: 0 },
+                        { label: '⊕ MÉDIA CIRCULAR', data: chartData.wind_dir_media_circular, borderColor: '#ffffff', backgroundColor: 'rgba(255,255,255,0.1)', tension: 0.2, borderWidth: 3, pointRadius: 0, borderDash: [5, 5] }
                     ]
                 },
                 options: {
@@ -1160,7 +1292,7 @@
         // Models Gusts Chart - 5 Modelos
         const modelsGustsCanvas = document.getElementById('modelsGustsChart');
         if (modelsGustsCanvas) {
-            new Chart(modelsGustsCanvas.getContext('2d'), {
+            modelsGustsChartRef = new Chart(modelsGustsCanvas.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: chartData.time,
@@ -1186,7 +1318,7 @@
         
         // Models Temperature Chart - 5 Modelos
         const modelsTempCtx = document.getElementById('modelsTempChart').getContext('2d');
-        new Chart(modelsTempCtx, {
+        modelsTempChartRef = new Chart(modelsTempCtx, {
             type: 'line',
             data: {
                 labels: chartData.time,
@@ -1212,7 +1344,7 @@
         // Models Pressure Chart - 5 Modelos
         const modelsPressureCanvas = document.getElementById('modelsPressureChart');
         if (modelsPressureCanvas) {
-            new Chart(modelsPressureCanvas.getContext('2d'), {
+            modelsPressureChartRef = new Chart(modelsPressureCanvas.getContext('2d'), {
                 type: 'line',
                 data: {
                     labels: chartData.time,
