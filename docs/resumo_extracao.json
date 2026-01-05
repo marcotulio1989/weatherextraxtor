@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-01-05T05:39:51.759229",
+  "coordenadas": {
+    "lat": -22.46,
+    "lon": -40.54
+  },
+  "arquivos": {
+    "openmeteo": [
+      "OpenMeteo_MULTIMODEL_2026-01-05_0213.csv",
+      "OpenMeteo_MULTIMODEL_2026-01-05_0239.csv",
+      "OpenMeteo_MULTIMODEL_2026-01-04_2159.csv",
+      "OpenMeteo_MULTIMODEL_2026-01-05_0209.csv",
+      "OpenMeteo_MULTIMODEL_2026-01-04_2148.csv",
+      "OpenMeteo_MULTIMODEL_2026-01-05.csv"
+    ],
+    "cptec": [
+      "CPTEC_Campos_dos_Goytacazes_2026-01-05_0539.csv"
+    ],
+    "gfs": [
+      "GFS_timeseries_2026-01-05_0539.csv"
+    ]
+  },
+  "total_arquivos": 8
+}

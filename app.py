@@ -3,6 +3,7 @@
 Weather Extractor - Open-Meteo (Multi-Model)
 Extrai dados meteorológicos e marinhos com menor intervalo possível (15 min).
 Compara múltiplos modelos: ECMWF, ICON, GFS, etc.
+Dashboard de monitoramento em tempo real.
 """
 
 import requests
@@ -12,7 +13,16 @@ import os
 import argparse
 import pytz
 import time
-from jinja2 import Template
+import json
+from jinja2 import Template, Environment, FileSystemLoader
+
+# Import CPTEC/INPE extractor
+try:
+    from cptec_extractor import CPTECExtractor, CONDICOES_CPTEC
+    CPTEC_AVAILABLE = True
+except ImportError:
+    CPTEC_AVAILABLE = False
+    CONDICOES_CPTEC = {}
 
 
 # --------------------------------------------------------------------------
@@ -136,7 +146,7 @@ def baixar_dados(url, params, nome_etapa, chave="minutely_15", delay=2):
         return pd.DataFrame()
 
 
-def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_hours=24, generate_html=False):
+def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_hours=24, generate_html=False, cidade_cptec=None):
     """Executa a extração completa com múltiplos modelos."""
     # Calcular período de tempo: 24h antes e 24h depois
     tz = pytz.timezone(timezone)
@@ -337,7 +347,7 @@ def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_
         
         # Gerar HTML se solicitado
         if generate_html:
-            html_file = gerar_html(df_final, agora, timezone, lat, lon, outdir, NOME_ARQUIVO)
+            html_file = gerar_html(df_final, agora, timezone, lat, lon, outdir, NOME_ARQUIVO, cidade_cptec)
             print(f"  HTML gerado: {html_file}")
         
         return 0
@@ -349,8 +359,89 @@ def run(lat, lon, timezone, outdir=None, forecast_days=3, past_hours=24, future_
         return 1
 
 
-def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None):
-    """Gera um arquivo HTML com a tabela de dados, destacando a hora atual."""
+def get_wind_direction_text(degrees):
+    """Converte graus em texto de direção do vento."""
+    if degrees is None or pd.isna(degrees):
+        return "N/A"
+    directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", 
+                  "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+    idx = int((degrees + 11.25) / 22.5) % 16
+    return directions[idx]
+
+
+def get_safe_value(df, col, idx, default=0):
+    """Obtém valor seguro de um DataFrame."""
+    try:
+        if col in df.columns:
+            val = df.iloc[idx][col]
+            if pd.notna(val):
+                return round(float(val), 2)
+    except:
+        pass
+    return default
+
+
+def buscar_dados_cptec(cidade_nome="Campos dos Goytacazes"):
+    """Busca dados do CPTEC/INPE para uma cidade."""
+    if not CPTEC_AVAILABLE:
+        return None
+    
+    try:
+        extractor = CPTECExtractor()
+        
+        # Buscar cidade
+        cidades = extractor.buscar_cidade(cidade_nome)
+        if not cidades:
+            print(f"[CPTEC] Cidade '{cidade_nome}' não encontrada")
+            return None
+        
+        codigo = int(cidades[0].get('id'))
+        nome = cidades[0].get('nome')
+        estado = cidades[0].get('estado')
+        
+        # Previsão 7 dias
+        previsao = extractor.previsao_cidade_7dias(codigo)
+        
+        if not previsao or not previsao.get('previsao'):
+            print(f"[CPTEC] Sem previsão para {nome}")
+            return None
+        
+        # Formatar dados
+        dados_cptec = {
+            'cidade': nome,
+            'estado': estado,
+            'atualizado': previsao.get('atualizado', ''),
+            'previsao': []
+        }
+        
+        for dia in previsao.get('previsao', []):
+            condicao_cod = dia.get('condicao', '')
+            condicao_desc = CONDICOES_CPTEC.get(condicao_cod, condicao_cod)
+            
+            dados_cptec['previsao'].append({
+                'data': dia.get('data', ''),
+                'min': dia.get('min', ''),
+                'max': dia.get('max', ''),
+                'condicao': condicao_cod,
+                'condicao_desc': condicao_desc,
+                'iuv': dia.get('iuv', '0')
+            })
+        
+        print(f"[CPTEC] ✓ {len(dados_cptec['previsao'])} dias de previsão para {nome}/{estado}")
+        return dados_cptec
+        
+    except Exception as e:
+        print(f"[CPTEC] Erro: {e}")
+        return None
+
+
+def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, cidade_cptec=None):
+    """Gera um dashboard HTML interativo com gráficos e monitoramento em tempo real."""
+    
+    # Buscar dados CPTEC se cidade especificada
+    dados_cptec = None
+    if cidade_cptec:
+        dados_cptec = buscar_dados_cptec(cidade_cptec)
     
     # Listar todos os CSVs disponíveis na pasta
     csv_files = []
@@ -359,289 +450,211 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None):
             if f.endswith('.csv') and f.startswith('OpenMeteo_MULTIMODEL_'):
                 csv_files.append(f)
     
-    # Identificar a linha mais próxima da hora atual
+    # Preparar dados
+    df = df.copy()
     df['time_dt'] = pd.to_datetime(df['time'])
     hora_atual_str = agora.strftime("%Y-%m-%dT%H")
     
-    # Selecionar apenas colunas principais para exibição (para não ficar muito pesado)
-    main_cols = ['time']
+    # Encontrar índice mais próximo da hora atual
+    agora_naive = agora.replace(tzinfo=None)
+    df['time_diff'] = abs(df['time_dt'] - agora_naive)
+    current_idx = df['time_diff'].idxmin()
     
-    # Adicionar colunas de ondas
+    # Selecionar todas as colunas (exceto auxiliares) para a tabela completa
+    exclude_cols = {'time_dt', 'time_diff'}
+    main_cols = ['time']
     for col in df.columns:
-        if any(v in col for v in ['wave_height', 'wave_direction', 'wave_period', 'wind_speed', 'wind_direction', 'wind_gusts', 'temperature', 'pressure']):
-            if col not in main_cols and len(main_cols) < 25:
-                main_cols.append(col)
+        if col not in exclude_cols and col != 'time':
+            main_cols.append(col)
     
     df_display = df[main_cols].copy()
-    
-    # Marcar linha atual
     df_display['is_current'] = df_display['time'].str.startswith(hora_atual_str)
     
-    html_template = """
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="3600">
-    <title>Weather Extractor - Bacia de Campos</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            color: #e0e0e0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 100%;
-            margin: 0 auto;
-        }
-        header {
-            text-align: center;
-            padding: 30px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-        }
-        h1 {
-            font-size: 2.5em;
-            color: #00d4ff;
-            text-shadow: 0 0 20px rgba(0,212,255,0.5);
-            margin-bottom: 10px;
-        }
-        .info {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            flex-wrap: wrap;
-            margin-top: 15px;
-        }
-        .info-item {
-            background: rgba(0,212,255,0.1);
-            padding: 10px 20px;
-            border-radius: 25px;
-            border: 1px solid rgba(0,212,255,0.3);
-        }
-        .info-item strong {
-            color: #00d4ff;
-        }
-        .update-time {
-            background: linear-gradient(90deg, #ff6b6b, #ffa502);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: 1.2em;
-            margin-top: 15px;
-        }
-        .table-container {
-            overflow-x: auto;
-            background: rgba(255,255,255,0.03);
-            border-radius: 15px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85em;
-        }
-        th {
-            background: linear-gradient(180deg, #00d4ff 0%, #0099cc 100%);
-            color: #1a1a2e;
-            padding: 12px 8px;
-            text-align: left;
-            font-weight: 600;
-            position: sticky;
-            top: 0;
-            white-space: nowrap;
-        }
-        td {
-            padding: 10px 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            white-space: nowrap;
-        }
-        tr:hover {
-            background: rgba(0,212,255,0.1);
-        }
-        .current-row {
-            background: linear-gradient(90deg, rgba(255,107,107,0.4), rgba(255,165,2,0.4)) !important;
-            animation: pulse 2s infinite;
-            font-weight: bold;
-        }
-        .current-row td {
-            color: #fff;
-            border-bottom: 2px solid #ff6b6b;
-        }
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 10px rgba(255,107,107,0.5); }
-            50% { box-shadow: 0 0 25px rgba(255,107,107,0.8); }
-        }
-        .past-row {
-            opacity: 0.6;
-        }
-        .legend {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin: 20px 0;
-            flex-wrap: wrap;
-        }
-        .legend-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .legend-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 4px;
-        }
-        .legend-current {
-            background: linear-gradient(90deg, rgba(255,107,107,0.8), rgba(255,165,2,0.8));
-        }
-        .legend-past {
-            background: rgba(255,255,255,0.3);
-        }
-        .legend-future {
-            background: rgba(0,212,255,0.5);
-        }
-        footer {
-            text-align: center;
-            padding: 20px;
-            margin-top: 30px;
-            color: #888;
-        }
-        .download-btn {
-            display: inline-block;
-            background: linear-gradient(90deg, #00d4ff, #0099cc);
-            color: #1a1a2e;
-            padding: 12px 30px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: bold;
-            margin: 10px;
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        .download-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0,212,255,0.4);
-        }
-        .csv-list {
-            background: rgba(255,255,255,0.05);
-            border-radius: 15px;
-            padding: 20px;
-            margin: 20px 0;
-        }
-        .csv-list h3 {
-            color: #00d4ff;
-            margin-bottom: 15px;
-        }
-        .csv-list ul {
-            list-style: none;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .csv-list li {
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .csv-list a {
-            color: #e0e0e0;
-            text-decoration: none;
-        }
-        .csv-list a:hover {
-            color: #00d4ff;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🌊 Weather Extractor</h1>
-            <p>Dados Meteorológicos e Marinhos - Bacia de Campos</p>
-            <div class="info">
-                <div class="info-item"><strong>📍 Latitude:</strong> {{ lat }}</div>
-                <div class="info-item"><strong>📍 Longitude:</strong> {{ lon }}</div>
-                <div class="info-item"><strong>🌐 Timezone:</strong> {{ timezone }}</div>
-                <div class="info-item"><strong>📊 Registros:</strong> {{ total_rows }}</div>
-            </div>
-            <p class="update-time">🕐 Última atualização: {{ update_time }}</p>
-            <p style="margin-top: 15px;">
-                <a href="{{ csv_filename }}" class="download-btn">📥 Download CSV Atual</a>
-            </p>
-        </header>
-        
-        <div class="csv-list">
-            <h3>📂 Histórico de Arquivos CSV</h3>
-            <ul>
-                {% for csv in csv_files %}
-                <li><a href="{{ csv }}">📄 {{ csv }}</a></li>
-                {% endfor %}
-            </ul>
-        </div>
-        
-        <div class="legend">
-            <div class="legend-item">
-                <div class="legend-color legend-current"></div>
-                <span>Hora Atual</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-past"></div>
-                <span>Passado (24h)</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-future"></div>
-                <span>Futuro (24h)</span>
-            </div>
-        </div>
-        
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        {% for col in columns %}
-                        <th>{{ col }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in rows %}
-                    <tr class="{{ row.row_class }}">
-                        {% for val in row.cells %}
-                        <td>{{ val }}</td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        
-        <footer>
-            <p>Dados obtidos via <a href="https://open-meteo.com/" style="color: #00d4ff;">Open-Meteo API</a></p>
-            <p>Atualização automática a cada hora</p>
-        </footer>
-    </div>
-</body>
-</html>
-    """
+    # Preparar dados para gráficos (amostrar a cada 4 pontos = 1h para reduzir dados)
+    df_chart = df.iloc[::4].reset_index(drop=True)
+    chart_current_idx = len(df_chart[df_chart['time_dt'] <= agora_naive]) - 1
     
-    # Preparar dados para o template
+    # Fator de conversão km/h para knots
+    KMH_TO_KNOTS = 0.539957
+    
+    # Preparar JSON para Chart.js
+    def safe_list(series):
+        return [round(float(x), 2) if pd.notna(x) else None for x in series]
+    
+    def safe_list_knots(series):
+        """Converte km/h para knots"""
+        return [round(float(x) * KMH_TO_KNOTS, 1) if pd.notna(x) else None for x in series]
+    
+    chart_data = {
+        'time': df_chart['time'].str.replace('T', ' ').str[:16].tolist(),
+        # Ondas (Marine API - único modelo)
+        'wave_height': safe_list(df_chart.get('wave_height', pd.Series())),
+        'wave_direction': safe_list(df_chart.get('wave_direction', pd.Series())),
+        'wave_period': safe_list(df_chart.get('wave_period', pd.Series())),
+        'swell_height': safe_list(df_chart.get('swell_wave_height', pd.Series())),
+        'swell_direction': safe_list(df_chart.get('swell_wave_direction', pd.Series())),
+        'swell_period': safe_list(df_chart.get('swell_wave_period', pd.Series())),
+        'swell_peak_period': safe_list(df_chart.get('swell_wave_peak_period', pd.Series())),
+        'wind_wave_height': safe_list(df_chart.get('wind_wave_height', pd.Series())),
+        'wind_wave_direction': safe_list(df_chart.get('wind_wave_direction', pd.Series())),
+        'wind_wave_period': safe_list(df_chart.get('wind_wave_period', pd.Series())),
+
+        # Instabilidade/Severidade
+        'cape': safe_list(df_chart.get('cape_best_match', pd.Series())),
+        'lifted_index': safe_list(df_chart.get('lifted_index_best_match', pd.Series())),
+        'cin': safe_list(df_chart.get('convective_inhibition_best_match', pd.Series())),
+        'lightning': safe_list(df_chart.get('lightning_potential_best_match', pd.Series())),
+        'sunshine': safe_list(df_chart.get('sunshine_duration_best_match', pd.Series())),
+        'visibility': safe_list(df_chart.get('visibility_best_match', pd.Series())),
+
+        # Radiação
+        'shortwave': safe_list(df_chart.get('shortwave_radiation_best_match', pd.Series())),
+        'direct_rad': safe_list(df_chart.get('direct_radiation_best_match', pd.Series())),
+        'diffuse_rad': safe_list(df_chart.get('diffuse_radiation_best_match', pd.Series())),
+        'dni': safe_list(df_chart.get('direct_normal_irradiance_best_match', pd.Series())),
+        'gti': safe_list(df_chart.get('global_tilted_irradiance_best_match', pd.Series())),
+        'terrestrial_rad': safe_list(df_chart.get('terrestrial_radiation_best_match', pd.Series())),
+        
+        # Cobertura de Nuvens
+        'cloud_cover': safe_list(df_chart.get('cloud_cover_best_match', pd.Series())),
+        'cloud_cover_low': safe_list(df_chart.get('cloud_cover_low_best_match', pd.Series())),
+        'cloud_cover_mid': safe_list(df_chart.get('cloud_cover_mid_best_match', pd.Series())),
+        'cloud_cover_high': safe_list(df_chart.get('cloud_cover_high_best_match', pd.Series())),
+        
+        # Umidade e Precipitação
+        'humidity': safe_list(df_chart.get('relative_humidity_2m_best_match', pd.Series())),
+        'dew_point': safe_list(df_chart.get('dew_point_2m_best_match', pd.Series())),
+        'apparent_temp': safe_list(df_chart.get('apparent_temperature_best_match', pd.Series())),
+        'precipitation': safe_list(df_chart.get('precipitation_best_match', pd.Series())),
+        'rain': safe_list(df_chart.get('rain_best_match', pd.Series())),
+        'snowfall': safe_list(df_chart.get('snowfall_best_match', pd.Series())),
+        'snow_depth': safe_list(df_chart.get('snow_depth_best_match', pd.Series())),
+        'evapotranspiration': safe_list(df_chart.get('evapotranspiration_best_match', pd.Series())),
+        
+        # Pressão de Superfície
+        'surface_pressure': safe_list(df_chart.get('surface_pressure_best_match', pd.Series())),
+        
+        # Vento 80m
+        'wind_speed_80m': safe_list_knots(df_chart.get('wind_speed_80m_best_match', pd.Series())),
+        'wind_dir_80m': safe_list(df_chart.get('wind_direction_80m_best_match', pd.Series())),
+        
+        # Weather Code
+        'weather_code': safe_list(df_chart.get('weather_code_best_match', pd.Series())),
+        
+        # Velocidade do Vento - TODOS OS MODELOS (em KNOTS)
+        'wind_speed_ecmwf': safe_list_knots(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
+        'wind_speed_icon': safe_list_knots(df_chart.get('wind_speed_10m_icon_seamless', pd.Series())),
+        'wind_speed_gfs': safe_list_knots(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
+        'wind_speed_meteofrance': safe_list_knots(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
+        'wind_speed_jma': safe_list_knots(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
+        
+        # Direção do Vento - TODOS OS MODELOS
+        'wind_dir_ecmwf': safe_list(df_chart.get('wind_direction_10m_ecmwf_ifs025', pd.Series())),
+        'wind_dir_icon': safe_list(df_chart.get('wind_direction_10m_icon_seamless', pd.Series())),
+        'wind_dir_gfs': safe_list(df_chart.get('wind_direction_10m_gfs_seamless', pd.Series())),
+        'wind_dir_meteofrance': safe_list(df_chart.get('wind_direction_10m_meteofrance_seamless', pd.Series())),
+        'wind_dir_jma': safe_list(df_chart.get('wind_direction_10m_jma_seamless', pd.Series())),
+        
+        # Rajadas - TODOS OS MODELOS (em KNOTS)
+        'wind_gusts_ecmwf': safe_list_knots(df_chart.get('wind_gusts_10m_ecmwf_ifs025', pd.Series())),
+        'wind_gusts_icon': safe_list_knots(df_chart.get('wind_gusts_10m_icon_seamless', pd.Series())),
+        'wind_gusts_gfs': safe_list_knots(df_chart.get('wind_gusts_10m_gfs_seamless', pd.Series())),
+        'wind_gusts_meteofrance': safe_list_knots(df_chart.get('wind_gusts_10m_meteofrance_seamless', pd.Series())),
+        'wind_gusts_jma': safe_list_knots(df_chart.get('wind_gusts_10m_jma_seamless', pd.Series())),
+        
+        # Temperatura - TODOS OS MODELOS
+        'temp_ecmwf': safe_list(df_chart.get('temperature_2m_ecmwf_ifs025', pd.Series())),
+        'temp_icon': safe_list(df_chart.get('temperature_2m_icon_seamless', pd.Series())),
+        'temp_gfs': safe_list(df_chart.get('temperature_2m_gfs_seamless', pd.Series())),
+        'temp_meteofrance': safe_list(df_chart.get('temperature_2m_meteofrance_seamless', pd.Series())),
+        'temp_jma': safe_list(df_chart.get('temperature_2m_jma_seamless', pd.Series())),
+        
+        # Pressão - TODOS OS MODELOS
+        'pressure_ecmwf': safe_list(df_chart.get('pressure_msl_ecmwf_ifs025', pd.Series())),
+        'pressure_icon': safe_list(df_chart.get('pressure_msl_icon_seamless', pd.Series())),
+        'pressure_gfs': safe_list(df_chart.get('pressure_msl_gfs_seamless', pd.Series())),
+        'pressure_meteofrance': safe_list(df_chart.get('pressure_msl_meteofrance_seamless', pd.Series())),
+        'pressure_jma': safe_list(df_chart.get('pressure_msl_jma_seamless', pd.Series())),
+        
+        # Aliases para compatibilidade (em KNOTS)
+        'wind_speed': safe_list_knots(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
+        'wind_gusts': safe_list_knots(df_chart.get('wind_gusts_10m_ecmwf_ifs025', pd.Series())),
+        'wind_direction': safe_list(df_chart.get('wind_direction_10m_ecmwf_ifs025', pd.Series())),
+        'wind_ecmwf': safe_list_knots(df_chart.get('wind_speed_10m_ecmwf_ifs025', pd.Series())),
+        'wind_icon': safe_list_knots(df_chart.get('wind_speed_10m_icon_seamless', pd.Series())),
+        'wind_gfs': safe_list_knots(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
+        'wind_meteofrance': safe_list_knots(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
+        'wind_jma': safe_list_knots(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
+    }
+    
+    # Valores atuais
+    current_wave_height = get_safe_value(df, 'wave_height', current_idx, 0)
+    current_wave_direction = get_safe_value(df, 'wave_direction', current_idx, 0)
+    current_wave_period = get_safe_value(df, 'wave_period', current_idx, 0)
+    current_swell_height = get_safe_value(df, 'swell_wave_height', current_idx, 0)
+    current_swell_direction = get_safe_value(df, 'swell_wave_direction', current_idx, 0)
+    current_swell_period = get_safe_value(df, 'swell_wave_period', current_idx, 0)
+    current_wind_wave_height = get_safe_value(df, 'wind_wave_height', current_idx, 0)
+    current_wind_wave_direction = get_safe_value(df, 'wind_wave_direction', current_idx, 0)
+    
+    # Fator de conversão para knots
+    KMH_TO_KT = 0.539957
+    
+    current_wind_speed = round(get_safe_value(df, 'wind_speed_10m_ecmwf_ifs025', current_idx, 0) * KMH_TO_KT, 1)
+    current_wind_gusts = round(get_safe_value(df, 'wind_gusts_10m_ecmwf_ifs025', current_idx, 0) * KMH_TO_KT, 1)
+    current_wind_direction = get_safe_value(df, 'wind_direction_10m_ecmwf_ifs025', current_idx, 0)
+    current_temperature = get_safe_value(df, 'temperature_2m_ecmwf_ifs025', current_idx, 0)
+    current_pressure = get_safe_value(df, 'pressure_msl_ecmwf_ifs025', current_idx, 0)
+    current_apparent_temp = get_safe_value(df, 'apparent_temperature_best_match', current_idx, current_temperature)
+
+    # Valores atuais (instabilidade / radiação)
+    current_cape = get_safe_value(df, 'cape_best_match', current_idx, None)
+    current_lifted_index = get_safe_value(df, 'lifted_index_best_match', current_idx, None)
+    current_cin = get_safe_value(df, 'convective_inhibition_best_match', current_idx, None)
+    current_lightning = get_safe_value(df, 'lightning_potential_best_match', current_idx, None)
+    current_dni = get_safe_value(df, 'direct_normal_irradiance_best_match', current_idx, None)
+    current_shortwave = get_safe_value(df, 'shortwave_radiation_best_match', current_idx, None)
+    
+    # Valores por modelo (em KNOTS)
+    wind_ecmwf = round(get_safe_value(df, 'wind_speed_10m_ecmwf_ifs025', current_idx, 0) * KMH_TO_KT, 1)
+    wind_icon = round(get_safe_value(df, 'wind_speed_10m_icon_seamless', current_idx, 0) * KMH_TO_KT, 1)
+    wind_gfs = round(get_safe_value(df, 'wind_speed_10m_gfs_seamless', current_idx, 0) * KMH_TO_KT, 1)
+    wind_meteofrance = round(get_safe_value(df, 'wind_speed_10m_meteofrance_seamless', current_idx, 0) * KMH_TO_KT, 1)
+    wind_jma = round(get_safe_value(df, 'wind_speed_10m_jma_seamless', current_idx, 0) * KMH_TO_KT, 1)
+    
+    # Calcular tendências (comparar com 1h atrás) - em KNOTS
+    prev_idx = max(0, current_idx - 4)
+    prev_wave = get_safe_value(df, 'wave_height', prev_idx, current_wave_height)
+    prev_wind = get_safe_value(df, 'wind_speed_10m_ecmwf_ifs025', prev_idx, 0) * KMH_TO_KT
+
+    wave_diff = current_wave_height - prev_wave
+    wind_diff = current_wind_speed - prev_wind
+    
+    if wave_diff > 0.1:
+        wave_trend_class, wave_trend_icon, wave_trend_text = 'trend-up', '↑', f'+{wave_diff:.1f}m'
+    elif wave_diff < -0.1:
+        wave_trend_class, wave_trend_icon, wave_trend_text = 'trend-down', '↓', f'{wave_diff:.1f}m'
+    else:
+        wave_trend_class, wave_trend_icon, wave_trend_text = 'trend-stable', '→', 'Estável'
+    
+    if wind_diff > 1:  # 1 kt threshold
+        wind_trend_class, wind_trend_icon, wind_trend_text = 'trend-up', '↑', f'+{wind_diff:.1f}kt'
+    elif wind_diff < -1:
+        wind_trend_class, wind_trend_icon, wind_trend_text = 'trend-down', '↓', f'{wind_diff:.1f}kt'
+    else:
+        wind_trend_class, wind_trend_icon, wind_trend_text = 'trend-stable', '→', 'Estável'
+    
+    wind_direction_text = get_wind_direction_text(current_wind_direction)
+    
+    # Preparar linhas da tabela
     columns = list(main_cols)
     rows = []
-    
     agora_str = agora.strftime("%Y-%m-%dT%H:%M")
     
-    for _, row in df_display.iterrows():
+    for idx, row in df_display.iterrows():
         time_str = row['time']
         is_current = row['is_current']
         
-        # Determinar classe da linha
         if is_current:
             row_class = 'current-row'
         elif time_str < agora_str:
@@ -661,7 +674,16 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None):
         
         rows.append({'row_class': row_class, 'cells': values})
     
-    # Extrair apenas o nome do arquivo CSV
+    # Carregar template
+    template_path = os.path.join(os.path.dirname(__file__), 'templates', 'dashboard.html')
+    
+    if os.path.exists(template_path):
+        with open(template_path, 'r', encoding='utf-8') as f:
+            html_template = f.read()
+    else:
+        # Fallback para template inline simples
+        html_template = get_fallback_template()
+    
     csv_basename = os.path.basename(csv_filename) if csv_filename else ""
     
     template = Template(html_template)
@@ -669,12 +691,52 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None):
         lat=lat,
         lon=lon,
         timezone=timezone,
-        total_rows=len(df),
+        current_time=agora.strftime("%H:%M"),
         update_time=agora.strftime("%Y-%m-%d %H:%M:%S"),
         csv_filename=csv_basename,
         csv_files=csv_files,
         columns=columns,
-        rows=rows
+        rows=rows,
+        chart_data_json=json.dumps(chart_data),
+        current_time_index=chart_current_idx,
+        # Valores atuais
+        current_wave_height=current_wave_height,
+        current_wave_direction=int(current_wave_direction),
+        current_wave_period=current_wave_period,
+        current_swell_height=current_swell_height,
+        current_swell_direction=int(current_swell_direction),
+        current_swell_period=current_swell_period,
+        current_wind_wave_height=current_wind_wave_height,
+        current_wind_wave_direction=int(current_wind_wave_direction),
+        current_wind_speed=current_wind_speed,
+        current_wind_gusts=current_wind_gusts,
+        current_wind_direction=int(current_wind_direction),
+        current_temperature=current_temperature,
+        current_pressure=current_pressure,
+        current_apparent_temp=current_apparent_temp,
+        current_cape=current_cape,
+        current_lifted_index=current_lifted_index,
+        current_cin=current_cin,
+        current_lightning=current_lightning,
+        current_dni=current_dni,
+        current_shortwave=current_shortwave,
+        wind_direction_text=wind_direction_text,
+        # Tendências
+        wave_trend_class=wave_trend_class,
+        wave_trend_icon=wave_trend_icon,
+        wave_trend_text=wave_trend_text,
+        wind_trend_class=wind_trend_class,
+        wind_trend_icon=wind_trend_icon,
+        wind_trend_text=wind_trend_text,
+        # Modelos
+        wind_ecmwf=wind_ecmwf,
+        wind_icon=wind_icon,
+        wind_gfs=wind_gfs,
+        wind_meteofrance=wind_meteofrance,
+        wind_jma=wind_jma,
+        # CPTEC/INPE
+        cptec_data=dados_cptec,
+        cptec_json=json.dumps(dados_cptec) if dados_cptec else 'null',
     )
     
     # Salvar HTML
@@ -686,6 +748,41 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None):
         f.write(html_content)
     
     return html_file
+
+
+def get_fallback_template():
+    """Template HTML de fallback caso o arquivo não exista."""
+    return """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Weather Monitor</title>
+    <meta http-equiv="refresh" content="900">
+    <style>
+        body { font-family: Arial; background: #1a1a2e; color: #e0e0e0; padding: 20px; }
+        h1 { color: #00d4ff; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #00d4ff; color: #1a1a2e; padding: 10px; }
+        td { padding: 8px; border-bottom: 1px solid #333; }
+        .current-row { background: rgba(255,107,107,0.4); }
+        .past-row { opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <h1>🌊 Weather Monitor - {{ lat }}, {{ lon }}</h1>
+    <p>Atualizado: {{ update_time }}</p>
+    <table>
+        <thead><tr>{% for col in columns %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+        <tbody>
+            {% for row in rows %}
+            <tr class="{{ row.row_class }}">{% for val in row.cells %}<td>{{ val }}</td>{% endfor %}</tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
+"""
 
 
 def parse_args():
@@ -710,6 +807,9 @@ def parse_args():
     parser.add_argument(
         "--html", action="store_true", help="Gerar arquivo HTML com visualização"
     )
+    parser.add_argument(
+        "--cidade", type=str, default=None, help="Cidade para buscar dados CPTEC/INPE (Brasil)"
+    )
     return parser.parse_args()
 
 
@@ -723,6 +823,7 @@ if __name__ == "__main__":
         args.days,
         args.past_hours,
         args.future_hours,
-        args.html
+        args.html,
+        args.cidade
     )
     raise SystemExit(exit_code)
