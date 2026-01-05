@@ -722,6 +722,22 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
     wind_meteofrance = round(get_safe_value(df, 'wind_speed_10m_meteofrance_seamless', current_idx, 0) * KMH_TO_KT, 1)
     wind_jma = round(get_safe_value(df, 'wind_speed_10m_jma_seamless', current_idx, 0) * KMH_TO_KT, 1)
     
+    # Média de velocidades (média aritmética simples)
+    wind_speeds = [wind_ecmwf, wind_icon, wind_gfs, wind_meteofrance, wind_jma]
+    wind_media = round(sum(wind_speeds) / len(wind_speeds), 1)
+    
+    # Direções por modelo (para média circular)
+    wind_dir_ecmwf = get_safe_value(df, 'wind_direction_10m_ecmwf_ifs025', current_idx, 0)
+    wind_dir_icon = get_safe_value(df, 'wind_direction_10m_icon_seamless', current_idx, 0)
+    wind_dir_gfs = get_safe_value(df, 'wind_direction_10m_gfs_seamless', current_idx, 0)
+    wind_dir_meteofrance = get_safe_value(df, 'wind_direction_10m_meteofrance_seamless', current_idx, 0)
+    wind_dir_jma = get_safe_value(df, 'wind_direction_10m_jma_seamless', current_idx, 0)
+    
+    # Média circular das direções (ponderada pelas velocidades)
+    wind_directions = [wind_dir_ecmwf, wind_dir_icon, wind_dir_gfs, wind_dir_meteofrance, wind_dir_jma]
+    wind_dir_media = media_circular_ponderada(wind_directions, wind_speeds)
+    wind_dir_media_text = get_wind_direction_text(wind_dir_media)
+    
     # Calcular tendências (comparar com 1h atrás) - em KNOTS
     prev_idx = max(0, current_idx - 4)
     prev_wave = get_safe_value(df, 'wave_height', prev_idx, current_wave_height)
@@ -834,6 +850,14 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
         wind_gfs=wind_gfs,
         wind_meteofrance=wind_meteofrance,
         wind_jma=wind_jma,
+        wind_media=wind_media,
+        wind_dir_ecmwf=int(wind_dir_ecmwf),
+        wind_dir_icon=int(wind_dir_icon),
+        wind_dir_gfs=int(wind_dir_gfs),
+        wind_dir_meteofrance=int(wind_dir_meteofrance),
+        wind_dir_jma=int(wind_dir_jma),
+        wind_dir_media=int(wind_dir_media),
+        wind_dir_media_text=wind_dir_media_text,
         # CPTEC/INPE
         cptec_data=dados_cptec,
         cptec_json=json.dumps(dados_cptec) if dados_cptec else 'null',
