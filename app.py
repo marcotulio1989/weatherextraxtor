@@ -14,6 +14,7 @@ import argparse
 import pytz
 import time
 import json
+import math
 from jinja2 import Template, Environment, FileSystemLoader
 
 # Import CPTEC/INPE extractor
@@ -23,6 +24,80 @@ try:
 except ImportError:
     CPTEC_AVAILABLE = False
     CONDICOES_CPTEC = {}
+
+
+# --------------------------------------------------------------------------
+# FUNÇÕES DE MÉDIA CIRCULAR (para direções em graus)
+# --------------------------------------------------------------------------
+
+def media_circular(angulos):
+    """
+    Calcula a média circular de ângulos (em graus).
+    Resolve o problema de ângulos próximos a 0°/360°.
+    Ex: media_circular([1, 359]) = 0° (não 180°)
+    
+    Args:
+        angulos: Lista de ângulos em graus (0-360)
+    
+    Returns:
+        Média circular em graus (0-360) ou None se lista vazia
+    """
+    # Filtrar valores válidos
+    angulos_validos = [a for a in angulos if a is not None and not pd.isna(a)]
+    
+    if not angulos_validos:
+        return None
+    
+    # Converter para radianos e decompor em X e Y
+    x_sum = sum(math.cos(math.radians(a)) for a in angulos_validos)
+    y_sum = sum(math.sin(math.radians(a)) for a in angulos_validos)
+    
+    # Média dos componentes
+    n = len(angulos_validos)
+    x_mean = x_sum / n
+    y_mean = y_sum / n
+    
+    # Converter de volta para ângulo
+    media_rad = math.atan2(y_mean, x_mean)
+    media_graus = math.degrees(media_rad)
+    
+    # Garantir resultado entre 0 e 360
+    if media_graus < 0:
+        media_graus += 360
+    
+    return round(media_graus, 1)
+
+
+def media_circular_ponderada(angulos, pesos):
+    """
+    Calcula a média circular ponderada de ângulos.
+    Útil para ponderar direção pelo valor de velocidade.
+    
+    Args:
+        angulos: Lista de ângulos em graus
+        pesos: Lista de pesos (ex: velocidades)
+    
+    Returns:
+        Média circular ponderada em graus (0-360)
+    """
+    if not angulos or not pesos:
+        return None
+    
+    # Filtrar pares válidos
+    pares_validos = [(a, p) for a, p in zip(angulos, pesos) 
+                     if a is not None and p is not None 
+                     and not pd.isna(a) and not pd.isna(p)]
+    
+    if not pares_validos:
+        return None
+    
+    x_sum = sum(p * math.cos(math.radians(a)) for a, p in pares_validos)
+    y_sum = sum(p * math.sin(math.radians(a)) for a, p in pares_validos)
+    
+    media_rad = math.atan2(y_sum, x_sum)
+    media_graus = math.degrees(media_rad)
+    
+    return round((media_graus + 360) % 360, 1)
 
 
 # --------------------------------------------------------------------------
@@ -579,6 +654,37 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
         'wind_gfs': safe_list(df_chart.get('wind_speed_10m_gfs_seamless', pd.Series())),
         'wind_meteofrance': safe_list(df_chart.get('wind_speed_10m_meteofrance_seamless', pd.Series())),
         'wind_jma': safe_list(df_chart.get('wind_speed_10m_jma_seamless', pd.Series())),
+    }
+    
+    # -------------------------------------------------------------------------
+    # CALCULAR MÉDIAS CIRCULARES para direções (resolve problema 0°/360°)
+    # -------------------------------------------------------------------------
+    def calc_media_circular_series(df, colunas):
+        """Calcula média circular para cada linha do DataFrame."""
+        result = []
+        for idx in range(len(df)):
+            angulos = []
+            for col in colunas:
+                if col in df.columns:
+                    val = df[col].iloc[idx]
+                    if pd.notna(val):
+                        angulos.append(float(val))
+            result.append(media_circular(angulos) if angulos else None)
+        return result
+    
+    # Média circular da direção do vento entre todos os modelos
+    wind_dir_cols = [
+        'wind_direction_10m_ecmwf_ifs025', 'wind_direction_10m_icon_seamless',
+        'wind_direction_10m_gfs_seamless', 'wind_direction_10m_meteofrance_seamless',
+        'wind_direction_10m_jma_seamless'
+    ]
+    chart_data['wind_dir_media_circular'] = calc_media_circular_series(df_chart, wind_dir_cols)
+    
+    # Adicionar também no formato JSON para o frontend usar
+    chart_data['media_circular_info'] = {
+        'wind_dir': 'Média circular da direção do vento (5 modelos)',
+        'wave_dir': 'Direção da onda (único modelo)',
+        'swell_dir': 'Direção do swell (único modelo)',
     }
     
     # Valores atuais
