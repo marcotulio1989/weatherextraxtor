@@ -545,8 +545,8 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
     df_display = df[main_cols].copy()
     df_display['is_current'] = df_display['time'].str.startswith(hora_atual_str)
     
-    # Preparar dados para gráficos (amostrar a cada 4 pontos = 1h para reduzir dados)
-    df_chart = df.iloc[::4].reset_index(drop=True)
+    # Preparar dados para gráficos - TODOS OS PONTOS DE 15 MIN
+    df_chart = df.reset_index(drop=True)
     chart_current_idx = len(df_chart[df_chart['time_dt'] <= agora_naive]) - 1
     
     # Preparar JSON para Chart.js
