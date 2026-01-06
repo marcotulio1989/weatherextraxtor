@@ -702,18 +702,19 @@
     }
     
     // Configuração dos satélites GOES (direto da NOAA)
+    // Bounds calculados com aspect ratio correto (7200x4320 = 1.667)
+    // Imagem cobre: lat -60° a 15° (75°), lon ajustado para aspect ratio
     const SATELLITE_CONFIG = {
         goes19: {
             name: 'GOES-19',
-            // Setor SSA (South America) - bounds aproximados da projeção
             url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg',
-            // Bounds do setor SSA (South South America)
-            bounds: [[-60.0, -110.0], [15.0, -25.0]]
+            // Bounds corrigidos para aspect ratio 1.667
+            bounds: [[-60.0, -130.0], [15.0, -5.0]]
         },
         goes16: {
             name: 'GOES-16',
             url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
-            bounds: [[-60.0, -110.0], [15.0, -25.0]]
+            bounds: [[-60.0, -130.0], [15.0, -5.0]]
         }
     };
     
