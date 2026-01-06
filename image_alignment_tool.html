@@ -606,14 +606,22 @@
             updatePointPositions();
         }
 
-        // ===== ARRASTAR IMAGEM =====
+        // ===== ARRASTAR IMAGEM (PAN) =====
         function setupImageDrag() {
             const area = document.getElementById('imageArea');
             
             area.addEventListener('mousedown', function(e) {
+                // Não arrastar se clicar em ponto GCP ou marcador de medição
                 if (e.target.classList.contains('image-point')) return;
-                if (gcpMode) return;
+                if (e.target.classList.contains('measure-marker')) return;
                 
+                // Não arrastar se estiver em modo GCP ou medição
+                if (gcpMode || measureMode) return;
+                
+                // Só arrasta com botão esquerdo
+                if (e.button !== 0) return;
+                
+                e.preventDefault();
                 isDragging = true;
                 dragTarget = 'image';
                 dragOffset = {
@@ -636,10 +644,21 @@
             });
 
             document.addEventListener('mouseup', function() {
-                isDragging = false;
-                dragTarget = null;
-                document.getElementById('imageArea').style.cursor = gcpMode ? 'crosshair' : 'grab';
+                if (isDragging) {
+                    isDragging = false;
+                    dragTarget = null;
+                    updateCursor();
+                }
             });
+        }
+
+        function updateCursor() {
+            const area = document.getElementById('imageArea');
+            if (gcpMode || measureMode) {
+                area.style.cursor = 'crosshair';
+            } else {
+                area.style.cursor = 'grab';
+            }
         }
 
         // ===== RASTREAR MOUSE =====
@@ -691,7 +710,6 @@
             gcpMode = !gcpMode;
             const btn = document.getElementById('btnGcpMode');
             const instructions = document.getElementById('gcpInstructions');
-            const area = document.getElementById('imageArea');
             
             if (gcpMode) {
                 // Desativar modo medição se estiver ativo
@@ -700,13 +718,12 @@
                 btn.classList.add('gcp-mode-active');
                 btn.innerHTML = '🎯 CLIQUE NA IMAGEM!';
                 instructions.style.display = 'block';
-                area.style.cursor = 'crosshair';
             } else {
                 btn.classList.remove('gcp-mode-active');
                 btn.innerHTML = '🎯 Marcar Ponto na Imagem';
                 instructions.style.display = 'none';
-                area.style.cursor = 'grab';
             }
+            updateCursor();
         }
 
         // ===== FUNÇÕES DE MEDIÇÃO (RANGE & BEARING) =====
@@ -714,7 +731,6 @@
             measureMode = !measureMode;
             const btn = document.getElementById('btnMeasureMode');
             const instructions = document.getElementById('measureInstructions');
-            const area = document.getElementById('imageArea');
             
             if (measureMode) {
                 // Desativar modo GCP se estiver ativo
@@ -726,13 +742,12 @@
                 btn.style.background = '#00b894';
                 btn.innerHTML = '📏 CLIQUE 2 PONTOS NA IMAGEM!';
                 instructions.style.display = 'block';
-                area.style.cursor = 'crosshair';
             } else {
                 btn.style.background = '#6c5ce7';
                 btn.innerHTML = '📏 Medir Distância (Range & Bearing)';
                 instructions.style.display = 'none';
-                area.style.cursor = 'grab';
             }
+            updateCursor();
         }
 
         function clearMeasurePoints() {
