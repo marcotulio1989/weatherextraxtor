@@ -556,7 +556,6 @@
     let map;
     let windDataPoints = [];  // Armazena todos os dados de vento
     let windLayerGroup;
-    let satelliteLayer;
     let gridLayer;
     
     // =========================================================================
@@ -950,60 +949,6 @@
         }
     }
     
-    // =========================================================================
-    // NDBC BUOYS (TEMPO REAL - < 60 MIN)
-    // =========================================================================
-    async function fetchNDBCData() {
-        setStatus('ndbc-status', 'loading');
-        log('info', '🔴 Buscando dados de bóias NDBC (tempo real)...');
-        
-        // Bóias próximas à Bacia de Campos
-        // Infelizmente não há bóias NDBC nesta região, mas vamos verificar
-        // e usar dados disponíveis ou informar ao usuário
-        
-        // Lista de bóias brasileiras e próximas (PNBOIA/CHM)
-        // https://www.marinha.mil.br/chm/dados-do-goos-brasil/pnboia
-        const buoys = [
-            { id: 'PIRATA', name: 'PIRATA (0°N, 35°W)', lat: 0, lon: -35 },
-            { id: 'Santos', name: 'Santos Pilot (24°S, 46°W)', lat: -24, lon: -46 },
-        ];
-        
-        // Tentar buscar dados via Open-Meteo Marine (tempo real)
-        // Isso é mais confiável que NDBC para a costa brasileira
-        try {
-            const url = `https://marine-api.open-meteo.com/v1/marine?` +
-                `latitude=${CONFIG.shipLat}&longitude=${CONFIG.shipLon}&` +
-                `current=wind_wave_height,wind_wave_direction,wind_wave_period,` +
-                `swell_wave_height,swell_wave_direction,swell_wave_period&` +
-                `hourly=wind_wave_height,wind_wave_direction&` +
-                `forecast_days=1`;
-            
-            const response = await fetch(url);
-            const data = await response.json();
-            
-            if (data.current) {
-                log('success', `✅ Dados marinhos em tempo real obtidos`);
-                log('info', `🌊 Onda de vento: ${data.current.wind_wave_height?.toFixed(1) || '--'}m`);
-                log('info', `🌊 Swell: ${data.current.swell_wave_height?.toFixed(1) || '--'}m`);
-                setStatus('ndbc-status', 'active');
-            } else {
-                log('warning', 'Sem dados marinhos disponíveis');
-                setStatus('ndbc-status', 'error');
-            }
-            
-            // Para vento em tempo real, usar Open-Meteo regular
-            log('info', '🌬️ Obtendo vento em tempo real via Open-Meteo...');
-            await fetchOpenMeteoData();
-            
-        } catch (error) {
-            log('error', `Erro NDBC/Marine: ${error.message}`);
-            setStatus('ndbc-status', 'error');
-        }
-        
-        log('info', '📍 Nota: Bóias NDBC não cobrem a costa brasileira');
-        log('info', '📍 Dados de vento via Open-Meteo (modelos em tempo real)');
-    }
-
     // =========================================================================
     // OPEN-METEO (MULTI-MODELO) COM PESOS DINÂMICOS
     // =========================================================================
@@ -1479,43 +1424,6 @@
         log('info', 'Use: https://search.earthdata.nasa.gov');
         
         setStatus('nasa-status', 'error');
-    }
-    
-    // =========================================================================
-    // BUSCAR DADOS - NDBC BUOYS (TEMPO REAL!)
-    // =========================================================================
-    async function fetchNDBCData() {
-        setStatus('ndbc-status', 'loading');
-        log('info', '📡 Buscando dados de bóias NDBC (tempo real)...');
-        
-        // Bóias próximas à costa brasileira / Atlântico Sul
-        // Infelizmente não há bóias NOAA NDBC na região da Bacia de Campos
-        // Mas podemos usar dados do PNBOIA (INPE/Marinha do Brasil)
-        
-        // Lista de bóias NDBC no Atlântico (as mais próximas disponíveis)
-        const buoys = [
-            // Não há bóias NDBC na costa brasileira
-            // PNBOIA brasileiras não têm API pública em tempo real
-        ];
-        
-        if (buoys.length === 0) {
-            log('warning', '⚠️ Sem bóias NDBC na região da Bacia de Campos');
-            log('info', '📍 Bóias brasileiras (PNBOIA) não têm API pública em tempo real');
-            log('info', '💡 Usando Open-Meteo como alternativa em tempo real');
-            setStatus('ndbc-status', 'error');
-            
-            // Chamar Open-Meteo como fallback
-            await fetchOpenMeteoData();
-            return;
-        }
-        
-        // Se houvesse bóias, buscaríamos assim:
-        // for (const buoyId of buoys) {
-        //     const url = `https://www.ndbc.noaa.gov/data/realtime2/${buoyId}.txt`;
-        //     // Parse dos dados...
-        // }
-        
-        setStatus('ndbc-status', 'active');
     }
     
     // =========================================================================
