@@ -574,8 +574,12 @@
     // =========================================================================
     // CONFIGURAÇÃO
     // =========================================================================
-    // 100 NM = ~185 km = ~1.67 graus
-    const RAIO_NM = 100;  // Raio em milhas náuticas
+    // Raio para visualização do mapa (círculo visual)
+    const RAIO_VISUAL_NM = 100;  // Raio do círculo visual no mapa
+    const RAIO_VISUAL_GRAUS = RAIO_VISUAL_NM / 60;
+    
+    // Raio para busca de dados Open-Meteo (menor para economizar API)
+    const RAIO_NM = 50;  // Raio em milhas náuticas para busca de dados
     const RAIO_GRAUS = RAIO_NM / 60;  // 1 grau = 60 NM
     
     // IMPORTANTE: Idade máxima dos dados em MINUTOS
@@ -635,9 +639,9 @@
             .bindPopup(`<b>${CONFIG.shipName}</b><br>Lat: ${CONFIG.shipLat}<br>Lon: ${CONFIG.shipLon}`)
             .addTo(map);
         
-        // Área de interesse (CÍRCULO)
+        // Área de interesse (CÍRCULO VISUAL - 100 NM)
         L.circle([CONFIG.shipLat, CONFIG.shipLon], {
-            radius: RAIO_NM * 1852,  // Converter NM para metros
+            radius: RAIO_VISUAL_NM * 1852,  // Converter NM para metros
             color: "#00ffcc",
             weight: 1,
             fillOpacity: 0.05,
@@ -653,7 +657,7 @@
         loadSavedCredentials();
         
         log('success', '✅ Mapa inicializado');
-        log('info', `📏 Área: ${CONFIG.latMin.toFixed(2)}° a ${CONFIG.latMax.toFixed(2)}° lat (${RAIO_NM} NM)`);
+        log('info', `📏 Área visual: ${RAIO_VISUAL_NM} NM | Grid dados: ${RAIO_NM} NM`);
         
         // Carregar satélite primeiro (500ms)
         log('info', '🛰️ Iniciando carregamento de satélite...');
@@ -1189,8 +1193,8 @@
             // Atualizar display
             updateModelAverage();
             
-            // Criar grid de pontos para o mapa (usando média ponderada)
-            await fetchGridPoints();
+            // Adicionar ponto único do modelo médio no centro do mapa
+            addModelAveragePoint();
             
             updateWindDisplay();
             setStatus('openmeteo-status', 'active');

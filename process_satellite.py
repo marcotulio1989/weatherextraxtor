@@ -25,15 +25,20 @@ SHIP_LAT = -22.50
 SHIP_LON = -40.50
 RADIUS_NM = 100  # Milhas náuticas
 
-# Converter NM para graus (1 grau ≈ 60 NM)
-RADIUS_DEG = RADIUS_NM / 60
+# Converter NM para graus
+# 1 grau de latitude ≈ 60 NM (constante)
+# 1 grau de longitude ≈ 60 NM * cos(latitude) (varia com a latitude)
+import math
+RADIUS_LAT_DEG = RADIUS_NM / 60  # Raio em graus de latitude
+RADIUS_LON_DEG = RADIUS_NM / (60 * math.cos(math.radians(SHIP_LAT)))  # Raio em graus de longitude
 
 # Diretório de saída
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'docs')
 
 print(f"🛰️ Satellite Processor (Multi-Satellite)")
 print(f"📍 Navio: {SHIP_LAT}°, {SHIP_LON}°")
-print(f"📏 Raio: {RADIUS_NM} NM ({RADIUS_DEG:.2f}°)")
+print(f"📏 Raio: {RADIUS_NM} NM")
+print(f"📏 Raio Lat: {RADIUS_LAT_DEG:.2f}° | Lon: {RADIUS_LON_DEG:.2f}°")
 
 # =========================================================================
 # CONFIGURAÇÃO DOS SATÉLITES
@@ -168,19 +173,19 @@ def is_point_in_circle(x, y, center_x, center_y, radius):
     return (dx * dx + dy * dy) <= (radius * radius)
 
 
-def extract_region(image_data, center_lat, center_lon, radius_deg, output_size=512):
-    """Extrai região centrada no navio."""
+def extract_region(image_data, center_lat, center_lon, output_size=512):
+    """Extrai região circular centrada no navio (corrigida para projeção)."""
     try:
         img = Image.open(BytesIO(image_data))
         img_width, img_height = img.size
         print(f"📐 Imagem original: {img_width}x{img_height}")
         
-        # Bounds da região de interesse
+        # Bounds da região de interesse (usando raios corrigidos)
         roi_bounds = {
-            "lat_min": center_lat - radius_deg,
-            "lat_max": center_lat + radius_deg,
-            "lon_min": center_lon - radius_deg,
-            "lon_max": center_lon + radius_deg,
+            "lat_min": center_lat - RADIUS_LAT_DEG,
+            "lat_max": center_lat + RADIUS_LAT_DEG,
+            "lon_min": center_lon - RADIUS_LON_DEG,
+            "lon_max": center_lon + RADIUS_LON_DEG,
         }
         
         # Converter corners para pixels
@@ -202,7 +207,7 @@ def extract_region(image_data, center_lat, center_lon, radius_deg, output_size=5
         cropped = img.crop((x1, y1, x2, y2))
         print(f"✂️ Recortado: {cropped.size}")
         
-        # Redimensionar
+        # Redimensionar para quadrado (vai ficar circular depois)
         resized = cropped.resize((output_size, output_size), Image.Resampling.LANCZOS)
         
         # Aplicar máscara circular
@@ -277,7 +282,6 @@ def process_satellite(sat_id):
         raw_data, 
         SHIP_LAT, 
         SHIP_LON, 
-        RADIUS_DEG,
         output_size=512
     )
     
