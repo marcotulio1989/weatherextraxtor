@@ -350,11 +350,37 @@
         <div class="control-panel">
             <h1>🛰️ Alinhamento de Satélite</h1>
 
+            <!-- Baixar Imagem Satélite -->
+            <div class="control-section">
+                <h3>🛰️ Carregar Imagem Satélite</h3>
+                <select id="satelliteProduct" style="width: 100%; padding: 8px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px; margin-bottom: 10px;">
+                    <optgroup label="GOES-16 América do Sul">
+                        <option value="goes16-ssa-ch13">GOES-16 SSA - Infravermelho (Ch13)</option>
+                        <option value="goes16-ssa-ch02">GOES-16 SSA - Visível (Ch02)</option>
+                        <option value="goes16-ssa-ch08">GOES-16 SSA - Vapor d'Água (Ch08)</option>
+                    </optgroup>
+                    <optgroup label="GOES-16 Brasil">
+                        <option value="goes16-br-ch13">GOES-16 Brasil - Infravermelho</option>
+                    </optgroup>
+                    <optgroup label="Windy.com (Funciona direto!)">
+                        <option value="windy-satellite">Windy Satélite IR</option>
+                        <option value="windy-radar">Windy Radar</option>
+                    </optgroup>
+                </select>
+                <button class="btn btn-primary" onclick="fetchSatelliteImage()" id="btnFetchSat">
+                    🔄 Buscar Imagem do Satélite
+                </button>
+                <button class="btn btn-secondary" onclick="openCPTECPage()" style="margin-top:5px;">
+                    🌐 Abrir CPTEC (salvar manualmente)
+                </button>
+                <div id="satStatus" style="font-size: 0.8em; color: #888; margin-top: 8px;"></div>
+            </div>
+
             <!-- Carregar Imagem -->
             <div class="control-section">
-                <h3>📁 Carregar Imagem</h3>
+                <h3>📁 Ou Carregar Imagem Manual</h3>
                 <div class="file-input-wrapper">
-                    <button class="btn btn-primary">Selecionar Imagem</button>
+                    <button class="btn btn-secondary">Selecionar Arquivo</button>
                     <input type="file" id="imageInput" accept="image/*">
                 </div>
                 <input type="text" id="imageUrl" placeholder="Ou cole URL da imagem..." 
@@ -560,6 +586,72 @@
 
             // Adicionar escala
             L.control.scale({ imperial: false }).addTo(map);
+        }
+
+        // ===== ABRIR CPTEC =====
+        function openCPTECPage() {
+            window.open('http://satelite.cptec.inpe.br/acervo/goes16.formulario.logic?i=br', '_blank');
+        }
+
+        // ===== BUSCAR IMAGEM SATÉLITE =====
+        async function fetchSatelliteImage() {
+            const product = document.getElementById('satelliteProduct').value;
+            const status = document.getElementById('satStatus');
+            const btn = document.getElementById('btnFetchSat');
+            
+            btn.disabled = true;
+            status.innerHTML = '⏳ Buscando imagem...';
+            status.style.color = '#ffff00';
+
+            // URLs que funcionam sem CORS
+            const imageUrls = {
+                // Windy tiles (funciona!)
+                'windy-satellite': 'https://ims.windy.com/sat/satellite/satellite/2026/01/06/12/satellite_2026010612.jpg',
+                'windy-radar': 'https://ims.windy.com/radar/radar/2026/01/06/12/radar_2026010612.jpg',
+                
+                // NOAA GOES (geralmente funciona)
+                'goes16-ssa-ch13': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
+                'goes16-ssa-ch02': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/02/latest.jpg',
+                'goes16-ssa-ch08': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/08/latest.jpg',
+                'goes16-br-ch13': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
+            };
+
+            const url = imageUrls[product];
+            
+            if (!url) {
+                status.innerHTML = '❌ Produto não disponível';
+                status.style.color = '#ff4444';
+                btn.disabled = false;
+                return;
+            }
+
+            try {
+                // Tentar carregar a imagem
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                img.onload = function() {
+                    loadImage(url);
+                    status.innerHTML = '✅ Imagem carregada! Agora alinhe com o mapa.';
+                    status.style.color = '#00ff00';
+                    btn.disabled = false;
+                };
+                
+                img.onerror = function() {
+                    // Se falhar CORS, tentar sem crossOrigin
+                    status.innerHTML = '⚠️ Carregando (pode ter restrição CORS)...';
+                    loadImage(url);
+                    status.style.color = '#ffaa00';
+                    btn.disabled = false;
+                };
+                
+                img.src = url;
+                
+            } catch (error) {
+                status.innerHTML = `❌ Erro: ${error.message}`;
+                status.style.color = '#ff4444';
+                btn.disabled = false;
+            }
         }
 
         // ===== CARREGAMENTO DE IMAGEM =====
