@@ -333,6 +333,101 @@
             color: #e94560;
             cursor: pointer;
         }
+
+        /* GCP Points styling */
+        .gcp-marker {
+            background: #ff00ff;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            width: 20px !important;
+            height: 20px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+        }
+
+        .gcp-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0a0a15;
+            border-radius: 5px;
+            padding: 10px;
+        }
+
+        .gcp-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: rgba(15, 52, 96, 0.5);
+            border-radius: 5px;
+            font-size: 0.8em;
+        }
+
+        .gcp-item input {
+            width: 70px;
+            padding: 3px;
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            color: #fff;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .gcp-item .gcp-number {
+            background: #ff00ff;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .gcp-item button {
+            background: #e94560;
+            border: none;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .gcp-mode-active {
+            background: linear-gradient(135deg, #ff00ff, #cc00cc) !important;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(255,0,255,0.5); }
+            50% { box-shadow: 0 0 20px rgba(255,0,255,0.8); }
+        }
+
+        .gcp-instructions {
+            font-size: 0.75em;
+            color: #ff00ff;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(255,0,255,0.1);
+            border-radius: 5px;
+            display: none;
+        }
+
+        .gcp-instructions.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -443,6 +538,28 @@
                 </div>
             </div>
 
+            <!-- Pontos de Controle GCP -->
+            <div class="control-section">
+                <h3>📌 Pontos de Referência (GCP)</h3>
+                <button class="btn btn-primary" id="btnGcpMode" onclick="toggleGcpMode()">
+                    🎯 Marcar Pontos no Mapa
+                </button>
+                <div class="gcp-instructions" id="gcpInstructions">
+                    ✨ Clique no mapa para adicionar pontos de referência.<br>
+                    📍 Cada ponto deve corresponder a uma localização conhecida.<br>
+                    🔢 Mínimo 2 pontos para alinhar.
+                </div>
+                <div class="gcp-list" id="gcpList">
+                    <p style="color:#888; font-size:0.85em;">Nenhum ponto marcado ainda</p>
+                </div>
+                <button class="btn btn-success" onclick="alignFromGcpPoints()" style="margin-top:10px;">
+                    ✨ Alinhar Automaticamente
+                </button>
+                <button class="btn btn-secondary" onclick="clearAllGcpPoints()" style="margin-top:5px;">
+                    🗑️ Limpar Todos os Pontos
+                </button>
+            </div>
+
             <!-- Ações -->
             <div class="control-section">
                 <h3>⚡ Ações</h3>
@@ -500,6 +617,11 @@
         let imageBounds = null;
         let originalImageSize = { width: 0, height: 0 };
         let currentImageUrl = null;
+        
+        // GCP (Ground Control Points)
+        let gcpMode = false;
+        let gcpPoints = [];  // Array de {marker, lat, lng, id}
+        let gcpCounter = 0;
         
         // Bounds padrão para América do Sul (aproximado para GOES-16)
         const defaultBounds = {
@@ -1044,6 +1166,196 @@ Lng: ${(data.bounds.east - data.bounds.west).toFixed(2)}°
                 console.log('Alinhamento anterior encontrado no localStorage');
             }
         });
+
+        // ===== GCP (GROUND CONTROL POINTS) =====
+        function toggleGcpMode() {
+            gcpMode = !gcpMode;
+            const btn = document.getElementById('btnGcpMode');
+            const instructions = document.getElementById('gcpInstructions');
+            
+            if (gcpMode) {
+                btn.classList.add('gcp-mode-active');
+                btn.innerHTML = '🎯 MODO ATIVO - Clique no mapa!';
+                instructions.classList.add('active');
+                map.getContainer().style.cursor = 'crosshair';
+                
+                // Adicionar listener de clique
+                map.on('click', onMapClickGcp);
+            } else {
+                btn.classList.remove('gcp-mode-active');
+                btn.innerHTML = '🎯 Marcar Pontos no Mapa';
+                instructions.classList.remove('active');
+                map.getContainer().style.cursor = '';
+                
+                // Remover listener
+                map.off('click', onMapClickGcp);
+            }
+        }
+
+        function onMapClickGcp(e) {
+            if (!gcpMode) return;
+            
+            gcpCounter++;
+            const id = gcpCounter;
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            
+            // Criar marcador
+            const icon = L.divIcon({
+                className: '',
+                html: `<div class="gcp-marker">${id}</div>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+            
+            const marker = L.marker([lat, lng], {
+                icon: icon,
+                draggable: true
+            }).addTo(map);
+            
+            // Atualizar coordenadas quando arrastar
+            marker.on('dragend', function() {
+                const pos = marker.getLatLng();
+                const point = gcpPoints.find(p => p.id === id);
+                if (point) {
+                    point.lat = pos.lat;
+                    point.lng = pos.lng;
+                    updateGcpList();
+                }
+            });
+            
+            // Adicionar ao array
+            gcpPoints.push({ marker, lat, lng, id });
+            
+            // Atualizar lista visual
+            updateGcpList();
+        }
+
+        function updateGcpList() {
+            const listEl = document.getElementById('gcpList');
+            
+            if (gcpPoints.length === 0) {
+                listEl.innerHTML = '<p style="color:#888; font-size:0.85em;">Nenhum ponto marcado ainda</p>';
+                return;
+            }
+            
+            let html = '';
+            gcpPoints.forEach((point, index) => {
+                html += `
+                    <div class="gcp-item" data-id="${point.id}">
+                        <span class="gcp-number">${point.id}</span>
+                        <span style="color:#888;">Lat:</span>
+                        <input type="number" step="0.0001" value="${point.lat.toFixed(4)}" 
+                               onchange="updateGcpCoord(${point.id}, 'lat', this.value)">
+                        <span style="color:#888;">Lng:</span>
+                        <input type="number" step="0.0001" value="${point.lng.toFixed(4)}" 
+                               onchange="updateGcpCoord(${point.id}, 'lng', this.value)">
+                        <button onclick="removeGcpPoint(${point.id})">×</button>
+                    </div>
+                `;
+            });
+            
+            listEl.innerHTML = html;
+        }
+
+        function updateGcpCoord(id, field, value) {
+            const point = gcpPoints.find(p => p.id === id);
+            if (point) {
+                point[field] = parseFloat(value);
+                point.marker.setLatLng([point.lat, point.lng]);
+            }
+        }
+
+        function removeGcpPoint(id) {
+            const index = gcpPoints.findIndex(p => p.id === id);
+            if (index !== -1) {
+                map.removeLayer(gcpPoints[index].marker);
+                gcpPoints.splice(index, 1);
+                updateGcpList();
+            }
+        }
+
+        function clearAllGcpPoints() {
+            gcpPoints.forEach(point => {
+                map.removeLayer(point.marker);
+            });
+            gcpPoints = [];
+            gcpCounter = 0;
+            updateGcpList();
+        }
+
+        function alignFromGcpPoints() {
+            if (gcpPoints.length < 2) {
+                alert('Você precisa de pelo menos 2 pontos de referência para alinhar a imagem!');
+                return;
+            }
+            
+            if (!imageOverlay) {
+                alert('Carregue uma imagem primeiro!');
+                return;
+            }
+            
+            // Calcular bounding box a partir dos pontos GCP
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+            
+            gcpPoints.forEach(point => {
+                minLat = Math.min(minLat, point.lat);
+                maxLat = Math.max(maxLat, point.lat);
+                minLng = Math.min(minLng, point.lng);
+                maxLng = Math.max(maxLng, point.lng);
+            });
+            
+            // Adicionar margem proporcional (10% de cada lado)
+            const latRange = maxLat - minLat;
+            const lngRange = maxLng - minLng;
+            
+            // Se temos só 2 pontos, eles definem os extremos
+            // Se temos mais pontos, usamos eles como área de interesse
+            
+            // Ajustar bounds - calcular proporção da imagem
+            const imageAspect = originalImageSize.width / originalImageSize.height;
+            const currentAspect = lngRange / latRange;
+            
+            let finalNorth, finalSouth, finalEast, finalWest;
+            
+            if (gcpPoints.length === 2) {
+                // Com 2 pontos, assumimos que são cantos opostos (ex: NW e SE)
+                finalNorth = maxLat;
+                finalSouth = minLat;
+                finalEast = maxLng;
+                finalWest = minLng;
+            } else {
+                // Com 3+ pontos, adicionamos margem
+                const marginLat = latRange * 0.1;
+                const marginLng = lngRange * 0.1;
+                
+                finalNorth = maxLat + marginLat;
+                finalSouth = minLat - marginLat;
+                finalEast = maxLng + marginLng;
+                finalWest = minLng - marginLng;
+            }
+            
+            // Aplicar novo bounds
+            imageBounds = L.latLngBounds([finalSouth, finalWest], [finalNorth, finalEast]);
+            imageOverlay.setBounds(imageBounds);
+            
+            // Atualizar markers de canto
+            if (cornerMarkers.tl) cornerMarkers.tl.setLatLng([finalNorth, finalWest]);
+            if (cornerMarkers.tr) cornerMarkers.tr.setLatLng([finalNorth, finalEast]);
+            if (cornerMarkers.bl) cornerMarkers.bl.setLatLng([finalSouth, finalWest]);
+            if (cornerMarkers.br) cornerMarkers.br.setLatLng([finalSouth, finalEast]);
+            
+            // Atualizar view
+            map.fitBounds(imageBounds, { padding: [50, 50] });
+            
+            updateCoordsDisplay();
+            
+            // Feedback visual
+            const status = document.getElementById('satStatus');
+            status.innerHTML = `✅ Imagem alinhada com ${gcpPoints.length} pontos de referência!`;
+            status.style.color = '#00ff00';
+        }
     </script>
 </body>
 </html>
