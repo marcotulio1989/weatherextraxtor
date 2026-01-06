@@ -702,20 +702,162 @@
     }
     
     // Configuração dos satélites GOES (direto da NOAA)
-    // Bounds calibrados usando a costa brasileira como referência
-    // Funciona bem para região sul/sudeste (erro < 2°)
+    // A imagem está em PROJEÇÃO GEOESTACIONÁRIA - precisa reprojetar para Web Mercator
     const SATELLITE_CONFIG = {
         goes19: {
             name: 'GOES-19',
-            url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg',
-            bounds: [[-60.0, -122.0], [15.0, -28.0]]
+            url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg'
         },
         goes16: {
             name: 'GOES-16',
-            url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
-            bounds: [[-60.0, -122.0], [15.0, -28.0]]
+            url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg'
         }
     };
+    
+    // Constantes da projeção geoestacionária GOES
+    const GOES_PARAMS = {
+        satLon: -75.2,        // Longitude do satélite (graus)
+        satHeight: 35786023,  // Altura do satélite (m)
+        earthRadius: 6378137, // Raio equatorial (m)
+        earthRadiusPolar: 6356752.31414, // Raio polar (m)
+        
+        // Scan angles calibrados para a imagem SSA (radianos)
+        scanXMin: -0.08365403,
+        scanXMax: 0.13199896,
+        scanYMin: -0.14002762,
+        scanYMax: 0.04996900,
+        
+        // Dimensões da imagem original
+        imgWidth: 7200,
+        imgHeight: 4320
+    };
+    
+    // Converte pixel na imagem GOES para lat/lon
+    function goesPixelToLatLon(px, py) {
+        const p = GOES_PARAMS;
+        
+        const x = p.scanXMin + (px / p.imgWidth) * (p.scanXMax - p.scanXMin);
+        const y = p.scanYMax - (py / p.imgHeight) * (p.scanYMax - p.scanYMin);
+        
+        const H = p.satHeight + p.earthRadius;
+        
+        const a = Math.pow(Math.sin(x), 2) + Math.pow(Math.cos(x), 2) * 
+                  (Math.pow(Math.cos(y), 2) + Math.pow(p.earthRadius/p.earthRadiusPolar, 2) * Math.pow(Math.sin(y), 2));
+        const b = -2 * H * Math.cos(x) * Math.cos(y);
+        const c = H*H - p.earthRadius*p.earthRadius;
+        
+        const discriminant = b*b - 4*a*c;
+        if (discriminant < 0) return null;
+        
+        const rs = (-b - Math.sqrt(discriminant)) / (2*a);
+        
+        const sxp = rs * Math.cos(x) * Math.cos(y);
+        const syp = -rs * Math.sin(x);
+        const szp = rs * Math.cos(x) * Math.sin(y);
+        
+        const lat = Math.atan(Math.pow(p.earthRadius/p.earthRadiusPolar, 2) * szp / 
+                    Math.sqrt(Math.pow(H-sxp, 2) + syp*syp)) * 180 / Math.PI;
+        const lon = p.satLon - Math.atan(syp / (H - sxp)) * 180 / Math.PI;
+        
+        return [lat, lon];
+    }
+    
+    // Converte lat/lon para pixel na imagem GOES
+    function latLonToGoesPixel(lat, lon) {
+        const p = GOES_PARAMS;
+        const latRad = lat * Math.PI / 180;
+        const lonRad = lon * Math.PI / 180;
+        const satLonRad = p.satLon * Math.PI / 180;
+        
+        const H = p.satHeight + p.earthRadius;
+        
+        const phiC = Math.atan(Math.pow(p.earthRadiusPolar/p.earthRadius, 2) * Math.tan(latRad));
+        const rc = p.earthRadiusPolar / Math.sqrt(1 - (Math.pow(p.earthRadius, 2) - Math.pow(p.earthRadiusPolar, 2)) / 
+                   Math.pow(p.earthRadius, 2) * Math.pow(Math.cos(phiC), 2));
+        
+        const sx = H - rc * Math.cos(phiC) * Math.cos(lonRad - satLonRad);
+        const sy = -rc * Math.cos(phiC) * Math.sin(lonRad - satLonRad);
+        const sz = rc * Math.sin(phiC);
+        
+        if (sx * (sx - H) + sy*sy + sz*sz > 0) return null;
+        
+        const scanY = Math.atan(sz / sx);
+        const scanX = Math.asin(-sy / Math.sqrt(sx*sx + sy*sy + sz*sz));
+        
+        const px = (scanX - p.scanXMin) / (p.scanXMax - p.scanXMin) * p.imgWidth;
+        const py = (p.scanYMax - scanY) / (p.scanYMax - p.scanYMin) * p.imgHeight;
+        
+        return [px, py];
+    }
+    
+    // Reprojeta imagem GOES de geoestacionária para Web Mercator
+    function reprojectGoesToMercator(srcImg, targetWidth, targetHeight, latMin, latMax, lonMin, lonMax) {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        const ctx = canvas.getContext('2d');
+        
+        // Desenhar imagem fonte em canvas temporário
+        const srcCanvas = document.createElement('canvas');
+        srcCanvas.width = srcImg.width;
+        srcCanvas.height = srcImg.height;
+        const srcCtx = srcCanvas.getContext('2d');
+        srcCtx.drawImage(srcImg, 0, 0);
+        const srcData = srcCtx.getImageData(0, 0, srcImg.width, srcImg.height).data;
+        
+        // Criar imagem de destino
+        const destImageData = ctx.createImageData(targetWidth, targetHeight);
+        const destData = destImageData.data;
+        
+        // Conversão Mercator
+        const latToMercY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
+        const mercYMin = latToMercY(latMin);
+        const mercYMax = latToMercY(latMax);
+        
+        for (let destY = 0; destY < targetHeight; destY++) {
+            // Posição Y no espaço Mercator
+            const t = destY / targetHeight;
+            const mercY = mercYMax - t * (mercYMax - mercYMin);
+            const lat = (2 * Math.atan(Math.exp(mercY)) - Math.PI / 2) * 180 / Math.PI;
+            
+            for (let destX = 0; destX < targetWidth; destX++) {
+                const lon = lonMin + (destX / targetWidth) * (lonMax - lonMin);
+                
+                // Converter lat/lon para pixel na imagem GOES
+                const srcPixel = latLonToGoesPixel(lat, lon);
+                
+                if (srcPixel) {
+                    const [srcX, srcY] = srcPixel;
+                    
+                    if (srcX >= 0 && srcX < srcImg.width && srcY >= 0 && srcY < srcImg.height) {
+                        // Interpolação bilinear
+                        const x0 = Math.floor(srcX);
+                        const y0 = Math.floor(srcY);
+                        const x1 = Math.min(x0 + 1, srcImg.width - 1);
+                        const y1 = Math.min(y0 + 1, srcImg.height - 1);
+                        const fx = srcX - x0;
+                        const fy = srcY - y0;
+                        
+                        const destIdx = (destY * targetWidth + destX) * 4;
+                        
+                        for (let c = 0; c < 4; c++) {
+                            const v00 = srcData[(y0 * srcImg.width + x0) * 4 + c];
+                            const v10 = srcData[(y0 * srcImg.width + x1) * 4 + c];
+                            const v01 = srcData[(y1 * srcImg.width + x0) * 4 + c];
+                            const v11 = srcData[(y1 * srcImg.width + x1) * 4 + c];
+                            
+                            const v = v00 * (1-fx) * (1-fy) + v10 * fx * (1-fy) + 
+                                     v01 * (1-fx) * fy + v11 * fx * fy;
+                            destData[destIdx + c] = Math.round(v);
+                        }
+                    }
+                }
+            }
+        }
+        
+        ctx.putImageData(destImageData, 0, 0);
+        return canvas.toDataURL('image/jpeg', 0.85);
+    }
     
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
@@ -731,18 +873,50 @@
                 satelliteLayer = null;
             }
             
-            // Carregar imagem da NOAA com bounds calibrados
             const imageUrl = `${config.url}?t=${Date.now()}`;
             
-            // Os bounds [-60, 15] x [-122, -28] foram calibrados usando a costa brasileira
-            // Erro < 2° na região sul/sudeste (onde está Campos dos Goytacazes)
-            log('info', '📍 Carregando imagem com bounds calibrados...');
-            satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
-                opacity: opacity,
-                zIndex: 1
-            });
-            satelliteLayer.addTo(map);
-            log('success', `🛰️ ${config.name} carregado!`);
+            // Bounds para a região de interesse (Brasil)
+            const bounds = [[-55, -75], [5, -30]];
+            
+            // Tentar reprojetar com CORS
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            try {
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = imageUrl;
+                });
+                
+                log('info', '🔄 Reprojetando de Geoestacionária para Web Mercator...');
+                
+                // Reprojetar para tamanho menor (mais rápido)
+                const mercatorDataUrl = reprojectGoesToMercator(
+                    img, 
+                    1800,  // largura reprojetada
+                    1200,  // altura reprojetada
+                    bounds[0][0], bounds[1][0],  // lat min, lat max
+                    bounds[0][1], bounds[1][1]   // lon min, lon max
+                );
+                
+                satelliteLayer = L.imageOverlay(mercatorDataUrl, bounds, {
+                    opacity: opacity,
+                    zIndex: 1
+                });
+                satelliteLayer.addTo(map);
+                log('success', `🛰️ ${config.name} reprojetado com sucesso!`);
+                
+            } catch (corsError) {
+                log('warning', '⚠️ CORS bloqueado - usando imagem original (desalinhada)');
+                // Fallback: usar imagem direta sem reprojeção
+                const fallbackBounds = [[-55, -80], [10, -25]];
+                satelliteLayer = L.imageOverlay(imageUrl, fallbackBounds, {
+                    opacity: opacity,
+                    zIndex: 1
+                });
+                satelliteLayer.addTo(map);
+            }
             
             // Pegar horário da imagem via HEAD request
             try {
@@ -754,7 +928,7 @@
                     
                     const infoEl = document.getElementById('satellite-info');
                     if (infoEl) {
-                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ Bounds calibrados`;
+                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ Projeção Geoestacionária`;
                     }
                     log('info', `🛰️ Imagem de: ${timeStr}`);
                 }

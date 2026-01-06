@@ -54,14 +54,23 @@ SATELLITES = {
     }
 }
 
-# Bounds do setor SSA (South America)
-# Calibrados usando a costa brasileira como referência
-# Erro < 2° na região sul/sudeste (onde está Campos dos Goytacazes)
-SSA_BOUNDS = {
-    "lat_min": -60.0,
-    "lat_max": 15.0,
-    "lon_min": -122.0,
-    "lon_max": -28.0,
+# Parâmetros da projeção geoestacionária GOES
+# A imagem SSA está em projeção geoestacionária do satélite GOES
+GOES_PROJECTION = {
+    "sat_lon": -75.2,          # Longitude do satélite (graus)
+    "sat_height": 35786023.0,  # Altura do satélite (m)
+    "earth_radius": 6378137.0, # Raio equatorial (m)
+    "earth_radius_polar": 6356752.31414, # Raio polar (m)
+    
+    # Scan angles calibrados para a imagem SSA (radianos)
+    "scan_x_min": -0.08365403,
+    "scan_x_max": 0.13199896,
+    "scan_y_min": -0.14002762,
+    "scan_y_max": 0.04996900,
+    
+    # Dimensões da imagem original
+    "img_width": 7200,
+    "img_height": 4320,
 }
 
 
