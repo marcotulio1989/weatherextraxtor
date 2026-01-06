@@ -125,6 +125,49 @@ def pixel_to_latlon(x, y, img_width, img_height, bounds):
     return lat, lon
 
 
+def apply_circular_mask(img):
+    """Aplica máscara circular na imagem, tornando cantos transparentes."""
+    # Converter para RGBA se necessário
+    if img.mode != 'RGBA':
+        img = img.convert('RGBA')
+    
+    width, height = img.size
+    
+    # Criar máscara circular
+    mask = Image.new('L', (width, height), 0)
+    center_x, center_y = width // 2, height // 2
+    radius = min(width, height) // 2
+    
+    # Desenhar círculo preenchido na máscara
+    for y in range(height):
+        for x in range(width):
+            # Distância do centro
+            dx = x - center_x
+            dy = y - center_y
+            distance = (dx * dx + dy * dy) ** 0.5
+            
+            if distance <= radius:
+                # Dentro do círculo - opaco
+                mask.putpixel((x, y), 255)
+            elif distance <= radius + 2:
+                # Borda suave (anti-aliasing)
+                alpha = int(255 * (1 - (distance - radius) / 2))
+                mask.putpixel((x, y), max(0, alpha))
+            # Fora do círculo - já é 0 (transparente)
+    
+    # Aplicar máscara ao canal alpha
+    img.putalpha(mask)
+    
+    return img
+
+
+def is_point_in_circle(x, y, center_x, center_y, radius):
+    """Verifica se um ponto está dentro do círculo."""
+    dx = x - center_x
+    dy = y - center_y
+    return (dx * dx + dy * dy) <= (radius * radius)
+
+
 def extract_region(image_data, center_lat, center_lon, radius_deg, output_size=512):
     """Extrai região centrada no navio."""
     try:
@@ -162,6 +205,10 @@ def extract_region(image_data, center_lat, center_lon, radius_deg, output_size=5
         # Redimensionar
         resized = cropped.resize((output_size, output_size), Image.Resampling.LANCZOS)
         
+        # Aplicar máscara circular
+        resized = apply_circular_mask(resized)
+        print(f"⭕ Máscara circular aplicada")
+        
         return resized, roi_bounds
         
     except Exception as e:
@@ -172,17 +219,30 @@ def extract_region(image_data, center_lat, center_lon, radius_deg, output_size=5
 
 
 def image_to_points(img, bounds, step=8):
-    """Converte imagem para array de pontos com coordenadas."""
-    if img.mode != 'L':
-        img = img.convert('L')
+    """Converte imagem para array de pontos com coordenadas (só dentro do círculo)."""
+    # Converter para grayscale para valores
+    if img.mode == 'RGBA':
+        gray = img.convert('L')
+    elif img.mode != 'L':
+        gray = img.convert('L')
+    else:
+        gray = img
     
     width, height = img.size
-    pixels = np.array(img)
+    pixels = np.array(gray)
+    
+    # Centro e raio do círculo
+    center_x, center_y = width // 2, height // 2
+    radius = min(width, height) // 2
     
     points = []
     
     for y in range(0, height, step):
         for x in range(0, width, step):
+            # Só incluir pontos dentro do círculo
+            if not is_point_in_circle(x, y, center_x, center_y, radius):
+                continue
+                
             lat, lon = pixel_to_latlon(x, y, width, height, bounds)
             value = int(pixels[y, x])
             
