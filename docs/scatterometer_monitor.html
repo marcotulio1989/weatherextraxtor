@@ -658,7 +658,11 @@
             }
             
             // URL do tile de satélite infravermelho
-            const tileUrl = `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/2/1_1.png`;
+            // Formato: {path}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png
+            // color: 0=original, 1-8=paletas de cor
+            // smooth: 0=sem suavizar, 1=suavizado
+            // snow: 0=sem neve, 1=com neve
+            const tileUrl = `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/0/0_0.png`;
             
             satelliteLayer = L.tileLayer(tileUrl, {
                 opacity: opacity,
