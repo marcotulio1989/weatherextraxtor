@@ -492,9 +492,10 @@
         <div class="section" style="border-left: 3px solid #00ff00;">
             <div class="section-title">
                 <span class="status-indicator" id="satellite-status"></span>
-                Satélite Infravermelho
+                GOES-19 Infravermelho
             </div>
-            <p class="source-info">✅ TEMPO REAL - RainViewer API</p>
+            <p class="source-info">✅ TEMPO REAL - NOAA GOES-19</p>
+            <p class="source-info">Band 13 (IR) - América do Sul</p>
             
             <label>Opacidade: <span id="opacity-value">60%</span></label>
             <input type="range" id="satellite-opacity" min="0" max="100" value="60" 
@@ -626,63 +627,72 @@
     }
     
     // =========================================================================
-    // CAMADA DE SATÉLITE EM TEMPO REAL (RainViewer API)
+    // CAMADA DE SATÉLITE EM TEMPO REAL (GOES-19 NOAA)
     // =========================================================================
     let satelliteEnabled = true;
     let satelliteLayer = null;
     let satelliteRefreshInterval = null;
     
+    // GOES-19 South America Sector (ssa) - Coordenadas aproximadas
+    // A imagem cobre toda América do Sul
+    const GOES_SSA_BOUNDS = [
+        [-60, -110],  // SW corner (lat, lon)
+        [15, -25]     // NE corner (lat, lon)
+    ];
+    
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
         
         setStatus('satellite-status', 'loading');
-        log('info', '🛰️ Carregando imagem de satélite...');
+        log('info', '🛰️ Carregando imagem GOES-19...');
         
         try {
-            // Buscar dados atuais do RainViewer
-            const response = await fetch('https://api.rainviewer.com/public/weather-maps.json');
-            const data = await response.json();
-            
-            if (!data.satellite || !data.satellite.infrared || data.satellite.infrared.length === 0) {
-                throw new Error('Sem dados de satélite disponíveis');
-            }
-            
-            // Pegar a imagem mais recente
-            const latestSat = data.satellite.infrared[data.satellite.infrared.length - 1];
-            const timestamp = latestSat.time;
-            const path = latestSat.path;
-            
             // Remover camada anterior
             if (satelliteLayer) {
                 map.removeLayer(satelliteLayer);
             }
             
-            // URL do tile de satélite infravermelho
-            // Formato: {path}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png
-            // color: 0=original, 1-8=paletas de cor
-            // smooth: 0=sem suavizar, 1=suavizado
-            // snow: 0=sem neve, 1=com neve
-            const tileUrl = `https://tilecache.rainviewer.com${path}/256/{z}/{x}/{y}/0/0_0.png`;
+            // URL da imagem GOES-19 América do Sul (Band 13 = IR)
+            // Adicionar timestamp para evitar cache
+            const timestamp = Date.now();
+            const imageUrl = `https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg?t=${timestamp}`;
             
-            satelliteLayer = L.tileLayer(tileUrl, {
+            // Criar ImageOverlay com bounds georreferenciados
+            satelliteLayer = L.imageOverlay(imageUrl, GOES_SSA_BOUNDS, {
                 opacity: opacity,
                 zIndex: 1,
-                tileSize: 256
-            }).addTo(map);
+                crossOrigin: 'anonymous'
+            });
+            
+            // Adicionar ao mapa
+            satelliteLayer.addTo(map);
             
             // Atualizar info
-            const imageTime = new Date(timestamp * 1000);
+            const now = new Date();
             const infoEl = document.getElementById('satellite-info');
             if (infoEl) {
-                infoEl.innerHTML = `📅 Imagem: ${imageTime.toLocaleString()}<br>🕐 Atualizado agora`;
+                infoEl.innerHTML = `📡 GOES-19 IR (Band 13)<br>📅 ${now.toLocaleString()}<br>🌎 América do Sul`;
             }
             
             setStatus('satellite-status', 'active');
-            log('success', `🛰️ Satélite IR carregado: ${imageTime.toLocaleTimeString()}`);
+            log('success', `🛰️ GOES-19 IR carregado`);
             
         } catch (error) {
             log('error', `Erro satélite: ${error.message}`);
             setStatus('satellite-status', 'error');
+            
+            // Tentar fallback para GOES-16 se GOES-19 falhar
+            try {
+                const fallbackUrl = `https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg?t=${Date.now()}`;
+                satelliteLayer = L.imageOverlay(fallbackUrl, GOES_SSA_BOUNDS, {
+                    opacity: opacity,
+                    zIndex: 1
+                }).addTo(map);
+                log('info', '🛰️ Usando GOES-16 como fallback');
+                setStatus('satellite-status', 'active');
+            } catch (e2) {
+                log('error', 'Fallback também falhou');
+            }
         }
         
         // Configurar auto-refresh a cada 10 minutos
