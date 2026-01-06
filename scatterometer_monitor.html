@@ -580,8 +580,8 @@
     // =========================================================================
     // CONFIGURAÇÃO
     // =========================================================================
-    // 100 NM = ~185 km = ~1.85 graus
-    const RAIO_NM = 100;  // Raio em milhas náuticas
+    // 50 NM = ~92 km = ~0.83 graus
+    const RAIO_NM = 50;  // Raio em milhas náuticas
     const RAIO_GRAUS = RAIO_NM / 60;  // 1 grau = 60 NM
     
     const CONFIG = {
@@ -639,8 +639,9 @@
             .bindPopup(`<b>${CONFIG.shipName}</b><br>Lat: ${CONFIG.shipLat}<br>Lon: ${CONFIG.shipLon}`)
             .addTo(map);
         
-        // Área de interesse (retângulo)
-        L.rectangle([[CONFIG.latMin, CONFIG.lonMin], [CONFIG.latMax, CONFIG.lonMax]], {
+        // Área de interesse (CÍRCULO)
+        L.circle([CONFIG.shipLat, CONFIG.shipLon], {
+            radius: RAIO_NM * 1852,  // Converter NM para metros
             color: "#00ffcc",
             weight: 1,
             fillOpacity: 0.05,
@@ -757,8 +758,7 @@
         const endTime = now.toISOString().split('.')[0] + 'Z';
         
         // Construir URL para dados de vento ASCAT
-        // Formato: dataset.json?variavel[(time_start):(time_end)][(lat_start):(lat_end)][(lon_start):(lon_end)]
-        const url = `${baseUrl}/erdQAwind1day.json?` +
+        const erddapUrl = `${baseUrl}/erdQAwind1day.json?` +
             `x_wind[(${startTime}):1:(${endTime})]` +
             `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
             `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]` +
@@ -766,8 +766,11 @@
             `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
             `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]`;
         
+        // Usar proxy local para evitar CORS
+        const url = `/api/noaa?url=${encodeURIComponent(erddapUrl)}`;
+        
         try {
-            log('info', 'URL: ' + url.substring(0, 80) + '...');
+            log('info', 'Buscando via proxy local...');
             const response = await fetch(url);
             
             if (!response.ok) {
@@ -938,32 +941,27 @@
                 !p.source.includes('JMA') && p.source !== 'Open-Meteo'
             );
             
-            // Buscar cada modelo separadamente (mais confiável)
-            const modelUrls = {
-                'gfs_seamless': 'https://api.open-meteo.com/v1/gfs?',
-                'ecmwf_ifs025': 'https://api.open-meteo.com/v1/ecmwf?',
-                'icon_seamless': 'https://api.open-meteo.com/v1/dwd-icon?',
-                'meteofrance_seamless': 'https://api.open-meteo.com/v1/meteofrance?',
-                'jma_seamless': 'https://api.open-meteo.com/v1/jma?'
-            };
-            
+            // Usar endpoint /forecast com parâmetro models para todos
+            // Isso garante dados 'current' disponíveis para todos os modelos
             const promises = MODELS.map(async model => {
                 try {
-                    const baseUrl = modelUrls[model] || 'https://api.open-meteo.com/v1/forecast?';
-                    const url = `${baseUrl}latitude=${CONFIG.shipLat}&longitude=${CONFIG.shipLon}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn`;
+                    // Endpoint unificado com parâmetro models
+                    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.shipLat}&longitude=${CONFIG.shipLon}&current=wind_speed_10m,wind_direction_10m&models=${model}&wind_speed_unit=kn`;
                     
                     const response = await fetch(url);
                     const data = await response.json();
                     
-                    if (data.current) {
+                    if (data.current && data.current.wind_speed_10m !== undefined) {
                         modelData[model] = {
                             speed: data.current.wind_speed_10m,
                             direction: data.current.wind_direction_10m
                         };
                         log('info', `  ✓ ${MODEL_NAMES[model]}: ${data.current.wind_speed_10m.toFixed(1)} kn`);
+                    } else {
+                        log('warning', `  ✗ ${MODEL_NAMES[model]}: sem dados current`);
                     }
                 } catch (e) {
-                    log('warning', `  ✗ ${MODEL_NAMES[model]}: erro`);
+                    log('warning', `  ✗ ${MODEL_NAMES[model]}: ${e.message}`);
                 }
             });
             
@@ -991,26 +989,34 @@
     }
     
     async function fetchGridPoints() {
-        const lats = [];
-        const lons = [];
-        const step = 0.2;  // Grid mais denso (triplicado)
-        
-        for (let la = CONFIG.latMin; la <= CONFIG.latMax; la += step) {
-            lats.push(la.toFixed(2));
-        }
-        for (let lo = CONFIG.lonMin; lo <= CONFIG.lonMax; lo += step) {
-            lons.push(lo.toFixed(2));
-        }
+        // Grid CIRCULAR usando o mesmo espaçamento do Open-Meteo (0.125°)
+        const step = 0.125;  // Grid nativo do Open-Meteo
+        const raioGraus = RAIO_GRAUS;
         
         let queryLats = [];
         let queryLons = [];
         
-        lats.forEach(la => {
-            lons.forEach(lo => {
-                queryLats.push(la);
-                queryLons.push(lo);
-            });
-        });
+        // Calcular quantos passos cabem no raio
+        const numSteps = Math.floor(raioGraus / step);
+        
+        // Iterar de -numSteps a +numSteps (garante simetria perfeita)
+        for (let i = -numSteps; i <= numSteps; i++) {
+            for (let j = -numSteps; j <= numSteps; j++) {
+                const lat = CONFIG.shipLat + (i * step);
+                const lon = CONFIG.shipLon + (j * step);
+                
+                // Distância do centro em passos
+                const dist = Math.sqrt(i*i + j*j) * step;
+                
+                // Só incluir se dentro do círculo
+                if (dist <= raioGraus) {
+                    queryLats.push(lat.toFixed(3));
+                    queryLons.push(lon.toFixed(3));
+                }
+            }
+        }
+        
+        log('info', `📍 Grid circular: ${queryLats.length} pontos (step ${step}°, raio ${RAIO_NM} NM)`);
         
         // Usar forecast API com modelo padrão para o grid
         const url = `https://api.open-meteo.com/v1/forecast?latitude=${queryLats.join(',')}&longitude=${queryLons.join(',')}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn`;
@@ -1018,29 +1024,39 @@
         const response = await fetch(url);
         const data = await response.json();
         
+        let addedCount = 0;
+        
         if (Array.isArray(data)) {
-            data.forEach(point => {
-                if (point.current) {
+            data.forEach((point, idx) => {
+                // Usar coordenadas SOLICITADAS, não as retornadas pela API
+                const lat = parseFloat(queryLats[idx]);
+                const lon = parseFloat(queryLons[idx]);
+                
+                if (point.current && point.current.wind_speed_10m !== null) {
                     addWindPoint({
-                        lat: point.latitude,
-                        lon: point.longitude,
+                        lat: lat,
+                        lon: lon,
                         speed: point.current.wind_speed_10m,
                         direction: point.current.wind_direction_10m,
                         time: new Date(),
                         source: 'Modelo (Open-Meteo)'
                     });
+                    addedCount++;
                 }
             });
-        } else if (data.current) {
+        } else if (data.current && data.current.wind_speed_10m !== null) {
             addWindPoint({
-                lat: data.latitude,
-                lon: data.longitude,
+                lat: parseFloat(queryLats[0]),
+                lon: parseFloat(queryLons[0]),
                 speed: data.current.wind_speed_10m,
                 direction: data.current.wind_direction_10m,
                 time: new Date(),
                 source: 'Modelo (Open-Meteo)'
             });
+            addedCount++;
         }
+        
+        log('info', `📍 Pontos adicionados: ${addedCount}/${queryLats.length}`);
     }
     
     function updateModelAverage() {
