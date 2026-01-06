@@ -49,17 +49,17 @@ print(f"📦 BBOX: {BBOX}")
 # GOES-East está em 75.2°W (GOES-16) ou 75.0°W (GOES-19)
 # Setor SSA (South America) tem parâmetros específicos
 
-# Bounds calibrados empiricamente para a imagem JPEG da NOAA
-# A imagem é 7200x4320 (aspect ratio 1.667)
-# Calibrado usando pontos costeiros conhecidos do Brasil
-# Lat: -60° a +15° (fixo)
-# Lon: -125° a 0° (calibrado com offset +5° do teórico)
+# Bounds do setor SSA (South America)
+# A imagem JPEG da NOAA é 7200x4320 (aspect ratio 1.667)
+# A imagem original está em Plate Carrée (equirectangular)
+# Bounds baseados no setor SSA oficial da NOAA expandido para aspect ratio
+# Lat: -60° a +15°, Lon: -130° a -5°
 
 SSA_BOUNDS = {
     "lat_min": -60.0,
     "lat_max": 15.0,
-    "lon_min": -125.0,
-    "lon_max": 0.0,
+    "lon_min": -130.0,
+    "lon_max": -5.0,
 }
 
 # Tamanho típico da imagem SSA

@@ -54,14 +54,15 @@ SATELLITES = {
     }
 }
 
-# Bounds do setor SSA (South America) - calibrados empiricamente
+# Bounds do setor SSA (South America)
 # A imagem JPEG da NOAA é 7200x4320 (aspect ratio 1.667)
-# Bounds corrigidos após análise de pontos costeiros conhecidos
+# A imagem original está em Plate Carrée (equirectangular)
+# Bounds baseados no setor SSA oficial da NOAA expandido para aspect ratio
 SSA_BOUNDS = {
     "lat_min": -60.0,
     "lat_max": 15.0,
-    "lon_min": -125.0,
-    "lon_max": 0.0,
+    "lon_min": -130.0,
+    "lon_max": -5.0,
 }
 
 
