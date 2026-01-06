@@ -143,6 +143,38 @@
             cursor: not-allowed;
         }
         
+        /* Toggle Button para Satélite */
+        .toggle-btn {
+            flex: 1;
+            padding: 8px 12px;
+            background: #333;
+            border: 1px solid #555;
+            color: #888;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .toggle-btn:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        
+        .toggle-btn:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .toggle-btn:hover {
+            background: #444;
+            color: #ccc;
+        }
+        
+        .toggle-btn.active {
+            background: #00cc99;
+            border-color: #00ffcc;
+            color: #000;
+        }
+        
         /* Log de Status */
         .log-area {
             background: #000;
@@ -488,14 +520,21 @@
         </div>
         
         <!-- Satélite em Tempo Real -->
-        <h2>🛰️ SATÉLITE (150 NM)</h2>
+        <h2>🛰️ SATÉLITE (100 NM)</h2>
         <div class="section" style="border-left: 3px solid #00ff00;">
             <div class="section-title">
                 <span class="status-indicator" id="satellite-status"></span>
-                GOES-19 IR (Recortado)
+                <span id="satellite-name">GOES-19</span> IR (Recortado)
             </div>
-            <p class="source-info">✅ Área de 150 NM processada</p>
+            <p class="source-info">✅ Área de 100 NM processada</p>
             <p class="source-info">Band 13 (IR) - Infravermelho</p>
+            
+            <!-- Toggle de Satélite -->
+            <label>Satélite:</label>
+            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
+                <button id="btn-goes19" class="toggle-btn active" onclick="selectSatellite('goes19')">GOES-19</button>
+                <button id="btn-goes16" class="toggle-btn" onclick="selectSatellite('goes16')">GOES-16</button>
+            </div>
             
             <label>Opacidade: <span id="opacity-value">60%</span></label>
             <input type="range" id="satellite-opacity" min="0" max="100" value="60" 
@@ -638,12 +677,31 @@
     let satelliteLayer = null;
     let satelliteRefreshInterval = null;
     let satelliteData = null;
+    let currentSatellite = 'goes19';  // Satélite padrão
+    
+    function selectSatellite(satId) {
+        currentSatellite = satId;
+        
+        // Atualizar botões
+        document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-' + satId).classList.add('active');
+        
+        // Atualizar nome no título
+        const nameEl = document.getElementById('satellite-name');
+        if (nameEl) {
+            nameEl.textContent = satId === 'goes19' ? 'GOES-19' : 'GOES-16';
+        }
+        
+        // Carregar novo satélite
+        loadSatelliteLayer();
+        log('info', `🛰️ Satélite alterado para ${satId.toUpperCase()}`);
+    }
     
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
         
         setStatus('satellite-status', 'loading');
-        log('info', '🛰️ Carregando dados de satélite...');
+        log('info', `🛰️ Carregando ${currentSatellite.toUpperCase()}...`);
         
         try {
             // Remover camada anterior
@@ -654,7 +712,7 @@
             
             // Buscar JSON com metadados e bounds
             log('info', '📥 Baixando metadados...');
-            const jsonUrl = `satellite_data.json?t=${Date.now()}`;
+            const jsonUrl = `satellite_${currentSatellite}.json?t=${Date.now()}`;
             const jsonResponse = await fetch(jsonUrl);
             
             if (!jsonResponse.ok) {
@@ -675,7 +733,7 @@
             
             // Carregar imagem PNG processada
             log('info', '📥 Carregando imagem recortada...');
-            const imageUrl = `satellite_current.png?t=${Date.now()}`;
+            const imageUrl = `satellite_${currentSatellite}.png?t=${Date.now()}`;
             
             satelliteLayer = L.imageOverlay(imageUrl, bounds, {
                 opacity: opacity,
@@ -686,13 +744,14 @@
             
             // Atualizar info com horário da captura do satélite
             const imageTimeStr = satelliteData.image_time_utc || 'Desconhecido';
+            const satName = satelliteData.satellite_name || currentSatellite.toUpperCase();
             const infoEl = document.getElementById('satellite-info');
             if (infoEl) {
-                infoEl.innerHTML = `📡 GOES-19 IR<br>🛰️ Captura: ${imageTimeStr}<br>📏 ${satelliteData.ship.radius_nm} NM`;
+                infoEl.innerHTML = `📡 ${satName} IR<br>🛰️ Captura: ${imageTimeStr}<br>📏 ${satelliteData.ship.radius_nm} NM`;
             }
             
             setStatus('satellite-status', 'active');
-            log('success', `🛰️ Satélite renderizado (${satelliteData.resolution}x${satelliteData.resolution}px)`);
+            log('success', `🛰️ ${satName} renderizado (${satelliteData.resolution}x${satelliteData.resolution}px)`);
             
         } catch (error) {
             log('error', `❌ Erro satélite: ${error.message}`);
