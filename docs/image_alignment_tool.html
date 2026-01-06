@@ -414,6 +414,9 @@
                 <button class="btn btn-success" onclick="previewAlignment()" id="btnPreview">
                     🗺️ Ver Alinhamento no Mapa
                 </button>
+                <button class="btn" onclick="downloadImage()" style="background:#e17055;">
+                    💾 Baixar Imagem
+                </button>
                 <button class="btn btn-secondary" onclick="exportAlignment()">
                     📤 Exportar JSON
                 </button>
@@ -1238,6 +1241,38 @@
 
         function closePreview() {
             document.getElementById('previewModal').style.display = 'none';
+        }
+
+        // ===== BAIXAR IMAGEM =====
+        function downloadImage() {
+            if (!imageLoaded || !imageElement.src) {
+                alert('Carregue uma imagem primeiro!');
+                return;
+            }
+
+            // Criar link de download
+            const a = document.createElement('a');
+            a.href = imageElement.src;
+            
+            // Extrair nome do arquivo ou gerar um
+            let filename = 'satellite_image.png';
+            if (imageElement.src.startsWith('data:')) {
+                // É uma imagem carregada localmente (base64)
+                const timestamp = new Date().toISOString().slice(0,19).replace(/:/g,'-');
+                filename = `satellite_${timestamp}.png`;
+            } else {
+                // Tenta extrair nome da URL
+                const urlParts = imageElement.src.split('/');
+                const lastPart = urlParts[urlParts.length - 1].split('?')[0];
+                if (lastPart && lastPart.includes('.')) {
+                    filename = lastPart;
+                }
+            }
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         // ===== EXPORTAR/IMPORTAR =====
