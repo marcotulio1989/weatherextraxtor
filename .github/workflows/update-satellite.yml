@@ -1,0 +1,35 @@
+name: 🛰️ Atualizar Imagens de Satélite
+
+on:
+  schedule:
+    # Roda a cada 15 minutos
+    - cron: '*/15 * * * *'
+  workflow_dispatch:  # Permite rodar manualmente
+
+jobs:
+  update-satellite:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+      
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 📦 Instalar dependências
+        run: |
+          pip install requests numpy pillow
+      
+      - name: 🛰️ Processar imagens de satélite
+        run: python process_satellite.py
+      
+      - name: 📤 Commit e Push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add docs/satellite_*.png docs/satellite_*.json
+          git diff --staged --quiet || git commit -m "🛰️ Atualização automática - $(date -u '+%Y-%m-%d %H:%M') UTC"
+          git push
