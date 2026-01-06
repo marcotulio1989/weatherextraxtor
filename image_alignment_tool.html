@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛰️ Ferramenta de Alinhamento de Imagem Satélite</title>
+    <title>🛰️ Alinhamento de Imagem Satélite - ECDIS</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * {
@@ -14,7 +14,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a2e;
+            background: #0a0a15;
             color: #eee;
             overflow: hidden;
         }
@@ -26,17 +26,18 @@
 
         /* Painel de Controle */
         .control-panel {
-            width: 320px;
+            width: 340px;
             background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
             padding: 20px;
             overflow-y: auto;
             border-right: 2px solid #0f3460;
             z-index: 1000;
+            flex-shrink: 0;
         }
 
         .control-panel h1 {
-            font-size: 1.3em;
-            margin-bottom: 20px;
+            font-size: 1.2em;
+            margin-bottom: 15px;
             color: #e94560;
             text-align: center;
             border-bottom: 1px solid #0f3460;
@@ -44,55 +45,28 @@
         }
 
         .control-section {
-            margin-bottom: 20px;
-            padding: 15px;
+            margin-bottom: 15px;
+            padding: 12px;
             background: rgba(15, 52, 96, 0.5);
             border-radius: 10px;
         }
 
         .control-section h3 {
             color: #00d9ff;
-            margin-bottom: 12px;
-            font-size: 0.95em;
-        }
-
-        .control-row {
-            display: flex;
-            align-items: center;
             margin-bottom: 10px;
-            gap: 10px;
-        }
-
-        .control-row label {
-            flex: 0 0 80px;
-            font-size: 0.85em;
-            color: #aaa;
-        }
-
-        .control-row input[type="range"] {
-            flex: 1;
-            accent-color: #e94560;
-        }
-
-        .control-row input[type="number"] {
-            width: 70px;
-            padding: 5px;
-            border: 1px solid #0f3460;
-            background: #1a1a2e;
-            color: #fff;
-            border-radius: 5px;
-            text-align: center;
+            font-size: 0.9em;
         }
 
         .btn {
             width: 100%;
-            padding: 12px;
-            margin-bottom: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s;
+            font-size: 0.85em;
         }
 
         .btn-primary {
@@ -138,254 +112,84 @@
             height: 100%;
         }
 
-        /* Área do Mapa */
-        .map-area {
+        /* Área da Imagem */
+        .image-area {
             flex: 1;
             position: relative;
-        }
-
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Marcadores de Controle - estilo para os markers Leaflet */
-        .control-marker {
-            width: 24px !important;
-            height: 24px !important;
-            border-radius: 50%;
-            border: 3px solid white;
-            cursor: grab !important;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-
-        .control-marker:hover {
-            transform: scale(1.2);
-        }
-
-        .control-marker.corner-tl { background: #ff6b6b; }
-        .control-marker.corner-tr { background: #4ecdc4; }
-        .control-marker.corner-bl { background: #ffe66d; }
-        .control-marker.corner-br { background: #95e1d3; }
-
-        /* Info Panel */
-        .info-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 340px;
-            background: rgba(26, 26, 46, 0.95);
-            padding: 15px 20px;
-            border-radius: 10px;
-            border: 1px solid #0f3460;
-            z-index: 1000;
-            max-width: 400px;
-        }
-
-        .info-panel h4 {
-            color: #00d9ff;
-            margin-bottom: 10px;
-        }
-
-        .info-panel pre {
-            font-size: 0.75em;
-            color: #aaa;
-            white-space: pre-wrap;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        /* Instruções */
-        .instructions {
-            font-size: 0.8em;
-            color: #888;
-            line-height: 1.5;
-            margin-top: 10px;
-        }
-
-        .instructions li {
-            margin-bottom: 5px;
-        }
-
-        /* Coordenadas dos pontos */
-        .coords-display {
-            font-family: monospace;
-            font-size: 0.75em;
-            background: #0a0a15;
-            padding: 10px;
-            border-radius: 5px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-
-        /* Toggle para visibilidade */
-        .toggle-container {
+            background: #000;
+            overflow: hidden;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            justify-content: center;
         }
 
-        .toggle-switch {
+        #imageContainer {
             position: relative;
-            width: 50px;
-            height: 26px;
+            transform-origin: center center;
         }
 
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #0f3460;
-            transition: 0.4s;
-            border-radius: 26px;
-        }
-
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .toggle-slider {
-            background-color: #00d9ff;
-        }
-
-        input:checked + .toggle-slider:before {
-            transform: translateX(24px);
-        }
-
-        /* Leaflet Image Overlay customization */
-        .leaflet-image-layer {
+        #satelliteImage {
+            max-width: none;
+            max-height: none;
+            display: block;
             image-rendering: auto;
         }
 
-        /* Zoom control customization */
-        .leaflet-control-zoom {
-            border: 2px solid #0f3460 !important;
-        }
-
-        .leaflet-control-zoom a {
-            background-color: #16213e !important;
-            color: #00d9ff !important;
-        }
-
-        .leaflet-control-zoom a:hover {
-            background-color: #0f3460 !important;
-        }
-
-        /* Modal de Salvamento */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background: #16213e;
-            padding: 30px;
-            border-radius: 15px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-content h2 {
-            color: #00d9ff;
-            margin-bottom: 20px;
-        }
-
-        .modal-content pre {
-            background: #0a0a15;
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;
-            font-size: 0.8em;
-        }
-
-        .close-modal {
+        /* Pontos de controle na imagem */
+        .image-point {
             position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 2em;
-            color: #e94560;
-            cursor: pointer;
-        }
-
-        /* GCP Points styling */
-        .gcp-marker {
+            width: 24px;
+            height: 24px;
             background: #ff00ff;
             border: 3px solid #fff;
             border-radius: 50%;
-            width: 20px !important;
-            height: 20px !important;
+            cursor: move;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: 11px;
             font-weight: bold;
             color: white;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+            box-shadow: 0 0 15px rgba(255,0,255,0.8);
+            transform: translate(-50%, -50%);
+            z-index: 100;
         }
 
+        .image-point:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+            background: #00ffff;
+        }
+
+        /* Lista de GCPs */
         .gcp-list {
-            max-height: 200px;
+            max-height: 250px;
             overflow-y: auto;
             background: #0a0a15;
             border-radius: 5px;
-            padding: 10px;
+            padding: 8px;
         }
 
         .gcp-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
             padding: 8px;
-            margin-bottom: 5px;
-            background: rgba(15, 52, 96, 0.5);
+            margin-bottom: 6px;
+            background: rgba(15, 52, 96, 0.7);
             border-radius: 5px;
             font-size: 0.8em;
+            border-left: 3px solid #ff00ff;
         }
 
-        .gcp-item input {
-            width: 70px;
-            padding: 3px;
-            background: #1a1a2e;
-            border: 1px solid #0f3460;
-            color: #fff;
-            border-radius: 3px;
-            text-align: center;
-            font-size: 0.9em;
+        .gcp-item .gcp-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
         }
 
         .gcp-item .gcp-number {
             background: #ff00ff;
             color: white;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -394,15 +198,37 @@
             flex-shrink: 0;
         }
 
-        .gcp-item button {
+        .gcp-item .gcp-coords {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+
+        .gcp-item input {
+            width: 100%;
+            padding: 5px;
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            color: #fff;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .gcp-item label {
+            font-size: 0.75em;
+            color: #888;
+        }
+
+        .gcp-item button.remove-btn {
             background: #e94560;
             border: none;
             color: white;
-            width: 20px;
-            height: 20px;
+            padding: 2px 8px;
             border-radius: 3px;
             cursor: pointer;
             font-size: 12px;
+            margin-left: auto;
         }
 
         .gcp-mode-active {
@@ -415,18 +241,117 @@
             50% { box-shadow: 0 0 20px rgba(255,0,255,0.8); }
         }
 
-        .gcp-instructions {
-            font-size: 0.75em;
-            color: #ff00ff;
-            margin-top: 8px;
-            padding: 8px;
-            background: rgba(255,0,255,0.1);
-            border-radius: 5px;
-            display: none;
+        /* Controles de zoom da imagem */
+        .zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 500;
         }
 
-        .gcp-instructions.active {
-            display: block;
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(22, 33, 62, 0.9);
+            border: 1px solid #0f3460;
+            color: #00d9ff;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .zoom-btn:hover {
+            background: #0f3460;
+        }
+
+        .zoom-level {
+            text-align: center;
+            font-size: 0.8em;
+            color: #888;
+            padding: 5px;
+        }
+
+        /* Info de posição do mouse */
+        .mouse-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(22, 33, 62, 0.9);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            z-index: 500;
+            border: 1px solid #0f3460;
+        }
+
+        /* Modal para preview de alinhamento */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: #16213e;
+            border-radius: 15px;
+            width: 95%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            padding: 15px 20px;
+            background: #0f3460;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            color: #00d9ff;
+            font-size: 1.2em;
+        }
+
+        .close-modal {
+            font-size: 1.5em;
+            color: #e94560;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+
+        #previewMap {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Status */
+        .status-bar {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+        }
+
+        .instructions {
+            font-size: 0.75em;
+            color: #666;
+            line-height: 1.4;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -434,649 +359,610 @@
     <div class="container">
         <!-- Painel de Controle -->
         <div class="control-panel">
-            <h1>🛰️ Alinhamento de Satélite</h1>
-
-            <!-- Baixar Imagem Satélite -->
-            <div class="control-section">
-                <h3>🛰️ Carregar Imagem Satélite</h3>
-                <select id="satelliteProduct" style="width: 100%; padding: 8px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px; margin-bottom: 10px;">
-                    <optgroup label="GOES-16 América do Sul">
-                        <option value="goes16-ssa-ch13">GOES-16 SSA - Infravermelho (Ch13)</option>
-                        <option value="goes16-ssa-ch02">GOES-16 SSA - Visível (Ch02)</option>
-                        <option value="goes16-ssa-ch08">GOES-16 SSA - Vapor d'Água (Ch08)</option>
-                    </optgroup>
-                    <optgroup label="GOES-16 Brasil">
-                        <option value="goes16-br-ch13">GOES-16 Brasil - Infravermelho</option>
-                    </optgroup>
-                    <optgroup label="Windy.com (Funciona direto!)">
-                        <option value="windy-satellite">Windy Satélite IR</option>
-                        <option value="windy-radar">Windy Radar</option>
-                    </optgroup>
-                </select>
-                <button class="btn btn-primary" onclick="fetchSatelliteImage()" id="btnFetchSat">
-                    🔄 Buscar Imagem do Satélite
-                </button>
-                <button class="btn btn-secondary" onclick="openCPTECPage()" style="margin-top:5px;">
-                    🌐 Abrir CPTEC (salvar manualmente)
-                </button>
-                <div id="satStatus" style="font-size: 0.8em; color: #888; margin-top: 8px;"></div>
-            </div>
+            <h1>🛰️ Alinhamento ECDIS</h1>
 
             <!-- Carregar Imagem -->
             <div class="control-section">
-                <h3>📁 Ou Carregar Imagem Manual</h3>
+                <h3>📁 Carregar Imagem</h3>
                 <div class="file-input-wrapper">
-                    <button class="btn btn-secondary">Selecionar Arquivo</button>
+                    <button class="btn btn-primary">📂 Selecionar Arquivo</button>
                     <input type="file" id="imageInput" accept="image/*">
                 </div>
                 <input type="text" id="imageUrl" placeholder="Ou cole URL da imagem..." 
-                       style="width: 100%; padding: 8px; margin-top: 10px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px;">
-                <button class="btn btn-secondary" onclick="loadImageFromUrl()" style="margin-top: 10px;">Carregar URL</button>
+                       style="width: 100%; padding: 8px; margin-top: 8px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px; font-size: 0.85em;">
+                <button class="btn btn-secondary" onclick="loadImageFromUrl()" style="margin-top: 5px;">🔗 Carregar URL</button>
+                <div class="status-bar" id="imageStatus">Nenhuma imagem carregada</div>
             </div>
 
-            <!-- Transformações Globais -->
-            <div class="control-section">
-                <h3>� Ajuste de Bounds (Coordenadas)</h3>
-                
-                <div class="control-row">
-                    <label>Norte:</label>
-                    <input type="number" id="boundNorth" value="10" step="0.1" style="flex:1;">
-                </div>
-
-                <div class="control-row">
-                    <label>Sul:</label>
-                    <input type="number" id="boundSouth" value="-55" step="0.1" style="flex:1;">
-                </div>
-
-                <div class="control-row">
-                    <label>Leste:</label>
-                    <input type="number" id="boundEast" value="-25" step="0.1" style="flex:1;">
-                </div>
-
-                <div class="control-row">
-                    <label>Oeste:</label>
-                    <input type="number" id="boundWest" value="-85" step="0.1" style="flex:1;">
-                </div>
-
-                <div class="control-row">
-                    <label>Opacidade:</label>
-                    <input type="range" id="opacity" min="0" max="1" value="0.7" step="0.05">
-                    <input type="number" id="opacityValue" value="0.7" step="0.05">
-                </div>
-
-                <button class="btn btn-secondary" onclick="fitImageToView()" style="margin-top:10px;">
-                    🔍 Ajustar Vista à Imagem
-                </button>
-            </div>
-
-            <!-- Visibilidade -->
-            <div class="control-section">
-                <h3>👁️ Visibilidade</h3>
-                
-                <div class="toggle-container">
-                    <span>Mostrar Imagem</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="showImage" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="toggle-container">
-                    <span>Mostrar Pontos de Controle</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="showControlPoints" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="toggle-container">
-                    <span>Bloquear Arraste</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="lockDrag">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <!-- Pontos de Controle GCP -->
+            <!-- Marcar Pontos -->
             <div class="control-section">
                 <h3>📌 Pontos de Referência (GCP)</h3>
                 <button class="btn btn-primary" id="btnGcpMode" onclick="toggleGcpMode()">
-                    🎯 Marcar Pontos no Mapa
+                    🎯 Marcar Ponto na Imagem
                 </button>
-                <div class="gcp-instructions" id="gcpInstructions">
-                    ✨ Clique no mapa para adicionar pontos de referência.<br>
-                    📍 Cada ponto deve corresponder a uma localização conhecida.<br>
+                <p class="instructions" id="gcpInstructions" style="display:none;">
+                    ✨ Clique na imagem para marcar um ponto.<br>
+                    📍 Digite as coordenadas do ECDIS nos campos.<br>
                     🔢 Mínimo 2 pontos para alinhar.
-                </div>
+                </p>
+                
                 <div class="gcp-list" id="gcpList">
-                    <p style="color:#888; font-size:0.85em;">Nenhum ponto marcado ainda</p>
+                    <p style="color:#666; font-size:0.85em; text-align:center;">
+                        Nenhum ponto marcado
+                    </p>
                 </div>
-                <button class="btn btn-success" onclick="alignFromGcpPoints()" style="margin-top:10px;">
-                    ✨ Alinhar Automaticamente
-                </button>
-                <button class="btn btn-secondary" onclick="clearAllGcpPoints()" style="margin-top:5px;">
-                    🗑️ Limpar Todos os Pontos
+                
+                <button class="btn btn-warning" onclick="clearAllPoints()" style="margin-top:8px;">
+                    🗑️ Limpar Pontos
                 </button>
             </div>
 
             <!-- Ações -->
             <div class="control-section">
                 <h3>⚡ Ações</h3>
-                <button class="btn btn-warning" onclick="resetTransformations()">🔄 Resetar Tudo</button>
-                <button class="btn btn-success" onclick="saveAlignment()">💾 Salvar Alinhamento</button>
-                <button class="btn btn-secondary" onclick="exportAsJSON()">📤 Exportar JSON</button>
-                <button class="btn btn-secondary" onclick="loadFromJSON()">📥 Importar JSON</button>
+                <button class="btn btn-success" onclick="previewAlignment()" id="btnPreview">
+                    🗺️ Ver Alinhamento no Mapa
+                </button>
+                <button class="btn btn-secondary" onclick="exportAlignment()">
+                    📤 Exportar JSON
+                </button>
+                <button class="btn btn-secondary" onclick="importAlignment()">
+                    📥 Importar JSON
+                </button>
             </div>
 
-            <!-- Coordenadas -->
+            <!-- Resumo -->
             <div class="control-section">
-                <h3>📍 Coordenadas dos Pontos</h3>
-                <div id="coordsDisplay" class="coords-display">
-                    Carregue uma imagem para ver as coordenadas
+                <h3>📊 Resumo</h3>
+                <div id="summaryDisplay" class="status-bar">
+                    Carregue uma imagem e marque os pontos
                 </div>
-            </div>
-
-            <!-- Instruções -->
-            <div class="control-section">
-                <h3>📖 Instruções</h3>
-                <ul class="instructions">
-                    <li>Carregue uma imagem de satélite</li>
-                    <li>A imagem fica <b>fixada ao mapa</b> - zoom e pan funcionam!</li>
-                    <li>Arraste os <b>marcadores coloridos</b> para ajustar os cantos</li>
-                    <li>Ou edite as coordenadas diretamente nos campos</li>
-                    <li>Clique em "Salvar Alinhamento" quando terminar</li>
-                </ul>
             </div>
         </div>
 
-        <!-- Área do Mapa -->
-        <div class="map-area">
-            <div id="map"></div>
+        <!-- Área da Imagem -->
+        <div class="image-area" id="imageArea">
+            <div id="imageContainer">
+                <img id="satelliteImage" src="" alt="Carregue uma imagem" style="display:none;">
+            </div>
+            
+            <div class="mouse-info" id="mouseInfo">
+                Pixel: -- , --
+            </div>
+
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomImage(1.2)">+</button>
+                <div class="zoom-level" id="zoomLevel">100%</div>
+                <button class="zoom-btn" onclick="zoomImage(0.8)">−</button>
+                <button class="zoom-btn" onclick="resetZoom()" style="font-size:12px;">⟲</button>
+            </div>
         </div>
     </div>
 
-    <!-- Modal de Resultado -->
-    <div class="modal" id="resultModal">
+    <!-- Modal de Preview -->
+    <div class="modal" id="previewModal">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">&times;</span>
-            <h2>✅ Alinhamento Salvo!</h2>
-            <p>Parâmetros de transformação capturados:</p>
-            <pre id="resultJSON"></pre>
-            <button class="btn btn-primary" onclick="copyToClipboard()" style="margin-top: 15px;">📋 Copiar JSON</button>
-            <button class="btn btn-secondary" onclick="downloadJSON()" style="margin-top: 10px;">💾 Baixar Arquivo</button>
+            <div class="modal-header">
+                <h2>🗺️ Preview do Alinhamento</h2>
+                <button class="close-modal" onclick="closePreview()">×</button>
+            </div>
+            <div id="previewMap"></div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // ===== ESTADO GLOBAL =====
-        let map;
-        let imageOverlay = null;
-        let cornerMarkers = {};
-        let imageBounds = null;
-        let originalImageSize = { width: 0, height: 0 };
-        let currentImageUrl = null;
-        
-        // GCP (Ground Control Points)
+        let imageElement = null;
+        let imageLoaded = false;
+        let imageNaturalSize = { width: 0, height: 0 };
+        let currentZoom = 1;
         let gcpMode = false;
-        let gcpPoints = [];  // Array de {marker, lat, lng, id}
+        let gcpPoints = [];  // {id, pixelX, pixelY, lat, lng, element}
         let gcpCounter = 0;
-        
-        // Bounds padrão para América do Sul (aproximado para GOES-16)
-        const defaultBounds = {
-            north: 10,
-            south: -55,
-            east: -25,
-            west: -85
-        };
+        let isDragging = false;
+        let dragTarget = null;
+        let dragOffset = { x: 0, y: 0 };
+        let imageOffset = { x: 0, y: 0 };
+        let previewMap = null;
 
-        // ===== INICIALIZAÇÃO DO MAPA =====
-        function initMap() {
-            map = L.map('map', {
-                center: [-22.0, -41.0],
-                zoom: 5,
-                zoomControl: true,
-                zoomSnap: 0.25,        // Permite zoom mais suave
-                zoomDelta: 0.5,        // Controla incremento do zoom
-                wheelPxPerZoomLevel: 120  // Sensibilidade do scroll (maior = menos sensível)
-            });
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            imageElement = document.getElementById('satelliteImage');
+            setupImageDrag();
+            setupMouseTracking();
+        });
 
-            // Camadas de mapa
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
-            });
-
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: '© Esri'
-            });
-
-            const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenTopoMap'
-            });
-
-            const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '© CartoDB'
-            });
-
-            osmLayer.addTo(map);
-
-            L.control.layers({
-                'OpenStreetMap': osmLayer,
-                'Satélite (Esri)': satelliteLayer,
-                'Topográfico': topoLayer,
-                'Dark Mode': darkLayer
-            }).addTo(map);
-
-            L.control.scale({ imperial: false }).addTo(map);
-
-            // Atualizar display quando mapa move
-            map.on('moveend zoomend', updateCoordsDisplay);
-        }
-
-        // ===== ABRIR CPTEC =====
-        function openCPTECPage() {
-            window.open('http://satelite.cptec.inpe.br/acervo/goes16.formulario.logic?i=br', '_blank');
-        }
-
-        // ===== BUSCAR IMAGEM SATÉLITE =====
-        async function fetchSatelliteImage() {
-            const product = document.getElementById('satelliteProduct').value;
-            const status = document.getElementById('satStatus');
-            const btn = document.getElementById('btnFetchSat');
-            
-            btn.disabled = true;
-            status.innerHTML = '⏳ Buscando imagem...';
-            status.style.color = '#ffff00';
-
-            const imageConfigs = {
-                'windy-satellite': {
-                    url: 'https://ims.windy.com/sat/satellite/satellite/2026/01/06/12/satellite_2026010612.jpg',
-                    bounds: { north: 70, south: -60, east: 50, west: -120 }
-                },
-                'windy-radar': {
-                    url: 'https://ims.windy.com/radar/radar/2026/01/06/12/radar_2026010612.jpg',
-                    bounds: { north: 70, south: -60, east: 50, west: -120 }
-                },
-                'goes16-ssa-ch13': {
-                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
-                    bounds: { north: 15, south: -60, east: -25, west: -110 }
-                },
-                'goes16-ssa-ch02': {
-                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/02/latest.jpg',
-                    bounds: { north: 15, south: -60, east: -25, west: -110 }
-                },
-                'goes16-ssa-ch08': {
-                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/08/latest.jpg',
-                    bounds: { north: 15, south: -60, east: -25, west: -110 }
-                },
-                'goes16-br-ch13': {
-                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
-                    bounds: { north: 15, south: -60, east: -25, west: -110 }
-                }
-            };
-
-            const config = imageConfigs[product];
-            
-            if (!config) {
-                status.innerHTML = '❌ Produto não disponível';
-                status.style.color = '#ff4444';
-                btn.disabled = false;
-                return;
-            }
-
-            try {
-                loadImageAsOverlay(config.url, config.bounds);
-                status.innerHTML = '✅ Imagem carregada! Arraste os marcadores para alinhar.';
-                status.style.color = '#00ff00';
-            } catch (error) {
-                status.innerHTML = `❌ Erro: ${error.message}`;
-                status.style.color = '#ff4444';
-            }
-            
-            btn.disabled = false;
-        }
-
-        // ===== CARREGAR IMAGEM COMO OVERLAY NO MAPA =====
-        function loadImageAsOverlay(imageUrl, bounds) {
-            // Remover overlay anterior
-            if (imageOverlay) {
-                map.removeLayer(imageOverlay);
-            }
-            removeCornerMarkers();
-
-            currentImageUrl = imageUrl;
-            
-            // Criar bounds para o Leaflet
-            const b = bounds || defaultBounds;
-            imageBounds = L.latLngBounds(
-                [b.south, b.west],  // SW corner
-                [b.north, b.east]   // NE corner
-            );
-
-            // Criar imagem temporária para obter dimensões
-            const tempImg = new Image();
-            tempImg.crossOrigin = 'anonymous';
-            tempImg.onload = function() {
-                originalImageSize = {
-                    width: this.naturalWidth,
-                    height: this.naturalHeight
-                };
-                
-                // Criar overlay
-                const opacity = parseFloat(document.getElementById('opacity').value);
-                imageOverlay = L.imageOverlay(imageUrl, imageBounds, {
-                    opacity: opacity,
-                    interactive: false,
-                    crossOrigin: 'anonymous'
-                }).addTo(map);
-
-                // Criar marcadores de controle nos cantos
-                createCornerMarkers();
-                updateCoordsDisplay();
-                
-                // Ajustar view para mostrar a imagem
-                map.fitBounds(imageBounds, { padding: [50, 50] });
-            };
-            
-            tempImg.onerror = function() {
-                // Tentar carregar mesmo sem CORS
-                const opacity = parseFloat(document.getElementById('opacity').value);
-                imageOverlay = L.imageOverlay(imageUrl, imageBounds, {
-                    opacity: opacity,
-                    interactive: false
-                }).addTo(map);
-                
-                createCornerMarkers();
-                updateCoordsDisplay();
-                map.fitBounds(imageBounds, { padding: [50, 50] });
-            };
-            
-            tempImg.src = imageUrl;
-        }
-
-        // ===== MARCADORES DE CONTROLE (CANTOS) =====
-        function createCornerMarkers() {
-            if (!imageBounds) return;
-
-            const corners = {
-                tl: imageBounds.getNorthWest(),
-                tr: imageBounds.getNorthEast(),
-                bl: imageBounds.getSouthWest(),
-                br: imageBounds.getSouthEast()
-            };
-
-            const colors = {
-                tl: '#ff6b6b',
-                tr: '#4ecdc4',
-                bl: '#ffe66d',
-                br: '#95e1d3'
-            };
-
-            const labels = {
-                tl: 'Noroeste (TL)',
-                tr: 'Nordeste (TR)',
-                bl: 'Sudoeste (BL)',
-                br: 'Sudeste (BR)'
-            };
-
-            for (const [key, latLng] of Object.entries(corners)) {
-                const icon = L.divIcon({
-                    className: '',
-                    html: `<div class="control-marker corner-${key}" style="background: ${colors[key]}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); cursor: grab;"></div>`,
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
-                });
-
-                const marker = L.marker(latLng, {
-                    icon: icon,
-                    draggable: true,
-                    title: labels[key]
-                }).addTo(map);
-
-                marker.on('drag', function() {
-                    updateImageBoundsFromMarkers();
-                });
-
-                marker.on('dragend', function() {
-                    updateImageBoundsFromMarkers();
-                    updateCoordsDisplay();
-                });
-
-                cornerMarkers[key] = marker;
-            }
-        }
-
-        function removeCornerMarkers() {
-            for (const key in cornerMarkers) {
-                if (cornerMarkers[key]) {
-                    map.removeLayer(cornerMarkers[key]);
-                }
-            }
-            cornerMarkers = {};
-        }
-
-        function updateImageBoundsFromMarkers() {
-            if (!imageOverlay) return;
-
-            const tl = cornerMarkers.tl.getLatLng();
-            const tr = cornerMarkers.tr.getLatLng();
-            const bl = cornerMarkers.bl.getLatLng();
-            const br = cornerMarkers.br.getLatLng();
-
-            // Calcular novo bounds (usa média para formar retângulo)
-            const north = Math.max(tl.lat, tr.lat);
-            const south = Math.min(bl.lat, br.lat);
-            const west = Math.min(tl.lng, bl.lng);
-            const east = Math.max(tr.lng, br.lng);
-
-            imageBounds = L.latLngBounds([south, west], [north, east]);
-            imageOverlay.setBounds(imageBounds);
-
-            // Reposicionar markers para ficarem nos cantos exatos do novo bounds
-            cornerMarkers.tl.setLatLng([north, west]);
-            cornerMarkers.tr.setLatLng([north, east]);
-            cornerMarkers.bl.setLatLng([south, west]);
-            cornerMarkers.br.setLatLng([south, east]);
-        }
-
-        // ===== CARREGAMENTO DE IMAGEM LOCAL =====
+        // ===== CARREGAR IMAGEM =====
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    loadImageAsOverlay(event.target.result, defaultBounds);
+                    loadImage(event.target.result, file.name);
                 };
                 reader.readAsDataURL(file);
             }
         });
 
         function loadImageFromUrl() {
-            const url = document.getElementById('imageUrl').value;
+            const url = document.getElementById('imageUrl').value.trim();
             if (url) {
-                loadImageAsOverlay(url, defaultBounds);
+                loadImage(url, 'URL');
             }
         }
 
-        // ===== CONTROLES =====
-        // Opacidade
-        document.getElementById('opacity').addEventListener('input', function() {
-            document.getElementById('opacityValue').value = this.value;
-            if (imageOverlay) {
-                imageOverlay.setOpacity(parseFloat(this.value));
-            }
-        });
+        function loadImage(src, name) {
+            const status = document.getElementById('imageStatus');
+            status.innerHTML = '⏳ Carregando...';
+            status.style.color = '#ffff00';
 
-        document.getElementById('opacityValue').addEventListener('change', function() {
-            document.getElementById('opacity').value = this.value;
-            if (imageOverlay) {
-                imageOverlay.setOpacity(parseFloat(this.value));
-            }
-        });
-
-        // Ajuste de bounds via controles numéricos
-        function updateBoundsFromInputs() {
-            if (!imageOverlay) return;
-
-            const north = parseFloat(document.getElementById('boundNorth').value);
-            const south = parseFloat(document.getElementById('boundSouth').value);
-            const east = parseFloat(document.getElementById('boundEast').value);
-            const west = parseFloat(document.getElementById('boundWest').value);
-
-            if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) return;
-
-            imageBounds = L.latLngBounds([south, west], [north, east]);
-            imageOverlay.setBounds(imageBounds);
-
-            // Atualizar posição dos markers
-            if (cornerMarkers.tl) cornerMarkers.tl.setLatLng([north, west]);
-            if (cornerMarkers.tr) cornerMarkers.tr.setLatLng([north, east]);
-            if (cornerMarkers.bl) cornerMarkers.bl.setLatLng([south, west]);
-            if (cornerMarkers.br) cornerMarkers.br.setLatLng([south, east]);
-
-            updateCoordsDisplay();
-        }
-
-        ['boundNorth', 'boundSouth', 'boundEast', 'boundWest'].forEach(id => {
-            document.getElementById(id).addEventListener('change', updateBoundsFromInputs);
-        });
-
-        // Toggles
-        document.getElementById('showImage').addEventListener('change', function() {
-            if (imageOverlay) {
-                if (this.checked) {
-                    imageOverlay.addTo(map);
-                } else {
-                    map.removeLayer(imageOverlay);
-                }
-            }
-        });
-
-        document.getElementById('showControlPoints').addEventListener('change', function() {
-            for (const key in cornerMarkers) {
-                if (this.checked) {
-                    cornerMarkers[key].addTo(map);
-                } else {
-                    map.removeLayer(cornerMarkers[key]);
-                }
-            }
-        });
-
-        document.getElementById('lockDrag').addEventListener('change', function() {
-            for (const key in cornerMarkers) {
-                if (this.checked) {
-                    cornerMarkers[key].dragging.disable();
-                } else {
-                    cornerMarkers[key].dragging.enable();
-                }
-            }
-        });
-
-        // ===== FUNÇÕES DE AÇÃO =====
-        function resetTransformations() {
-            document.getElementById('opacity').value = 0.7;
-            document.getElementById('opacityValue').value = 0.7;
-
-            if (imageOverlay) {
-                imageOverlay.setOpacity(0.7);
+            imageElement.onload = function() {
+                imageNaturalSize = {
+                    width: this.naturalWidth,
+                    height: this.naturalHeight
+                };
                 
-                // Resetar para bounds padrão
-                const b = defaultBounds;
-                imageBounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
-                imageOverlay.setBounds(imageBounds);
+                imageElement.style.display = 'block';
+                imageLoaded = true;
+                resetZoom();
+                
+                status.innerHTML = `✅ ${name}<br>📐 ${imageNaturalSize.width} × ${imageNaturalSize.height} px`;
+                status.style.color = '#00ff00';
+                
+                updateSummary();
+            };
 
-                // Atualizar markers
-                if (cornerMarkers.tl) cornerMarkers.tl.setLatLng([b.north, b.west]);
-                if (cornerMarkers.tr) cornerMarkers.tr.setLatLng([b.north, b.east]);
-                if (cornerMarkers.bl) cornerMarkers.bl.setLatLng([b.south, b.west]);
-                if (cornerMarkers.br) cornerMarkers.br.setLatLng([b.south, b.east]);
+            imageElement.onerror = function() {
+                status.innerHTML = '❌ Erro ao carregar imagem';
+                status.style.color = '#ff4444';
+            };
 
-                map.fitBounds(imageBounds, { padding: [50, 50] });
-            }
-
-            updateCoordsDisplay();
+            imageElement.src = src;
         }
 
-        function fitImageToView() {
-            if (imageBounds) {
-                map.fitBounds(imageBounds, { padding: [50, 50] });
+        // ===== ZOOM DA IMAGEM =====
+        function zoomImage(factor) {
+            currentZoom *= factor;
+            currentZoom = Math.max(0.1, Math.min(10, currentZoom));
+            applyZoom();
+        }
+
+        function resetZoom() {
+            if (!imageLoaded) return;
+            
+            const area = document.getElementById('imageArea');
+            const areaRect = area.getBoundingClientRect();
+            
+            // Calcular zoom para caber na área
+            const scaleX = (areaRect.width - 100) / imageNaturalSize.width;
+            const scaleY = (areaRect.height - 100) / imageNaturalSize.height;
+            currentZoom = Math.min(scaleX, scaleY, 1);
+            
+            imageOffset = { x: 0, y: 0 };
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const container = document.getElementById('imageContainer');
+            container.style.transform = `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            updatePointPositions();
+        }
+
+        // ===== ARRASTAR IMAGEM =====
+        function setupImageDrag() {
+            const area = document.getElementById('imageArea');
+            
+            area.addEventListener('mousedown', function(e) {
+                if (e.target.classList.contains('image-point')) return;
+                if (gcpMode) return;
+                
+                isDragging = true;
+                dragTarget = 'image';
+                dragOffset = {
+                    x: e.clientX - imageOffset.x,
+                    y: e.clientY - imageOffset.y
+                };
+                area.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                if (dragTarget === 'image') {
+                    imageOffset.x = e.clientX - dragOffset.x;
+                    imageOffset.y = e.clientY - dragOffset.y;
+                    applyZoom();
+                } else if (dragTarget && dragTarget.type === 'point') {
+                    updatePointDrag(e, dragTarget.point);
+                }
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                dragTarget = null;
+                document.getElementById('imageArea').style.cursor = gcpMode ? 'crosshair' : 'grab';
+            });
+        }
+
+        // ===== RASTREAR MOUSE =====
+        function setupMouseTracking() {
+            const area = document.getElementById('imageArea');
+            
+            area.addEventListener('mousemove', function(e) {
+                if (!imageLoaded) return;
+                
+                const pixel = clientToImagePixel(e.clientX, e.clientY);
+                if (pixel) {
+                    document.getElementById('mouseInfo').innerHTML = 
+                        `Pixel: <b>${Math.round(pixel.x)}</b> , <b>${Math.round(pixel.y)}</b>`;
+                }
+            });
+
+            area.addEventListener('click', function(e) {
+                if (gcpMode && !e.target.classList.contains('image-point')) {
+                    addGcpPoint(e);
+                }
+            });
+        }
+
+        function clientToImagePixel(clientX, clientY) {
+            const container = document.getElementById('imageContainer');
+            const rect = container.getBoundingClientRect();
+            const imgRect = imageElement.getBoundingClientRect();
+            
+            // Posição relativa à imagem escalada
+            const relX = clientX - imgRect.left;
+            const relY = clientY - imgRect.top;
+            
+            // Converter para coordenadas de pixel original
+            const pixelX = relX / currentZoom;
+            const pixelY = relY / currentZoom;
+            
+            if (pixelX >= 0 && pixelX <= imageNaturalSize.width &&
+                pixelY >= 0 && pixelY <= imageNaturalSize.height) {
+                return { x: pixelX, y: pixelY };
+            }
+            return null;
+        }
+
+        // ===== GCP POINTS =====
+        function toggleGcpMode() {
+            gcpMode = !gcpMode;
+            const btn = document.getElementById('btnGcpMode');
+            const instructions = document.getElementById('gcpInstructions');
+            const area = document.getElementById('imageArea');
+            
+            if (gcpMode) {
+                btn.classList.add('gcp-mode-active');
+                btn.innerHTML = '🎯 CLIQUE NA IMAGEM!';
+                instructions.style.display = 'block';
+                area.style.cursor = 'crosshair';
+            } else {
+                btn.classList.remove('gcp-mode-active');
+                btn.innerHTML = '🎯 Marcar Ponto na Imagem';
+                instructions.style.display = 'none';
+                area.style.cursor = 'grab';
             }
         }
 
-        function getAlignmentData() {
-            if (!imageOverlay || !imageBounds) return null;
+        function addGcpPoint(e) {
+            if (!imageLoaded) {
+                alert('Carregue uma imagem primeiro!');
+                return;
+            }
 
-            const bounds = imageBounds;
+            const pixel = clientToImagePixel(e.clientX, e.clientY);
+            if (!pixel) return;
+
+            gcpCounter++;
+            const id = gcpCounter;
+
+            // Criar elemento visual
+            const pointEl = document.createElement('div');
+            pointEl.className = 'image-point';
+            pointEl.innerHTML = id;
+            pointEl.dataset.id = id;
+            document.getElementById('imageContainer').appendChild(pointEl);
+
+            // Posicionar
+            pointEl.style.left = (pixel.x * currentZoom) + 'px';
+            pointEl.style.top = (pixel.y * currentZoom) + 'px';
+
+            // Permitir arrastar
+            setupPointDrag(pointEl);
+
+            // Adicionar ao array
+            const point = {
+                id: id,
+                pixelX: pixel.x,
+                pixelY: pixel.y,
+                lat: 0,
+                lng: 0,
+                element: pointEl
+            };
+            gcpPoints.push(point);
+
+            updateGcpList();
+            updateSummary();
+            
+            // Desativar modo após adicionar
+            toggleGcpMode();
+        }
+
+        function setupPointDrag(pointEl) {
+            pointEl.addEventListener('mousedown', function(e) {
+                e.stopPropagation();
+                isDragging = true;
+                const id = parseInt(pointEl.dataset.id);
+                const point = gcpPoints.find(p => p.id === id);
+                dragTarget = { type: 'point', point: point };
+            });
+        }
+
+        function updatePointDrag(e, point) {
+            const pixel = clientToImagePixel(e.clientX, e.clientY);
+            if (pixel) {
+                point.pixelX = pixel.x;
+                point.pixelY = pixel.y;
+                point.element.style.left = (pixel.x * currentZoom) + 'px';
+                point.element.style.top = (pixel.y * currentZoom) + 'px';
+                updateGcpList();
+            }
+        }
+
+        function updatePointPositions() {
+            gcpPoints.forEach(point => {
+                point.element.style.left = (point.pixelX * currentZoom) + 'px';
+                point.element.style.top = (point.pixelY * currentZoom) + 'px';
+            });
+        }
+
+        function updateGcpList() {
+            const listEl = document.getElementById('gcpList');
+            
+            if (gcpPoints.length === 0) {
+                listEl.innerHTML = '<p style="color:#666; font-size:0.85em; text-align:center;">Nenhum ponto marcado</p>';
+                return;
+            }
+            
+            let html = '';
+            gcpPoints.forEach(point => {
+                html += `
+                    <div class="gcp-item" data-id="${point.id}">
+                        <div class="gcp-header">
+                            <span class="gcp-number">${point.id}</span>
+                            <span style="color:#888; font-size:0.8em;">Pixel: ${Math.round(point.pixelX)}, ${Math.round(point.pixelY)}</span>
+                            <button class="remove-btn" onclick="removePoint(${point.id})">×</button>
+                        </div>
+                        <div class="gcp-coords">
+                            <div>
+                                <label>Latitude</label>
+                                <input type="number" step="0.0001" value="${point.lat}" 
+                                       placeholder="-22.1234"
+                                       onchange="updatePointCoord(${point.id}, 'lat', this.value)">
+                            </div>
+                            <div>
+                                <label>Longitude</label>
+                                <input type="number" step="0.0001" value="${point.lng}" 
+                                       placeholder="-41.5678"
+                                       onchange="updatePointCoord(${point.id}, 'lng', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            listEl.innerHTML = html;
+        }
+
+        function updatePointCoord(id, field, value) {
+            const point = gcpPoints.find(p => p.id === id);
+            if (point) {
+                point[field] = parseFloat(value) || 0;
+                updateSummary();
+            }
+        }
+
+        function removePoint(id) {
+            const index = gcpPoints.findIndex(p => p.id === id);
+            if (index !== -1) {
+                gcpPoints[index].element.remove();
+                gcpPoints.splice(index, 1);
+                updateGcpList();
+                updateSummary();
+            }
+        }
+
+        function clearAllPoints() {
+            gcpPoints.forEach(p => p.element.remove());
+            gcpPoints = [];
+            gcpCounter = 0;
+            updateGcpList();
+            updateSummary();
+        }
+
+        // ===== CALCULAR ALINHAMENTO =====
+        function calculateAlignment() {
+            if (gcpPoints.length < 2) {
+                return null;
+            }
+
+            // Verificar se todos os pontos têm coordenadas
+            const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
+            if (validPoints.length < 2) {
+                return null;
+            }
+
+            // Calcular transformação linear simples (escala + offset)
+            // Usando os pontos para calcular bounds geográficos
+
+            let minPixelX = Infinity, maxPixelX = -Infinity;
+            let minPixelY = Infinity, maxPixelY = -Infinity;
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+
+            validPoints.forEach(p => {
+                minPixelX = Math.min(minPixelX, p.pixelX);
+                maxPixelX = Math.max(maxPixelX, p.pixelX);
+                minPixelY = Math.min(minPixelY, p.pixelY);
+                maxPixelY = Math.max(maxPixelY, p.pixelY);
+                minLat = Math.min(minLat, p.lat);
+                maxLat = Math.max(maxLat, p.lat);
+                minLng = Math.min(minLng, p.lng);
+                maxLng = Math.max(maxLng, p.lng);
+            });
+
+            // Calcular escala (graus por pixel)
+            const pixelRangeX = maxPixelX - minPixelX;
+            const pixelRangeY = maxPixelY - minPixelY;
+            const latRange = maxLat - minLat;
+            const lngRange = maxLng - minLng;
+
+            // Escala
+            const scaleX = pixelRangeX > 0 ? lngRange / pixelRangeX : 0;
+            const scaleY = pixelRangeY > 0 ? latRange / pixelRangeY : 0;
+
+            // Extrapolar para os cantos da imagem
+            // Pixel (0,0) está no topo-esquerdo
+            // Lat aumenta para cima (Norte), Y de pixel aumenta para baixo
+            
+            // Calcular offset usando um ponto de referência
+            const refPoint = validPoints[0];
+            const offsetLng = refPoint.lng - (refPoint.pixelX * scaleX);
+            const offsetLat = refPoint.lat + (refPoint.pixelY * scaleY); // + porque Y é invertido
+
+            // Calcular bounds da imagem completa
+            const north = offsetLat;  // Y=0
+            const south = offsetLat - (imageNaturalSize.height * scaleY);
+            const west = offsetLng;   // X=0
+            const east = offsetLng + (imageNaturalSize.width * scaleX);
 
             return {
-                timestamp: new Date().toISOString(),
-                mapCenter: { 
-                    lat: map.getCenter().lat, 
-                    lng: map.getCenter().lng 
-                },
-                mapZoom: map.getZoom(),
-                imageUrl: currentImageUrl,
-                originalImageSize: originalImageSize,
-                opacity: parseFloat(document.getElementById('opacity').value),
-                bounds: {
-                    north: bounds.getNorth(),
-                    south: bounds.getSouth(),
-                    east: bounds.getEast(),
-                    west: bounds.getWest()
-                },
-                corners: {
-                    tl: { lat: bounds.getNorth(), lng: bounds.getWest() },
-                    tr: { lat: bounds.getNorth(), lng: bounds.getEast() },
-                    bl: { lat: bounds.getSouth(), lng: bounds.getWest() },
-                    br: { lat: bounds.getSouth(), lng: bounds.getEast() }
-                }
+                bounds: { north, south, east, west },
+                scale: { x: scaleX, y: scaleY },
+                gcpPoints: validPoints.map(p => ({
+                    pixelX: p.pixelX,
+                    pixelY: p.pixelY,
+                    lat: p.lat,
+                    lng: p.lng
+                })),
+                imageSize: imageNaturalSize
             };
         }
 
-        function saveAlignment() {
-            const data = getAlignmentData();
-            if (!data) {
-                alert('Carregue uma imagem primeiro!');
+        function updateSummary() {
+            const el = document.getElementById('summaryDisplay');
+            const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
+            
+            if (!imageLoaded) {
+                el.innerHTML = 'Carregue uma imagem';
+                return;
+            }
+            
+            if (gcpPoints.length === 0) {
+                el.innerHTML = `📐 Imagem: ${imageNaturalSize.width}×${imageNaturalSize.height}px<br>📌 Marque pontos de referência`;
                 return;
             }
 
-            const json = JSON.stringify(data, null, 2);
-            document.getElementById('resultJSON').textContent = json;
-            document.getElementById('resultModal').style.display = 'flex';
+            let html = `📐 Imagem: ${imageNaturalSize.width}×${imageNaturalSize.height}px<br>`;
+            html += `📌 Pontos: ${validPoints.length} com coordenadas / ${gcpPoints.length} total<br>`;
 
-            localStorage.setItem('satelliteAlignment', json);
-            console.log('Alinhamento salvo:', data);
+            const alignment = calculateAlignment();
+            if (alignment) {
+                html += `<br><b style="color:#00ff00;">✅ Pronto para alinhar!</b><br>`;
+                html += `N: ${alignment.bounds.north.toFixed(4)}°<br>`;
+                html += `S: ${alignment.bounds.south.toFixed(4)}°<br>`;
+                html += `E: ${alignment.bounds.east.toFixed(4)}°<br>`;
+                html += `W: ${alignment.bounds.west.toFixed(4)}°`;
+            } else {
+                html += `<span style="color:#ffaa00;">⚠️ Adicione coordenadas aos pontos</span>`;
+            }
+
+            el.innerHTML = html;
         }
 
-        function exportAsJSON() {
-            const data = getAlignmentData();
-            if (!data) {
-                alert('Carregue uma imagem primeiro!');
+        // ===== PREVIEW NO MAPA =====
+        function previewAlignment() {
+            const alignment = calculateAlignment();
+            
+            if (!alignment) {
+                alert('Você precisa de pelo menos 2 pontos com coordenadas para ver o alinhamento!');
                 return;
             }
-            downloadJSONData(data);
+
+            document.getElementById('previewModal').style.display = 'flex';
+
+            // Inicializar mapa se não existir
+            setTimeout(() => {
+                if (!previewMap) {
+                    previewMap = L.map('previewMap', {
+                        zoomControl: true
+                    });
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap'
+                    }).addTo(previewMap);
+                }
+
+                // Limpar camadas anteriores
+                previewMap.eachLayer(layer => {
+                    if (layer instanceof L.ImageOverlay || layer instanceof L.Marker) {
+                        previewMap.removeLayer(layer);
+                    }
+                });
+
+                // Adicionar overlay da imagem
+                const bounds = L.latLngBounds(
+                    [alignment.bounds.south, alignment.bounds.west],
+                    [alignment.bounds.north, alignment.bounds.east]
+                );
+
+                L.imageOverlay(imageElement.src, bounds, {
+                    opacity: 0.8
+                }).addTo(previewMap);
+
+                // Adicionar marcadores dos GCPs
+                alignment.gcpPoints.forEach((p, i) => {
+                    L.marker([p.lat, p.lng])
+                        .bindPopup(`GCP ${i+1}: ${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}`)
+                        .addTo(previewMap);
+                });
+
+                previewMap.fitBounds(bounds);
+                previewMap.invalidateSize();
+            }, 100);
         }
 
-        function downloadJSONData(data) {
+        function closePreview() {
+            document.getElementById('previewModal').style.display = 'none';
+        }
+
+        // ===== EXPORTAR/IMPORTAR =====
+        function exportAlignment() {
+            const alignment = calculateAlignment();
+            if (!alignment) {
+                alert('Configure os pontos de referência primeiro!');
+                return;
+            }
+
+            const data = {
+                timestamp: new Date().toISOString(),
+                ...alignment
+            };
+
             const json = JSON.stringify(data, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `satellite_alignment_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+            a.download = `alignment_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
             a.click();
             URL.revokeObjectURL(url);
         }
 
-        function downloadJSON() {
-            const data = getAlignmentData();
-            if (data) {
-                downloadJSONData(data);
-            }
-        }
-
-        function loadFromJSON() {
+        function importAlignment() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
@@ -1087,9 +973,9 @@
                     reader.onload = function(event) {
                         try {
                             const data = JSON.parse(event.target.result);
-                            applyAlignmentData(data);
+                            applyImportedAlignment(data);
                         } catch (err) {
-                            alert('Erro ao ler arquivo JSON: ' + err.message);
+                            alert('Erro ao ler arquivo: ' + err.message);
                         }
                     };
                     reader.readAsText(file);
@@ -1098,264 +984,42 @@
             input.click();
         }
 
-        function applyAlignmentData(data) {
-            // Aplicar opacidade
-            if (data.opacity !== undefined) {
-                document.getElementById('opacity').value = data.opacity;
-                document.getElementById('opacityValue').value = data.opacity;
-            }
+        function applyImportedAlignment(data) {
+            if (data.gcpPoints) {
+                clearAllPoints();
+                data.gcpPoints.forEach(p => {
+                    gcpCounter++;
+                    const id = gcpCounter;
+                    
+                    const pointEl = document.createElement('div');
+                    pointEl.className = 'image-point';
+                    pointEl.innerHTML = id;
+                    pointEl.dataset.id = id;
+                    document.getElementById('imageContainer').appendChild(pointEl);
+                    pointEl.style.left = (p.pixelX * currentZoom) + 'px';
+                    pointEl.style.top = (p.pixelY * currentZoom) + 'px';
+                    setupPointDrag(pointEl);
 
-            // Carregar imagem com bounds salvos
-            if (data.imageUrl && data.bounds) {
-                loadImageAsOverlay(data.imageUrl, data.bounds);
-            }
-
-            // Aplicar view do mapa
-            if (data.mapCenter && data.mapZoom) {
-                map.setView([data.mapCenter.lat, data.mapCenter.lng], data.mapZoom);
-            }
-        }
-
-        function copyToClipboard() {
-            const text = document.getElementById('resultJSON').textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('JSON copiado para a área de transferência!');
-            });
-        }
-
-        function closeModal() {
-            document.getElementById('resultModal').style.display = 'none';
-        }
-
-        function updateCoordsDisplay() {
-            const data = getAlignmentData();
-            if (!data) {
-                document.getElementById('coordsDisplay').innerHTML = 'Carregue uma imagem para ver as coordenadas';
-                return;
-            }
-
-            // Atualizar inputs de bounds
-            document.getElementById('boundNorth').value = data.bounds.north.toFixed(4);
-            document.getElementById('boundSouth').value = data.bounds.south.toFixed(4);
-            document.getElementById('boundEast').value = data.bounds.east.toFixed(4);
-            document.getElementById('boundWest').value = data.bounds.west.toFixed(4);
-
-            const html = `
-<b>Bounding Box:</b>
-Norte: ${data.bounds.north.toFixed(4)}°
-Sul: ${data.bounds.south.toFixed(4)}°
-Leste: ${data.bounds.east.toFixed(4)}°
-Oeste: ${data.bounds.west.toFixed(4)}°
-
-<b>Dimensões:</b>
-Lat: ${(data.bounds.north - data.bounds.south).toFixed(2)}°
-Lng: ${(data.bounds.east - data.bounds.west).toFixed(2)}°
-
-<b>Zoom atual:</b> ${map.getZoom().toFixed(2)}
-            `;
-            document.getElementById('coordsDisplay').innerHTML = html;
-        }
-
-        // ===== INICIALIZAÇÃO =====
-        document.addEventListener('DOMContentLoaded', function() {
-            initMap();
-
-            // Carregar alinhamento anterior se existir
-            const saved = localStorage.getItem('satelliteAlignment');
-            if (saved) {
-                console.log('Alinhamento anterior encontrado no localStorage');
-            }
-        });
-
-        // ===== GCP (GROUND CONTROL POINTS) =====
-        function toggleGcpMode() {
-            gcpMode = !gcpMode;
-            const btn = document.getElementById('btnGcpMode');
-            const instructions = document.getElementById('gcpInstructions');
-            
-            if (gcpMode) {
-                btn.classList.add('gcp-mode-active');
-                btn.innerHTML = '🎯 MODO ATIVO - Clique no mapa!';
-                instructions.classList.add('active');
-                map.getContainer().style.cursor = 'crosshair';
-                
-                // Adicionar listener de clique
-                map.on('click', onMapClickGcp);
-            } else {
-                btn.classList.remove('gcp-mode-active');
-                btn.innerHTML = '🎯 Marcar Pontos no Mapa';
-                instructions.classList.remove('active');
-                map.getContainer().style.cursor = '';
-                
-                // Remover listener
-                map.off('click', onMapClickGcp);
-            }
-        }
-
-        function onMapClickGcp(e) {
-            if (!gcpMode) return;
-            
-            gcpCounter++;
-            const id = gcpCounter;
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
-            
-            // Criar marcador
-            const icon = L.divIcon({
-                className: '',
-                html: `<div class="gcp-marker">${id}</div>`,
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
-            });
-            
-            const marker = L.marker([lat, lng], {
-                icon: icon,
-                draggable: true
-            }).addTo(map);
-            
-            // Atualizar coordenadas quando arrastar
-            marker.on('dragend', function() {
-                const pos = marker.getLatLng();
-                const point = gcpPoints.find(p => p.id === id);
-                if (point) {
-                    point.lat = pos.lat;
-                    point.lng = pos.lng;
-                    updateGcpList();
-                }
-            });
-            
-            // Adicionar ao array
-            gcpPoints.push({ marker, lat, lng, id });
-            
-            // Atualizar lista visual
-            updateGcpList();
-        }
-
-        function updateGcpList() {
-            const listEl = document.getElementById('gcpList');
-            
-            if (gcpPoints.length === 0) {
-                listEl.innerHTML = '<p style="color:#888; font-size:0.85em;">Nenhum ponto marcado ainda</p>';
-                return;
-            }
-            
-            let html = '';
-            gcpPoints.forEach((point, index) => {
-                html += `
-                    <div class="gcp-item" data-id="${point.id}">
-                        <span class="gcp-number">${point.id}</span>
-                        <span style="color:#888;">Lat:</span>
-                        <input type="number" step="0.0001" value="${point.lat.toFixed(4)}" 
-                               onchange="updateGcpCoord(${point.id}, 'lat', this.value)">
-                        <span style="color:#888;">Lng:</span>
-                        <input type="number" step="0.0001" value="${point.lng.toFixed(4)}" 
-                               onchange="updateGcpCoord(${point.id}, 'lng', this.value)">
-                        <button onclick="removeGcpPoint(${point.id})">×</button>
-                    </div>
-                `;
-            });
-            
-            listEl.innerHTML = html;
-        }
-
-        function updateGcpCoord(id, field, value) {
-            const point = gcpPoints.find(p => p.id === id);
-            if (point) {
-                point[field] = parseFloat(value);
-                point.marker.setLatLng([point.lat, point.lng]);
-            }
-        }
-
-        function removeGcpPoint(id) {
-            const index = gcpPoints.findIndex(p => p.id === id);
-            if (index !== -1) {
-                map.removeLayer(gcpPoints[index].marker);
-                gcpPoints.splice(index, 1);
+                    gcpPoints.push({
+                        id: id,
+                        pixelX: p.pixelX,
+                        pixelY: p.pixelY,
+                        lat: p.lat,
+                        lng: p.lng,
+                        element: pointEl
+                    });
+                });
                 updateGcpList();
+                updateSummary();
             }
         }
 
-        function clearAllGcpPoints() {
-            gcpPoints.forEach(point => {
-                map.removeLayer(point.marker);
-            });
-            gcpPoints = [];
-            gcpCounter = 0;
-            updateGcpList();
-        }
-
-        function alignFromGcpPoints() {
-            if (gcpPoints.length < 2) {
-                alert('Você precisa de pelo menos 2 pontos de referência para alinhar a imagem!');
-                return;
-            }
-            
-            if (!imageOverlay) {
-                alert('Carregue uma imagem primeiro!');
-                return;
-            }
-            
-            // Calcular bounding box a partir dos pontos GCP
-            let minLat = Infinity, maxLat = -Infinity;
-            let minLng = Infinity, maxLng = -Infinity;
-            
-            gcpPoints.forEach(point => {
-                minLat = Math.min(minLat, point.lat);
-                maxLat = Math.max(maxLat, point.lat);
-                minLng = Math.min(minLng, point.lng);
-                maxLng = Math.max(maxLng, point.lng);
-            });
-            
-            // Adicionar margem proporcional (10% de cada lado)
-            const latRange = maxLat - minLat;
-            const lngRange = maxLng - minLng;
-            
-            // Se temos só 2 pontos, eles definem os extremos
-            // Se temos mais pontos, usamos eles como área de interesse
-            
-            // Ajustar bounds - calcular proporção da imagem
-            const imageAspect = originalImageSize.width / originalImageSize.height;
-            const currentAspect = lngRange / latRange;
-            
-            let finalNorth, finalSouth, finalEast, finalWest;
-            
-            if (gcpPoints.length === 2) {
-                // Com 2 pontos, assumimos que são cantos opostos (ex: NW e SE)
-                finalNorth = maxLat;
-                finalSouth = minLat;
-                finalEast = maxLng;
-                finalWest = minLng;
-            } else {
-                // Com 3+ pontos, adicionamos margem
-                const marginLat = latRange * 0.1;
-                const marginLng = lngRange * 0.1;
-                
-                finalNorth = maxLat + marginLat;
-                finalSouth = minLat - marginLat;
-                finalEast = maxLng + marginLng;
-                finalWest = minLng - marginLng;
-            }
-            
-            // Aplicar novo bounds
-            imageBounds = L.latLngBounds([finalSouth, finalWest], [finalNorth, finalEast]);
-            imageOverlay.setBounds(imageBounds);
-            
-            // Atualizar markers de canto
-            if (cornerMarkers.tl) cornerMarkers.tl.setLatLng([finalNorth, finalWest]);
-            if (cornerMarkers.tr) cornerMarkers.tr.setLatLng([finalNorth, finalEast]);
-            if (cornerMarkers.bl) cornerMarkers.bl.setLatLng([finalSouth, finalWest]);
-            if (cornerMarkers.br) cornerMarkers.br.setLatLng([finalSouth, finalEast]);
-            
-            // Atualizar view
-            map.fitBounds(imageBounds, { padding: [50, 50] });
-            
-            updateCoordsDisplay();
-            
-            // Feedback visual
-            const status = document.getElementById('satStatus');
-            status.innerHTML = `✅ Imagem alinhada com ${gcpPoints.length} pontos de referência!`;
-            status.style.color = '#00ff00';
-        }
+        // Scroll para zoom
+        document.getElementById('imageArea').addEventListener('wheel', function(e) {
+            e.preventDefault();
+            const factor = e.deltaY > 0 ? 0.9 : 1.1;
+            zoomImage(factor);
+        });
     </script>
 </body>
 </html>
