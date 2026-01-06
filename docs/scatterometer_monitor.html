@@ -576,9 +576,6 @@
             maxZoom: 19
         }).addTo(map);
         
-        // Camada de satélite
-        loadSatelliteLayer();
-        
         // Grupos de camadas
         windLayerGroup = L.layerGroup().addTo(map);
         gridLayer = L.layerGroup();
@@ -617,6 +614,9 @@
         
         // Buscar dados Open-Meteo automaticamente
         setTimeout(() => fetchOpenMeteoData(), 1000);
+        
+        // Carregar satélite após mapa inicializado
+        setTimeout(() => loadSatelliteLayer(), 500);
         
         // Atualização automática do Open-Meteo a cada 15 minutos
         setInterval(() => {
