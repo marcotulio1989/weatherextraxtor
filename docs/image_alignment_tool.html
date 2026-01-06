@@ -364,6 +364,17 @@
             <!-- Carregar Imagem -->
             <div class="control-section">
                 <h3>📁 Carregar Imagem</h3>
+                
+                <!-- Botões NOAA -->
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:10px;">
+                    <button class="btn" onclick="loadNoaaImage('goes19')" style="background:#e74c3c; font-size:0.8em; padding:8px;">
+                        🛰️ GOES-19
+                    </button>
+                    <button class="btn" onclick="loadNoaaImage('goes16')" style="background:#3498db; font-size:0.8em; padding:8px;">
+                        🛰️ GOES-16
+                    </button>
+                </div>
+                
                 <div class="file-input-wrapper">
                     <button class="btn btn-primary">📂 Selecionar Arquivo</button>
                     <input type="file" id="imageInput" accept="image/*">
@@ -509,6 +520,32 @@
             if (url) {
                 loadImage(url, 'URL');
             }
+        }
+
+        // ===== CARREGAR IMAGEM NOAA DIRETO =====
+        const NOAA_URLS = {
+            goes19: {
+                name: 'GOES-19 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg'
+            },
+            goes16: {
+                name: 'GOES-16 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg'
+            }
+        };
+
+        function loadNoaaImage(satellite) {
+            const sat = NOAA_URLS[satellite];
+            if (!sat) return;
+
+            const status = document.getElementById('imageStatus');
+            status.innerHTML = `⏳ Baixando ${sat.name}...`;
+            status.style.color = '#ffff00';
+
+            // Adicionar timestamp para evitar cache
+            const urlWithCache = sat.url + '?t=' + Date.now();
+            
+            loadImage(urlWithCache, sat.name);
         }
 
         function loadImage(src, name) {
