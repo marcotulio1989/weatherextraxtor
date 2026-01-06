@@ -1193,8 +1193,8 @@
             // Atualizar display
             updateModelAverage();
             
-            // Adicionar ponto único do modelo médio no centro do mapa
-            addModelAveragePoint();
+            // Criar grid de pontos para o mapa (50 NM)
+            await fetchGridPoints();
             
             updateWindDisplay();
             setStatus('openmeteo-status', 'active');
