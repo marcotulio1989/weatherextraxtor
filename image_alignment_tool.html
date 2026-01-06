@@ -149,52 +149,24 @@
             height: 100%;
         }
 
-        /* Overlay da Imagem */
-        .image-overlay-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 500;
-        }
-
-        .satellite-image {
-            position: absolute;
-            transform-origin: center center;
-            pointer-events: auto;
-            cursor: move;
-        }
-
-        /* Pontos de Controle */
-        .control-point {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: #e94560;
-            border: 3px solid white;
+        /* Marcadores de Controle - estilo para os markers Leaflet */
+        .control-marker {
+            width: 24px !important;
+            height: 24px !important;
             border-radius: 50%;
-            cursor: grab;
-            z-index: 1000;
-            pointer-events: auto;
-            box-shadow: 0 0 10px rgba(233, 69, 96, 0.8);
-            transition: transform 0.1s;
+            border: 3px solid white;
+            cursor: grab !important;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
 
-        .control-point:hover {
-            transform: scale(1.3);
-            background: #00d9ff;
+        .control-marker:hover {
+            transform: scale(1.2);
         }
 
-        .control-point:active {
-            cursor: grabbing;
-        }
-
-        .control-point.corner-tl { background: #ff6b6b; }
-        .control-point.corner-tr { background: #4ecdc4; }
-        .control-point.corner-bl { background: #ffe66d; }
-        .control-point.corner-br { background: #95e1d3; }
+        .control-marker.corner-tl { background: #ff6b6b; }
+        .control-marker.corner-tr { background: #4ecdc4; }
+        .control-marker.corner-bl { background: #ffe66d; }
+        .control-marker.corner-br { background: #95e1d3; }
 
         /* Info Panel */
         .info-panel {
@@ -297,6 +269,25 @@
             transform: translateX(24px);
         }
 
+        /* Leaflet Image Overlay customization */
+        .leaflet-image-layer {
+            image-rendering: auto;
+        }
+
+        /* Zoom control customization */
+        .leaflet-control-zoom {
+            border: 2px solid #0f3460 !important;
+        }
+
+        .leaflet-control-zoom a {
+            background-color: #16213e !important;
+            color: #00d9ff !important;
+        }
+
+        .leaflet-control-zoom a:hover {
+            background-color: #0f3460 !important;
+        }
+
         /* Modal de Salvamento */
         .modal {
             display: none;
@@ -390,24 +381,26 @@
 
             <!-- Transformações Globais -->
             <div class="control-section">
-                <h3>🔄 Transformações Globais</h3>
+                <h3>� Ajuste de Bounds (Coordenadas)</h3>
                 
                 <div class="control-row">
-                    <label>Rotação:</label>
-                    <input type="range" id="rotation" min="-180" max="180" value="0" step="0.1">
-                    <input type="number" id="rotationValue" value="0" step="0.1">
+                    <label>Norte:</label>
+                    <input type="number" id="boundNorth" value="10" step="0.1" style="flex:1;">
                 </div>
 
                 <div class="control-row">
-                    <label>Escala X:</label>
-                    <input type="range" id="scaleX" min="0.1" max="3" value="1" step="0.01">
-                    <input type="number" id="scaleXValue" value="1" step="0.01">
+                    <label>Sul:</label>
+                    <input type="number" id="boundSouth" value="-55" step="0.1" style="flex:1;">
                 </div>
 
                 <div class="control-row">
-                    <label>Escala Y:</label>
-                    <input type="range" id="scaleY" min="0.1" max="3" value="1" step="0.01">
-                    <input type="number" id="scaleYValue" value="1" step="0.01">
+                    <label>Leste:</label>
+                    <input type="number" id="boundEast" value="-25" step="0.1" style="flex:1;">
+                </div>
+
+                <div class="control-row">
+                    <label>Oeste:</label>
+                    <input type="number" id="boundWest" value="-85" step="0.1" style="flex:1;">
                 </div>
 
                 <div class="control-row">
@@ -416,40 +409,9 @@
                     <input type="number" id="opacityValue" value="0.7" step="0.05">
                 </div>
 
-                <div class="control-row">
-                    <label>Skew X:</label>
-                    <input type="range" id="skewX" min="-45" max="45" value="0" step="0.5">
-                    <input type="number" id="skewXValue" value="0" step="0.5">
-                </div>
-
-                <div class="control-row">
-                    <label>Skew Y:</label>
-                    <input type="range" id="skewY" min="-45" max="45" value="0" step="0.5">
-                    <input type="number" id="skewYValue" value="0" step="0.5">
-                </div>
-            </div>
-
-            <!-- Perspectiva (Distorção 3D) -->
-            <div class="control-section">
-                <h3>📐 Perspectiva 3D</h3>
-                
-                <div class="control-row">
-                    <label>Perspectiva:</label>
-                    <input type="range" id="perspective" min="100" max="2000" value="1000" step="10">
-                    <input type="number" id="perspectiveValue" value="1000" step="10">
-                </div>
-
-                <div class="control-row">
-                    <label>Rot. X:</label>
-                    <input type="range" id="rotateX" min="-60" max="60" value="0" step="0.5">
-                    <input type="number" id="rotateXValue" value="0" step="0.5">
-                </div>
-
-                <div class="control-row">
-                    <label>Rot. Y:</label>
-                    <input type="range" id="rotateY" min="-60" max="60" value="0" step="0.5">
-                    <input type="number" id="rotateYValue" value="0" step="0.5">
-                </div>
+                <button class="btn btn-secondary" onclick="fitImageToView()" style="margin-top:10px;">
+                    🔍 Ajustar Vista à Imagem
+                </button>
             </div>
 
             <!-- Visibilidade -->
@@ -503,9 +465,9 @@
                 <h3>📖 Instruções</h3>
                 <ul class="instructions">
                     <li>Carregue uma imagem de satélite</li>
-                    <li>Arraste a imagem para posicionar</li>
-                    <li>Use os pontos coloridos nos cantos para distorcer</li>
-                    <li>Ajuste rotação, escala e perspectiva</li>
+                    <li>A imagem fica <b>fixada ao mapa</b> - zoom e pan funcionam!</li>
+                    <li>Arraste os <b>marcadores coloridos</b> para ajustar os cantos</li>
+                    <li>Ou edite as coordenadas diretamente nos campos</li>
                     <li>Clique em "Salvar Alinhamento" quando terminar</li>
                 </ul>
             </div>
@@ -514,9 +476,6 @@
         <!-- Área do Mapa -->
         <div class="map-area">
             <div id="map"></div>
-            <div class="image-overlay-container" id="overlayContainer">
-                <!-- A imagem de satélite será inserida aqui -->
-            </div>
         </div>
     </div>
 
@@ -534,31 +493,31 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // ===== INICIALIZAÇÃO =====
+        // ===== ESTADO GLOBAL =====
         let map;
-        let imageElement = null;
-        let controlPoints = [];
-        let isDragging = false;
-        let dragTarget = null;
-        let dragOffset = { x: 0, y: 0 };
-        let imagePosition = { x: 0, y: 0 };
+        let imageOverlay = null;
+        let cornerMarkers = {};
+        let imageBounds = null;
         let originalImageSize = { width: 0, height: 0 };
-
-        // Pontos de controle originais (relativos à imagem)
-        let cornerOffsets = {
-            tl: { x: 0, y: 0 },
-            tr: { x: 0, y: 0 },
-            bl: { x: 0, y: 0 },
-            br: { x: 0, y: 0 }
+        let currentImageUrl = null;
+        
+        // Bounds padrão para América do Sul (aproximado para GOES-16)
+        const defaultBounds = {
+            north: 10,
+            south: -55,
+            east: -25,
+            west: -85
         };
 
-        // Inicializar mapa
+        // ===== INICIALIZAÇÃO DO MAPA =====
         function initMap() {
-            // Centralizado em Campos dos Goytacazes / região costeira
             map = L.map('map', {
                 center: [-22.0, -41.0],
-                zoom: 7,
-                zoomControl: true
+                zoom: 5,
+                zoomControl: true,
+                zoomSnap: 0.25,        // Permite zoom mais suave
+                zoomDelta: 0.5,        // Controla incremento do zoom
+                wheelPxPerZoomLevel: 120  // Sensibilidade do scroll (maior = menos sensível)
             });
 
             // Camadas de mapa
@@ -574,18 +533,23 @@
                 attribution: '© OpenTopoMap'
             });
 
-            // Adicionar camada padrão
+            const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© CartoDB'
+            });
+
             osmLayer.addTo(map);
 
-            // Controle de camadas
             L.control.layers({
                 'OpenStreetMap': osmLayer,
                 'Satélite (Esri)': satelliteLayer,
-                'Topográfico': topoLayer
+                'Topográfico': topoLayer,
+                'Dark Mode': darkLayer
             }).addTo(map);
 
-            // Adicionar escala
             L.control.scale({ imperial: false }).addTo(map);
+
+            // Atualizar display quando mapa move
+            map.on('moveend zoomend', updateCoordsDisplay);
         }
 
         // ===== ABRIR CPTEC =====
@@ -603,22 +567,36 @@
             status.innerHTML = '⏳ Buscando imagem...';
             status.style.color = '#ffff00';
 
-            // URLs que funcionam sem CORS
-            const imageUrls = {
-                // Windy tiles (funciona!)
-                'windy-satellite': 'https://ims.windy.com/sat/satellite/satellite/2026/01/06/12/satellite_2026010612.jpg',
-                'windy-radar': 'https://ims.windy.com/radar/radar/2026/01/06/12/radar_2026010612.jpg',
-                
-                // NOAA GOES (geralmente funciona)
-                'goes16-ssa-ch13': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
-                'goes16-ssa-ch02': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/02/latest.jpg',
-                'goes16-ssa-ch08': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/08/latest.jpg',
-                'goes16-br-ch13': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
+            const imageConfigs = {
+                'windy-satellite': {
+                    url: 'https://ims.windy.com/sat/satellite/satellite/2026/01/06/12/satellite_2026010612.jpg',
+                    bounds: { north: 70, south: -60, east: 50, west: -120 }
+                },
+                'windy-radar': {
+                    url: 'https://ims.windy.com/radar/radar/2026/01/06/12/radar_2026010612.jpg',
+                    bounds: { north: 70, south: -60, east: 50, west: -120 }
+                },
+                'goes16-ssa-ch13': {
+                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
+                    bounds: { north: 15, south: -60, east: -25, west: -110 }
+                },
+                'goes16-ssa-ch02': {
+                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/02/latest.jpg',
+                    bounds: { north: 15, south: -60, east: -25, west: -110 }
+                },
+                'goes16-ssa-ch08': {
+                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/08/latest.jpg',
+                    bounds: { north: 15, south: -60, east: -25, west: -110 }
+                },
+                'goes16-br-ch13': {
+                    url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
+                    bounds: { north: 15, south: -60, east: -25, west: -110 }
+                }
             };
 
-            const url = imageUrls[product];
+            const config = imageConfigs[product];
             
-            if (!url) {
+            if (!config) {
                 status.innerHTML = '❌ Produto não disponível';
                 status.style.color = '#ff4444';
                 btn.disabled = false;
@@ -626,41 +604,167 @@
             }
 
             try {
-                // Tentar carregar a imagem
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                img.onload = function() {
-                    loadImage(url);
-                    status.innerHTML = '✅ Imagem carregada! Agora alinhe com o mapa.';
-                    status.style.color = '#00ff00';
-                    btn.disabled = false;
-                };
-                
-                img.onerror = function() {
-                    // Se falhar CORS, tentar sem crossOrigin
-                    status.innerHTML = '⚠️ Carregando (pode ter restrição CORS)...';
-                    loadImage(url);
-                    status.style.color = '#ffaa00';
-                    btn.disabled = false;
-                };
-                
-                img.src = url;
-                
+                loadImageAsOverlay(config.url, config.bounds);
+                status.innerHTML = '✅ Imagem carregada! Arraste os marcadores para alinhar.';
+                status.style.color = '#00ff00';
             } catch (error) {
                 status.innerHTML = `❌ Erro: ${error.message}`;
                 status.style.color = '#ff4444';
-                btn.disabled = false;
+            }
+            
+            btn.disabled = false;
+        }
+
+        // ===== CARREGAR IMAGEM COMO OVERLAY NO MAPA =====
+        function loadImageAsOverlay(imageUrl, bounds) {
+            // Remover overlay anterior
+            if (imageOverlay) {
+                map.removeLayer(imageOverlay);
+            }
+            removeCornerMarkers();
+
+            currentImageUrl = imageUrl;
+            
+            // Criar bounds para o Leaflet
+            const b = bounds || defaultBounds;
+            imageBounds = L.latLngBounds(
+                [b.south, b.west],  // SW corner
+                [b.north, b.east]   // NE corner
+            );
+
+            // Criar imagem temporária para obter dimensões
+            const tempImg = new Image();
+            tempImg.crossOrigin = 'anonymous';
+            tempImg.onload = function() {
+                originalImageSize = {
+                    width: this.naturalWidth,
+                    height: this.naturalHeight
+                };
+                
+                // Criar overlay
+                const opacity = parseFloat(document.getElementById('opacity').value);
+                imageOverlay = L.imageOverlay(imageUrl, imageBounds, {
+                    opacity: opacity,
+                    interactive: false,
+                    crossOrigin: 'anonymous'
+                }).addTo(map);
+
+                // Criar marcadores de controle nos cantos
+                createCornerMarkers();
+                updateCoordsDisplay();
+                
+                // Ajustar view para mostrar a imagem
+                map.fitBounds(imageBounds, { padding: [50, 50] });
+            };
+            
+            tempImg.onerror = function() {
+                // Tentar carregar mesmo sem CORS
+                const opacity = parseFloat(document.getElementById('opacity').value);
+                imageOverlay = L.imageOverlay(imageUrl, imageBounds, {
+                    opacity: opacity,
+                    interactive: false
+                }).addTo(map);
+                
+                createCornerMarkers();
+                updateCoordsDisplay();
+                map.fitBounds(imageBounds, { padding: [50, 50] });
+            };
+            
+            tempImg.src = imageUrl;
+        }
+
+        // ===== MARCADORES DE CONTROLE (CANTOS) =====
+        function createCornerMarkers() {
+            if (!imageBounds) return;
+
+            const corners = {
+                tl: imageBounds.getNorthWest(),
+                tr: imageBounds.getNorthEast(),
+                bl: imageBounds.getSouthWest(),
+                br: imageBounds.getSouthEast()
+            };
+
+            const colors = {
+                tl: '#ff6b6b',
+                tr: '#4ecdc4',
+                bl: '#ffe66d',
+                br: '#95e1d3'
+            };
+
+            const labels = {
+                tl: 'Noroeste (TL)',
+                tr: 'Nordeste (TR)',
+                bl: 'Sudoeste (BL)',
+                br: 'Sudeste (BR)'
+            };
+
+            for (const [key, latLng] of Object.entries(corners)) {
+                const icon = L.divIcon({
+                    className: '',
+                    html: `<div class="control-marker corner-${key}" style="background: ${colors[key]}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); cursor: grab;"></div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                const marker = L.marker(latLng, {
+                    icon: icon,
+                    draggable: true,
+                    title: labels[key]
+                }).addTo(map);
+
+                marker.on('drag', function() {
+                    updateImageBoundsFromMarkers();
+                });
+
+                marker.on('dragend', function() {
+                    updateImageBoundsFromMarkers();
+                    updateCoordsDisplay();
+                });
+
+                cornerMarkers[key] = marker;
             }
         }
 
-        // ===== CARREGAMENTO DE IMAGEM =====
+        function removeCornerMarkers() {
+            for (const key in cornerMarkers) {
+                if (cornerMarkers[key]) {
+                    map.removeLayer(cornerMarkers[key]);
+                }
+            }
+            cornerMarkers = {};
+        }
+
+        function updateImageBoundsFromMarkers() {
+            if (!imageOverlay) return;
+
+            const tl = cornerMarkers.tl.getLatLng();
+            const tr = cornerMarkers.tr.getLatLng();
+            const bl = cornerMarkers.bl.getLatLng();
+            const br = cornerMarkers.br.getLatLng();
+
+            // Calcular novo bounds (usa média para formar retângulo)
+            const north = Math.max(tl.lat, tr.lat);
+            const south = Math.min(bl.lat, br.lat);
+            const west = Math.min(tl.lng, bl.lng);
+            const east = Math.max(tr.lng, br.lng);
+
+            imageBounds = L.latLngBounds([south, west], [north, east]);
+            imageOverlay.setBounds(imageBounds);
+
+            // Reposicionar markers para ficarem nos cantos exatos do novo bounds
+            cornerMarkers.tl.setLatLng([north, west]);
+            cornerMarkers.tr.setLatLng([north, east]);
+            cornerMarkers.bl.setLatLng([south, west]);
+            cornerMarkers.br.setLatLng([south, east]);
+        }
+
+        // ===== CARREGAMENTO DE IMAGEM LOCAL =====
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    loadImage(event.target.result);
+                    loadImageAsOverlay(event.target.result, defaultBounds);
                 };
                 reader.readAsDataURL(file);
             }
@@ -669,350 +773,119 @@
         function loadImageFromUrl() {
             const url = document.getElementById('imageUrl').value;
             if (url) {
-                loadImage(url);
+                loadImageAsOverlay(url, defaultBounds);
             }
         }
 
-        function loadImage(src) {
-            const container = document.getElementById('overlayContainer');
-            
-            // Remover imagem anterior
-            if (imageElement) {
-                imageElement.remove();
-                controlPoints.forEach(p => p.remove());
-                controlPoints = [];
+        // ===== CONTROLES =====
+        // Opacidade
+        document.getElementById('opacity').addEventListener('input', function() {
+            document.getElementById('opacityValue').value = this.value;
+            if (imageOverlay) {
+                imageOverlay.setOpacity(parseFloat(this.value));
             }
+        });
 
-            // Criar nova imagem
-            imageElement = document.createElement('img');
-            imageElement.src = src;
-            imageElement.className = 'satellite-image';
-            imageElement.id = 'satelliteImage';
-            
-            imageElement.onload = function() {
-                originalImageSize = {
-                    width: this.naturalWidth,
-                    height: this.naturalHeight
-                };
-
-                // Ajustar tamanho inicial
-                const containerRect = container.getBoundingClientRect();
-                const scale = Math.min(
-                    containerRect.width * 0.6 / this.naturalWidth,
-                    containerRect.height * 0.6 / this.naturalHeight
-                );
-                
-                this.style.width = (this.naturalWidth * scale) + 'px';
-                this.style.height = (this.naturalHeight * scale) + 'px';
-
-                // Posicionar no centro
-                imagePosition.x = (containerRect.width - this.naturalWidth * scale) / 2;
-                imagePosition.y = (containerRect.height - this.naturalHeight * scale) / 2;
-                
-                updateImageTransform();
-                createControlPoints();
-                updateCoordsDisplay();
-            };
-
-            container.appendChild(imageElement);
-            setupImageDrag();
-        }
-
-        // ===== PONTOS DE CONTROLE =====
-        function createControlPoints() {
-            const container = document.getElementById('overlayContainer');
-            const corners = ['tl', 'tr', 'bl', 'br'];
-            const labels = ['Top-Left', 'Top-Right', 'Bottom-Left', 'Bottom-Right'];
-            const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
-
-            corners.forEach((corner, index) => {
-                const point = document.createElement('div');
-                point.className = `control-point corner-${corner}`;
-                point.dataset.corner = corner;
-                point.title = labels[index];
-                container.appendChild(point);
-                controlPoints.push(point);
-
-                // Reset offset
-                cornerOffsets[corner] = { x: 0, y: 0 };
-
-                setupControlPointDrag(point, corner);
-            });
-
-            updateControlPointsPosition();
-        }
-
-        function updateControlPointsPosition() {
-            if (!imageElement) return;
-
-            const rect = imageElement.getBoundingClientRect();
-            const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-
-            const positions = {
-                tl: { x: rect.left - containerRect.left, y: rect.top - containerRect.top },
-                tr: { x: rect.right - containerRect.left, y: rect.top - containerRect.top },
-                bl: { x: rect.left - containerRect.left, y: rect.bottom - containerRect.top },
-                br: { x: rect.right - containerRect.left, y: rect.bottom - containerRect.top }
-            };
-
-            controlPoints.forEach(point => {
-                const corner = point.dataset.corner;
-                const pos = positions[corner];
-                const offset = cornerOffsets[corner];
-                
-                point.style.left = (pos.x + offset.x - 10) + 'px';
-                point.style.top = (pos.y + offset.y - 10) + 'px';
-            });
-        }
-
-        function setupControlPointDrag(point, corner) {
-            point.addEventListener('mousedown', function(e) {
-                if (document.getElementById('lockDrag').checked) return;
-                e.stopPropagation();
-                isDragging = true;
-                dragTarget = { type: 'control', corner: corner, element: point };
-                
-                const rect = point.getBoundingClientRect();
-                dragOffset = {
-                    x: e.clientX - rect.left - 10,
-                    y: e.clientY - rect.top - 10
-                };
-            });
-        }
-
-        // ===== ARRASTE DA IMAGEM =====
-        function setupImageDrag() {
-            imageElement.addEventListener('mousedown', function(e) {
-                if (document.getElementById('lockDrag').checked) return;
-                if (e.target.classList.contains('control-point')) return;
-                
-                isDragging = true;
-                dragTarget = { type: 'image', element: imageElement };
-                dragOffset = {
-                    x: e.clientX - imagePosition.x,
-                    y: e.clientY - imagePosition.y
-                };
-            });
-        }
-
-        // ===== EVENT LISTENERS GLOBAIS =====
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging || !dragTarget) return;
-
-            if (dragTarget.type === 'image') {
-                imagePosition.x = e.clientX - dragOffset.x;
-                imagePosition.y = e.clientY - dragOffset.y;
-                updateImageTransform();
-                updateControlPointsPosition();
-            } else if (dragTarget.type === 'control') {
-                const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-                const imageRect = imageElement.getBoundingClientRect();
-                
-                const corner = dragTarget.corner;
-                let basePos;
-                
-                switch(corner) {
-                    case 'tl':
-                        basePos = { x: imageRect.left - containerRect.left, y: imageRect.top - containerRect.top };
-                        break;
-                    case 'tr':
-                        basePos = { x: imageRect.right - containerRect.left, y: imageRect.top - containerRect.top };
-                        break;
-                    case 'bl':
-                        basePos = { x: imageRect.left - containerRect.left, y: imageRect.bottom - containerRect.top };
-                        break;
-                    case 'br':
-                        basePos = { x: imageRect.right - containerRect.left, y: imageRect.bottom - containerRect.top };
-                        break;
-                }
-
-                const newX = e.clientX - containerRect.left - dragOffset.x;
-                const newY = e.clientY - containerRect.top - dragOffset.y;
-
-                cornerOffsets[corner] = {
-                    x: newX - basePos.x + 10,
-                    y: newY - basePos.y + 10
-                };
-
-                updateControlPointsPosition();
-                applyPerspectiveDistortion();
+        document.getElementById('opacityValue').addEventListener('change', function() {
+            document.getElementById('opacity').value = this.value;
+            if (imageOverlay) {
+                imageOverlay.setOpacity(parseFloat(this.value));
             }
+        });
+
+        // Ajuste de bounds via controles numéricos
+        function updateBoundsFromInputs() {
+            if (!imageOverlay) return;
+
+            const north = parseFloat(document.getElementById('boundNorth').value);
+            const south = parseFloat(document.getElementById('boundSouth').value);
+            const east = parseFloat(document.getElementById('boundEast').value);
+            const west = parseFloat(document.getElementById('boundWest').value);
+
+            if (isNaN(north) || isNaN(south) || isNaN(east) || isNaN(west)) return;
+
+            imageBounds = L.latLngBounds([south, west], [north, east]);
+            imageOverlay.setBounds(imageBounds);
+
+            // Atualizar posição dos markers
+            if (cornerMarkers.tl) cornerMarkers.tl.setLatLng([north, west]);
+            if (cornerMarkers.tr) cornerMarkers.tr.setLatLng([north, east]);
+            if (cornerMarkers.bl) cornerMarkers.bl.setLatLng([south, west]);
+            if (cornerMarkers.br) cornerMarkers.br.setLatLng([south, east]);
 
             updateCoordsDisplay();
-        });
-
-        document.addEventListener('mouseup', function() {
-            isDragging = false;
-            dragTarget = null;
-        });
-
-        // ===== TRANSFORMAÇÕES =====
-        function updateImageTransform() {
-            if (!imageElement) return;
-
-            const rotation = parseFloat(document.getElementById('rotation').value);
-            const scaleX = parseFloat(document.getElementById('scaleX').value);
-            const scaleY = parseFloat(document.getElementById('scaleY').value);
-            const opacity = parseFloat(document.getElementById('opacity').value);
-            const skewX = parseFloat(document.getElementById('skewX').value);
-            const skewY = parseFloat(document.getElementById('skewY').value);
-            const perspective = parseFloat(document.getElementById('perspective').value);
-            const rotateX = parseFloat(document.getElementById('rotateX').value);
-            const rotateY = parseFloat(document.getElementById('rotateY').value);
-
-            imageElement.style.left = imagePosition.x + 'px';
-            imageElement.style.top = imagePosition.y + 'px';
-            imageElement.style.opacity = opacity;
-
-            const transform = `
-                perspective(${perspective}px)
-                rotateX(${rotateX}deg)
-                rotateY(${rotateY}deg)
-                rotate(${rotation}deg)
-                scaleX(${scaleX})
-                scaleY(${scaleY})
-                skewX(${skewX}deg)
-                skewY(${skewY}deg)
-            `;
-
-            imageElement.style.transform = transform;
-            
-            setTimeout(updateControlPointsPosition, 10);
         }
 
-        function applyPerspectiveDistortion() {
-            if (!imageElement) return;
-
-            // Calcular matriz de transformação baseada nos offsets dos cantos
-            const tl = cornerOffsets.tl;
-            const tr = cornerOffsets.tr;
-            const bl = cornerOffsets.bl;
-            const br = cornerOffsets.br;
-
-            // Usar CSS matrix3d para distorção baseada nos pontos de controle
-            // Isso é uma aproximação - distorção real requer cálculos mais complexos
-            const avgSkewX = ((tr.x - tl.x) + (br.x - bl.x)) / 2;
-            const avgSkewY = ((bl.y - tl.y) + (br.y - tr.y)) / 2;
-            
-            // Atualizar skew baseado nos pontos
-            // document.getElementById('skewX').value = avgSkewX / 5;
-            // document.getElementById('skewXValue').value = avgSkewX / 5;
-        }
-
-        // ===== SINCRONIZAÇÃO DE CONTROLES =====
-        const controls = ['rotation', 'scaleX', 'scaleY', 'opacity', 'skewX', 'skewY', 'perspective', 'rotateX', 'rotateY'];
-
-        controls.forEach(control => {
-            const slider = document.getElementById(control);
-            const value = document.getElementById(control + 'Value');
-
-            slider.addEventListener('input', function() {
-                value.value = this.value;
-                updateImageTransform();
-            });
-
-            value.addEventListener('change', function() {
-                slider.value = this.value;
-                updateImageTransform();
-            });
+        ['boundNorth', 'boundSouth', 'boundEast', 'boundWest'].forEach(id => {
+            document.getElementById(id).addEventListener('change', updateBoundsFromInputs);
         });
 
         // Toggles
         document.getElementById('showImage').addEventListener('change', function() {
-            if (imageElement) {
-                imageElement.style.display = this.checked ? 'block' : 'none';
+            if (imageOverlay) {
+                if (this.checked) {
+                    imageOverlay.addTo(map);
+                } else {
+                    map.removeLayer(imageOverlay);
+                }
             }
         });
 
         document.getElementById('showControlPoints').addEventListener('change', function() {
-            controlPoints.forEach(p => {
-                p.style.display = this.checked ? 'block' : 'none';
-            });
+            for (const key in cornerMarkers) {
+                if (this.checked) {
+                    cornerMarkers[key].addTo(map);
+                } else {
+                    map.removeLayer(cornerMarkers[key]);
+                }
+            }
+        });
+
+        document.getElementById('lockDrag').addEventListener('change', function() {
+            for (const key in cornerMarkers) {
+                if (this.checked) {
+                    cornerMarkers[key].dragging.disable();
+                } else {
+                    cornerMarkers[key].dragging.enable();
+                }
+            }
         });
 
         // ===== FUNÇÕES DE AÇÃO =====
         function resetTransformations() {
-            document.getElementById('rotation').value = 0;
-            document.getElementById('rotationValue').value = 0;
-            document.getElementById('scaleX').value = 1;
-            document.getElementById('scaleXValue').value = 1;
-            document.getElementById('scaleY').value = 1;
-            document.getElementById('scaleYValue').value = 1;
             document.getElementById('opacity').value = 0.7;
             document.getElementById('opacityValue').value = 0.7;
-            document.getElementById('skewX').value = 0;
-            document.getElementById('skewXValue').value = 0;
-            document.getElementById('skewY').value = 0;
-            document.getElementById('skewYValue').value = 0;
-            document.getElementById('perspective').value = 1000;
-            document.getElementById('perspectiveValue').value = 1000;
-            document.getElementById('rotateX').value = 0;
-            document.getElementById('rotateXValue').value = 0;
-            document.getElementById('rotateY').value = 0;
-            document.getElementById('rotateYValue').value = 0;
 
-            cornerOffsets = {
-                tl: { x: 0, y: 0 },
-                tr: { x: 0, y: 0 },
-                bl: { x: 0, y: 0 },
-                br: { x: 0, y: 0 }
-            };
+            if (imageOverlay) {
+                imageOverlay.setOpacity(0.7);
+                
+                // Resetar para bounds padrão
+                const b = defaultBounds;
+                imageBounds = L.latLngBounds([b.south, b.west], [b.north, b.east]);
+                imageOverlay.setBounds(imageBounds);
 
-            if (imageElement) {
-                const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-                imagePosition.x = (containerRect.width - imageElement.offsetWidth) / 2;
-                imagePosition.y = (containerRect.height - imageElement.offsetHeight) / 2;
+                // Atualizar markers
+                if (cornerMarkers.tl) cornerMarkers.tl.setLatLng([b.north, b.west]);
+                if (cornerMarkers.tr) cornerMarkers.tr.setLatLng([b.north, b.east]);
+                if (cornerMarkers.bl) cornerMarkers.bl.setLatLng([b.south, b.west]);
+                if (cornerMarkers.br) cornerMarkers.br.setLatLng([b.south, b.east]);
+
+                map.fitBounds(imageBounds, { padding: [50, 50] });
             }
 
-            updateImageTransform();
-            updateControlPointsPosition();
             updateCoordsDisplay();
         }
 
+        function fitImageToView() {
+            if (imageBounds) {
+                map.fitBounds(imageBounds, { padding: [50, 50] });
+            }
+        }
+
         function getAlignmentData() {
-            if (!imageElement) return null;
+            if (!imageOverlay || !imageBounds) return null;
 
-            const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-            const imageRect = imageElement.getBoundingClientRect();
-            
-            // Converter posições de pixel para coordenadas do mapa
-            const mapBounds = map.getBounds();
-            const mapContainer = map.getContainer().getBoundingClientRect();
-
-            function pixelToLatLng(x, y) {
-                const point = map.containerPointToLatLng([
-                    x - mapContainer.left + containerRect.left,
-                    y - mapContainer.top + containerRect.top
-                ]);
-                return { lat: point.lat, lng: point.lng };
-            }
-
-            // Posições dos cantos em pixels relativos ao container
-            const corners = {
-                tl: { 
-                    x: imageRect.left - containerRect.left + cornerOffsets.tl.x,
-                    y: imageRect.top - containerRect.top + cornerOffsets.tl.y
-                },
-                tr: { 
-                    x: imageRect.right - containerRect.left + cornerOffsets.tr.x,
-                    y: imageRect.top - containerRect.top + cornerOffsets.tr.y
-                },
-                bl: { 
-                    x: imageRect.left - containerRect.left + cornerOffsets.bl.x,
-                    y: imageRect.bottom - containerRect.top + cornerOffsets.bl.y
-                },
-                br: { 
-                    x: imageRect.right - containerRect.left + cornerOffsets.br.x,
-                    y: imageRect.bottom - containerRect.top + cornerOffsets.br.y
-                }
-            };
-
-            // Converter para coordenadas geográficas
-            const geoCorners = {};
-            for (const [key, pos] of Object.entries(corners)) {
-                const point = map.containerPointToLatLng([pos.x, pos.y]);
-                geoCorners[key] = { lat: point.lat, lng: point.lng };
-            }
+            const bounds = imageBounds;
 
             return {
                 timestamp: new Date().toISOString(),
@@ -1021,31 +894,20 @@
                     lng: map.getCenter().lng 
                 },
                 mapZoom: map.getZoom(),
+                imageUrl: currentImageUrl,
                 originalImageSize: originalImageSize,
-                displayedImageSize: {
-                    width: imageElement.offsetWidth,
-                    height: imageElement.offsetHeight
+                opacity: parseFloat(document.getElementById('opacity').value),
+                bounds: {
+                    north: bounds.getNorth(),
+                    south: bounds.getSouth(),
+                    east: bounds.getEast(),
+                    west: bounds.getWest()
                 },
-                imagePosition: imagePosition,
-                transformations: {
-                    rotation: parseFloat(document.getElementById('rotation').value),
-                    scaleX: parseFloat(document.getElementById('scaleX').value),
-                    scaleY: parseFloat(document.getElementById('scaleY').value),
-                    skewX: parseFloat(document.getElementById('skewX').value),
-                    skewY: parseFloat(document.getElementById('skewY').value),
-                    perspective: parseFloat(document.getElementById('perspective').value),
-                    rotateX: parseFloat(document.getElementById('rotateX').value),
-                    rotateY: parseFloat(document.getElementById('rotateY').value),
-                    opacity: parseFloat(document.getElementById('opacity').value)
-                },
-                cornerOffsets: cornerOffsets,
-                cornerPositionsPixel: corners,
-                cornerPositionsGeo: geoCorners,
-                boundingBox: {
-                    north: Math.max(geoCorners.tl.lat, geoCorners.tr.lat),
-                    south: Math.min(geoCorners.bl.lat, geoCorners.br.lat),
-                    east: Math.max(geoCorners.tr.lng, geoCorners.br.lng),
-                    west: Math.min(geoCorners.tl.lng, geoCorners.bl.lng)
+                corners: {
+                    tl: { lat: bounds.getNorth(), lng: bounds.getWest() },
+                    tr: { lat: bounds.getNorth(), lng: bounds.getEast() },
+                    bl: { lat: bounds.getSouth(), lng: bounds.getWest() },
+                    br: { lat: bounds.getSouth(), lng: bounds.getEast() }
                 }
             };
         }
@@ -1061,7 +923,6 @@
             document.getElementById('resultJSON').textContent = json;
             document.getElementById('resultModal').style.display = 'flex';
 
-            // Salvar no localStorage também
             localStorage.setItem('satelliteAlignment', json);
             console.log('Alinhamento salvo:', data);
         }
@@ -1116,46 +977,21 @@
         }
 
         function applyAlignmentData(data) {
-            // Aplicar transformações
-            if (data.transformations) {
-                document.getElementById('rotation').value = data.transformations.rotation;
-                document.getElementById('rotationValue').value = data.transformations.rotation;
-                document.getElementById('scaleX').value = data.transformations.scaleX;
-                document.getElementById('scaleXValue').value = data.transformations.scaleX;
-                document.getElementById('scaleY').value = data.transformations.scaleY;
-                document.getElementById('scaleYValue').value = data.transformations.scaleY;
-                document.getElementById('skewX').value = data.transformations.skewX;
-                document.getElementById('skewXValue').value = data.transformations.skewX;
-                document.getElementById('skewY').value = data.transformations.skewY;
-                document.getElementById('skewYValue').value = data.transformations.skewY;
-                document.getElementById('perspective').value = data.transformations.perspective;
-                document.getElementById('perspectiveValue').value = data.transformations.perspective;
-                document.getElementById('rotateX').value = data.transformations.rotateX;
-                document.getElementById('rotateXValue').value = data.transformations.rotateX;
-                document.getElementById('rotateY').value = data.transformations.rotateY;
-                document.getElementById('rotateYValue').value = data.transformations.rotateY;
-                document.getElementById('opacity').value = data.transformations.opacity;
-                document.getElementById('opacityValue').value = data.transformations.opacity;
+            // Aplicar opacidade
+            if (data.opacity !== undefined) {
+                document.getElementById('opacity').value = data.opacity;
+                document.getElementById('opacityValue').value = data.opacity;
             }
 
-            // Aplicar posição
-            if (data.imagePosition) {
-                imagePosition = data.imagePosition;
-            }
-
-            // Aplicar offsets dos cantos
-            if (data.cornerOffsets) {
-                cornerOffsets = data.cornerOffsets;
+            // Carregar imagem com bounds salvos
+            if (data.imageUrl && data.bounds) {
+                loadImageAsOverlay(data.imageUrl, data.bounds);
             }
 
             // Aplicar view do mapa
             if (data.mapCenter && data.mapZoom) {
                 map.setView([data.mapCenter.lat, data.mapCenter.lng], data.mapZoom);
             }
-
-            updateImageTransform();
-            updateControlPointsPosition();
-            updateCoordsDisplay();
         }
 
         function copyToClipboard() {
@@ -1176,56 +1012,37 @@
                 return;
             }
 
-            const geo = data.cornerPositionsGeo;
+            // Atualizar inputs de bounds
+            document.getElementById('boundNorth').value = data.bounds.north.toFixed(4);
+            document.getElementById('boundSouth').value = data.bounds.south.toFixed(4);
+            document.getElementById('boundEast').value = data.bounds.east.toFixed(4);
+            document.getElementById('boundWest').value = data.bounds.west.toFixed(4);
+
             const html = `
-<b>Cantos (Lat, Lng):</b>
-TL: ${geo.tl.lat.toFixed(4)}, ${geo.tl.lng.toFixed(4)}
-TR: ${geo.tr.lat.toFixed(4)}, ${geo.tr.lng.toFixed(4)}
-BL: ${geo.bl.lat.toFixed(4)}, ${geo.bl.lng.toFixed(4)}
-BR: ${geo.br.lat.toFixed(4)}, ${geo.br.lng.toFixed(4)}
-
 <b>Bounding Box:</b>
-N: ${data.boundingBox.north.toFixed(4)}
-S: ${data.boundingBox.south.toFixed(4)}
-E: ${data.boundingBox.east.toFixed(4)}
-W: ${data.boundingBox.west.toFixed(4)}
+Norte: ${data.bounds.north.toFixed(4)}°
+Sul: ${data.bounds.south.toFixed(4)}°
+Leste: ${data.bounds.east.toFixed(4)}°
+Oeste: ${data.bounds.west.toFixed(4)}°
 
-<b>Distorções:</b>
-TL: (${cornerOffsets.tl.x.toFixed(1)}, ${cornerOffsets.tl.y.toFixed(1)})
-TR: (${cornerOffsets.tr.x.toFixed(1)}, ${cornerOffsets.tr.y.toFixed(1)})
-BL: (${cornerOffsets.bl.x.toFixed(1)}, ${cornerOffsets.bl.y.toFixed(1)})
-BR: (${cornerOffsets.br.x.toFixed(1)}, ${cornerOffsets.br.y.toFixed(1)})
+<b>Dimensões:</b>
+Lat: ${(data.bounds.north - data.bounds.south).toFixed(2)}°
+Lng: ${(data.bounds.east - data.bounds.west).toFixed(2)}°
+
+<b>Zoom atual:</b> ${map.getZoom().toFixed(2)}
             `;
             document.getElementById('coordsDisplay').innerHTML = html;
-        }
-
-        // Atualizar coords quando o mapa mover
-        function onMapMove() {
-            updateCoordsDisplay();
         }
 
         // ===== INICIALIZAÇÃO =====
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
-            map.on('move', onMapMove);
-            map.on('zoom', onMapMove);
 
             // Carregar alinhamento anterior se existir
             const saved = localStorage.getItem('satelliteAlignment');
             if (saved) {
                 console.log('Alinhamento anterior encontrado no localStorage');
             }
-        });
-
-        // Prevenir que o mapa capture eventos quando arrastando a imagem
-        document.getElementById('overlayContainer').addEventListener('mousedown', function(e) {
-            if (e.target.id === 'satelliteImage' || e.target.classList.contains('control-point')) {
-                map.dragging.disable();
-            }
-        });
-
-        document.addEventListener('mouseup', function() {
-            map.dragging.enable();
         });
     </script>
 </body>
