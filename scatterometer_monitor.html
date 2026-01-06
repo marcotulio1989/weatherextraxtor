@@ -701,11 +701,28 @@
         log('info', `🛰️ Satélite alterado para ${satId.toUpperCase()}`);
     }
     
+    // Configuração dos satélites GOES (direto da NOAA)
+    const SATELLITE_CONFIG = {
+        goes19: {
+            name: 'GOES-19',
+            // Setor SSA (South America) - bounds aproximados da projeção
+            url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg',
+            // Bounds do setor SSA (South South America)
+            bounds: [[-60.0, -110.0], [15.0, -25.0]]
+        },
+        goes16: {
+            name: 'GOES-16',
+            url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
+            bounds: [[-60.0, -110.0], [15.0, -25.0]]
+        }
+    };
+    
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
+        const config = SATELLITE_CONFIG[currentSatellite];
         
         setStatus('satellite-status', 'loading');
-        log('info', `🛰️ Carregando ${currentSatellite.toUpperCase()}...`);
+        log('info', `🛰️ Carregando ${config.name} direto da NOAA...`);
         
         try {
             // Remover camada anterior
@@ -714,52 +731,41 @@
                 satelliteLayer = null;
             }
             
-            // Buscar JSON com metadados e bounds
-            log('info', '📥 Baixando metadados...');
-            const jsonUrl = `satellite_${currentSatellite}.json?t=${Date.now()}`;
-            const jsonResponse = await fetch(jsonUrl);
+            // Carregar imagem diretamente da NOAA (sempre atualizada!)
+            const imageUrl = `${config.url}?t=${Date.now()}`;
             
-            if (!jsonResponse.ok) {
-                throw new Error(`Metadados não encontrados (${jsonResponse.status})`);
-            }
-            
-            satelliteData = await jsonResponse.json();
-            log('success', `✅ Metadados: ${satelliteData.points_count} pontos`);
-            
-            // Mostrar horário real da imagem de satélite
-            if (satelliteData.image_time_utc) {
-                log('info', `🛰️ Imagem capturada: ${satelliteData.image_time_utc}`);
-            }
-            
-            // Usar bounds do JSON processado
-            const bounds = satelliteData.leaflet_bounds;
-            log('info', `📍 Área: ${bounds[0][0].toFixed(2)}° a ${bounds[1][0].toFixed(2)}° lat`);
-            
-            // Carregar imagem PNG processada
-            log('info', '📥 Carregando imagem recortada...');
-            const imageUrl = `satellite_${currentSatellite}.png?t=${Date.now()}`;
-            
-            satelliteLayer = L.imageOverlay(imageUrl, bounds, {
+            // Usar bounds do setor SSA completo
+            satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
                 opacity: opacity,
                 zIndex: 1
             });
             
             satelliteLayer.addTo(map);
             
-            // Atualizar info com horário da captura do satélite
-            const imageTimeStr = satelliteData.image_time_utc || 'Desconhecido';
-            const satName = satelliteData.satellite_name || currentSatellite.toUpperCase();
-            const infoEl = document.getElementById('satellite-info');
-            if (infoEl) {
-                infoEl.innerHTML = `📡 ${satName} IR<br>🛰️ Captura: ${imageTimeStr}<br>📏 ${satelliteData.ship.radius_nm} NM`;
+            // Pegar horário da imagem via HEAD request
+            try {
+                const headResponse = await fetch(config.url, { method: 'HEAD' });
+                const lastModified = headResponse.headers.get('last-modified');
+                if (lastModified) {
+                    const imageTime = new Date(lastModified);
+                    const timeStr = imageTime.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+                    
+                    const infoEl = document.getElementById('satellite-info');
+                    if (infoEl) {
+                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>📍 Direto da NOAA`;
+                    }
+                    log('info', `🛰️ Imagem de: ${timeStr}`);
+                }
+            } catch (e) {
+                log('warning', '⚠️ Não foi possível verificar horário da imagem');
             }
             
             setStatus('satellite-status', 'active');
-            log('success', `🛰️ ${satName} renderizado (${satelliteData.resolution}x${satelliteData.resolution}px)`);
+            log('success', `🛰️ ${config.name} carregado (direto da NOAA - sempre atualizado!)`);
             
         } catch (error) {
             log('error', `❌ Erro satélite: ${error.message}`);
-            log('info', '💡 Execute: python process_satellite.py para atualizar');
+            log('info', '💡 Verifique sua conexão ou tente novamente');
             setStatus('satellite-status', 'error');
         }
     }
