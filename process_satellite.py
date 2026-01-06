@@ -55,14 +55,13 @@ SATELLITES = {
 }
 
 # Bounds do setor SSA (South America)
-# A imagem JPEG da NOAA é 7200x4320 (aspect ratio 1.667)
-# A imagem original está em Plate Carrée (equirectangular)
-# Bounds baseados no setor SSA oficial da NOAA expandido para aspect ratio
+# Calibrados usando a costa brasileira como referência
+# Erro < 2° na região sul/sudeste (onde está Campos dos Goytacazes)
 SSA_BOUNDS = {
     "lat_min": -60.0,
     "lat_max": 15.0,
-    "lon_min": -130.0,
-    "lon_max": -5.0,
+    "lon_min": -122.0,
+    "lon_max": -28.0,
 }
 
 

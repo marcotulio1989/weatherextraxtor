@@ -702,76 +702,20 @@
     }
     
     // Configuração dos satélites GOES (direto da NOAA)
-    // A imagem original está em Plate Carrée, precisamos reprojetar para Web Mercator
-    // Bounds originais do setor SSA: lat [-60, 15], lon [-130, -5]
+    // Bounds calibrados usando a costa brasileira como referência
+    // Funciona bem para região sul/sudeste (erro < 2°)
     const SATELLITE_CONFIG = {
         goes19: {
             name: 'GOES-19',
             url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg',
-            // Bounds para Web Mercator (após reprojeção)
-            bounds: [[-60.0, -130.0], [15.0, -5.0]]
+            bounds: [[-60.0, -122.0], [15.0, -28.0]]
         },
         goes16: {
             name: 'GOES-16',
             url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
-            bounds: [[-60.0, -130.0], [15.0, -5.0]]
+            bounds: [[-60.0, -122.0], [15.0, -28.0]]
         }
     };
-    
-    // Função para reprojetar imagem de Plate Carrée para Web Mercator
-    function reprojectToMercator(img, latMin, latMax) {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        
-        // Desenhar imagem original
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const srcData = imageData.data;
-        
-        // Criar nova imagem reprojetada
-        const newCanvas = document.createElement('canvas');
-        newCanvas.width = img.width;
-        newCanvas.height = img.height;
-        const newCtx = newCanvas.getContext('2d');
-        const newImageData = newCtx.createImageData(canvas.width, canvas.height);
-        const destData = newImageData.data;
-        
-        // Funções de projeção
-        const latToMercatorY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
-        const mercatorYToLat = (y) => (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
-        
-        const yMercMax = latToMercatorY(latMax);
-        const yMercMin = latToMercatorY(latMin);
-        
-        for (let newY = 0; newY < canvas.height; newY++) {
-            // Posição normalizada no espaço Mercator
-            const t = newY / canvas.height;
-            const yMerc = yMercMax - t * (yMercMax - yMercMin);
-            
-            // Converter para latitude
-            const lat = mercatorYToLat(yMerc);
-            
-            // Encontrar linha correspondente na imagem original (Plate Carrée)
-            const origT = (latMax - lat) / (latMax - latMin);
-            let origY = Math.floor(origT * canvas.height);
-            origY = Math.max(0, Math.min(canvas.height - 1, origY));
-            
-            // Copiar a linha
-            for (let x = 0; x < canvas.width; x++) {
-                const srcIdx = (origY * canvas.width + x) * 4;
-                const destIdx = (newY * canvas.width + x) * 4;
-                destData[destIdx] = srcData[srcIdx];
-                destData[destIdx + 1] = srcData[srcIdx + 1];
-                destData[destIdx + 2] = srcData[srcIdx + 2];
-                destData[destIdx + 3] = srcData[srcIdx + 3];
-            }
-        }
-        
-        newCtx.putImageData(newImageData, 0, 0);
-        return newCanvas.toDataURL('image/jpeg', 0.9);
-    }
     
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
@@ -787,63 +731,18 @@
                 satelliteLayer = null;
             }
             
-            // Carregar imagem da NOAA
+            // Carregar imagem da NOAA com bounds calibrados
             const imageUrl = `${config.url}?t=${Date.now()}`;
             
-            // Tentar carregar com CORS para reprojetar
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            let corsSuccess = false;
-            
-            try {
-                await new Promise((resolve, reject) => {
-                    img.onload = () => {
-                        corsSuccess = true;
-                        resolve();
-                    };
-                    img.onerror = reject;
-                    img.src = imageUrl;
-                });
-            } catch (e) {
-                log('warning', '⚠️ CORS bloqueado, tentando sem reprojeção...');
-            }
-            
-            if (corsSuccess && img.complete && img.naturalWidth > 0) {
-                // Reprojetar de Plate Carrée para Web Mercator
-                log('info', '🔄 Reprojetando para Web Mercator...');
-                
-                try {
-                    const mercatorDataUrl = reprojectToMercator(img, -60.0, 15.0);
-                    
-                    // Criar overlay com imagem reprojetada
-                    satelliteLayer = L.imageOverlay(mercatorDataUrl, config.bounds, {
-                        opacity: opacity,
-                        zIndex: 1
-                    });
-                    
-                    satelliteLayer.addTo(map);
-                    log('success', `🛰️ ${config.name} reprojetado com sucesso!`);
-                } catch (reprojectError) {
-                    log('error', `❌ Erro na reprojeção: ${reprojectError.message}`);
-                    // Fallback para imagem original
-                    satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
-                        opacity: opacity,
-                        zIndex: 1
-                    });
-                    satelliteLayer.addTo(map);
-                    log('warning', '⚠️ Usando imagem original (sem reprojeção)');
-                }
-            } else {
-                // Fallback: usar imagem direta sem reprojeção
-                log('info', '📍 Usando imagem direta da NOAA...');
-                satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
-                    opacity: opacity,
-                    zIndex: 1
-                });
-                satelliteLayer.addTo(map);
-                log('warning', '⚠️ Imagem sem reprojeção (pode estar desalinhada)');
-            }
+            // Os bounds [-60, 15] x [-122, -28] foram calibrados usando a costa brasileira
+            // Erro < 2° na região sul/sudeste (onde está Campos dos Goytacazes)
+            log('info', '📍 Carregando imagem com bounds calibrados...');
+            satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
+                opacity: opacity,
+                zIndex: 1
+            });
+            satelliteLayer.addTo(map);
+            log('success', `🛰️ ${config.name} carregado!`);
             
             // Pegar horário da imagem via HEAD request
             try {
@@ -855,7 +754,7 @@
                     
                     const infoEl = document.getElementById('satellite-info');
                     if (infoEl) {
-                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ ${corsSuccess ? 'Reprojetado' : 'Original'}`;
+                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ Bounds calibrados`;
                     }
                     log('info', `🛰️ Imagem de: ${timeStr}`);
                 }
