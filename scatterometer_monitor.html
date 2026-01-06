@@ -488,14 +488,14 @@
         </div>
         
         <!-- Satélite em Tempo Real -->
-        <h2>🛰️ SATÉLITE (Tempo Real)</h2>
+        <h2>🛰️ SATÉLITE (150 NM)</h2>
         <div class="section" style="border-left: 3px solid #00ff00;">
             <div class="section-title">
                 <span class="status-indicator" id="satellite-status"></span>
-                GOES-19 Infravermelho
+                GOES-19 IR (Recortado)
             </div>
-            <p class="source-info">✅ TEMPO REAL - NOAA GOES-19</p>
-            <p class="source-info">Band 13 (IR) - América do Sul</p>
+            <p class="source-info">✅ Área de 150 NM processada</p>
+            <p class="source-info">Band 13 (IR) - Infravermelho</p>
             
             <label>Opacidade: <span id="opacity-value">60%</span></label>
             <input type="range" id="satellite-opacity" min="0" max="100" value="60" 
@@ -632,24 +632,18 @@
     }
     
     // =========================================================================
-    // CAMADA DE SATÉLITE EM TEMPO REAL (GOES-19 NOAA)
+    // CAMADA DE SATÉLITE (Imagem pré-processada)
     // =========================================================================
     let satelliteEnabled = true;
     let satelliteLayer = null;
     let satelliteRefreshInterval = null;
-    
-    // GOES-19 South America Sector (ssa) - Coordenadas aproximadas
-    // A imagem cobre toda América do Sul
-    const GOES_SSA_BOUNDS = [
-        [-60, -110],  // SW corner (lat, lon)
-        [15, -25]     // NE corner (lat, lon)
-    ];
+    let satelliteData = null;
     
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
         
         setStatus('satellite-status', 'loading');
-        log('info', '🛰️ Iniciando download GOES-19...');
+        log('info', '🛰️ Carregando dados de satélite...');
         
         try {
             // Remover camada anterior
@@ -658,58 +652,27 @@
                 satelliteLayer = null;
             }
             
-            // URL da imagem GOES-19 América do Sul (Band 13 = IR)
-            const timestamp = Date.now();
-            const imageUrl = `https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg?t=${timestamp}`;
+            // Buscar JSON com metadados e bounds
+            log('info', '📥 Baixando metadados...');
+            const jsonUrl = `satellite_data.json?t=${Date.now()}`;
+            const jsonResponse = await fetch(jsonUrl);
             
-            log('info', `📥 Baixando: ${imageUrl.split('?')[0].split('/').pop()}`);
-            
-            // Baixar com fetch para mostrar progresso
-            const response = await fetch(imageUrl);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            if (!jsonResponse.ok) {
+                throw new Error(`Metadados não encontrados (${jsonResponse.status})`);
             }
             
-            const contentLength = response.headers.get('content-length');
-            const totalBytes = contentLength ? parseInt(contentLength) : 0;
-            const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+            satelliteData = await jsonResponse.json();
+            log('success', `✅ Metadados: ${satelliteData.points_count} pontos`);
             
-            log('info', `📦 Tamanho: ${totalMB} MB`);
+            // Usar bounds do JSON processado
+            const bounds = satelliteData.leaflet_bounds;
+            log('info', `📍 Área: ${bounds[0][0].toFixed(2)}° a ${bounds[1][0].toFixed(2)}° lat`);
             
-            // Ler o body como stream para mostrar progresso
-            const reader = response.body.getReader();
-            const chunks = [];
-            let receivedBytes = 0;
-            let lastLogPercent = 0;
+            // Carregar imagem PNG processada
+            log('info', '📥 Carregando imagem recortada...');
+            const imageUrl = `satellite_current.png?t=${Date.now()}`;
             
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                chunks.push(value);
-                receivedBytes += value.length;
-                
-                // Log a cada 25%
-                if (totalBytes > 0) {
-                    const percent = Math.floor((receivedBytes / totalBytes) * 100);
-                    if (percent >= lastLogPercent + 25) {
-                        const receivedMB = (receivedBytes / 1024 / 1024).toFixed(2);
-                        log('info', `📥 ${percent}% - ${receivedMB}/${totalMB} MB`);
-                        lastLogPercent = percent;
-                    }
-                }
-            }
-            
-            const receivedMB = (receivedBytes / 1024 / 1024).toFixed(2);
-            log('success', `✅ Download completo: ${receivedMB} MB`);
-            
-            // Converter chunks para Blob
-            const blob = new Blob(chunks, { type: 'image/jpeg' });
-            const blobUrl = URL.createObjectURL(blob);
-            
-            // Criar ImageOverlay
-            satelliteLayer = L.imageOverlay(blobUrl, GOES_SSA_BOUNDS, {
+            satelliteLayer = L.imageOverlay(imageUrl, bounds, {
                 opacity: opacity,
                 zIndex: 1
             });
@@ -717,48 +680,19 @@
             satelliteLayer.addTo(map);
             
             // Atualizar info
-            const now = new Date();
+            const timestamp = new Date(satelliteData.timestamp);
             const infoEl = document.getElementById('satellite-info');
             if (infoEl) {
-                infoEl.innerHTML = `📡 GOES-19 IR (Band 13)<br>📅 ${now.toLocaleString()}<br>📦 ${receivedMB} MB`;
+                infoEl.innerHTML = `📡 GOES-19 IR (Processado)<br>📅 ${timestamp.toLocaleString()}<br>📏 ${satelliteData.ship.radius_nm} NM`;
             }
             
             setStatus('satellite-status', 'active');
-            log('success', `🛰️ GOES-19 IR renderizado no mapa`);
+            log('success', `🛰️ Satélite renderizado (${satelliteData.resolution}x${satelliteData.resolution}px)`);
             
         } catch (error) {
             log('error', `❌ Erro satélite: ${error.message}`);
+            log('info', '💡 Execute: python process_satellite.py para atualizar');
             setStatus('satellite-status', 'error');
-            
-            // Tentar fallback para GOES-16
-            log('info', '🔄 Tentando GOES-16 como fallback...');
-            try {
-                const fallbackUrl = `https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg?t=${Date.now()}`;
-                const fallbackResponse = await fetch(fallbackUrl);
-                if (fallbackResponse.ok) {
-                    const blob = await fallbackResponse.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    satelliteLayer = L.imageOverlay(blobUrl, GOES_SSA_BOUNDS, {
-                        opacity: (document.getElementById('satellite-opacity')?.value || 60) / 100,
-                        zIndex: 1
-                    }).addTo(map);
-                    log('success', '🛰️ GOES-16 fallback carregado');
-                    setStatus('satellite-status', 'active');
-                } else {
-                    throw new Error('Fallback também falhou');
-                }
-            } catch (e2) {
-                log('error', `❌ Fallback falhou: ${e2.message}`);
-            }
-        }
-        
-        // Configurar auto-refresh a cada 10 minutos
-        if (!satelliteRefreshInterval) {
-            satelliteRefreshInterval = setInterval(() => {
-                if (satelliteEnabled) {
-                    loadSatelliteLayer();
-                }
-            }, 10 * 60 * 1000); // 10 minutos
         }
     }
     
