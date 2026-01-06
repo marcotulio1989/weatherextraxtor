@@ -778,7 +778,7 @@
         const config = SATELLITE_CONFIG[currentSatellite];
         
         setStatus('satellite-status', 'loading');
-        log('info', `🛰️ Carregando e reprojetando ${config.name}...`);
+        log('info', `🛰️ Carregando ${config.name}...`);
         
         try {
             // Remover camada anterior
@@ -790,19 +790,51 @@
             // Carregar imagem da NOAA
             const imageUrl = `${config.url}?t=${Date.now()}`;
             
-            // Usar proxy CORS ou carregar diretamente
+            // Tentar carregar com CORS para reprojetar
             const img = new Image();
             img.crossOrigin = 'anonymous';
             
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = () => {
-                    // Se falhar com crossOrigin, tenta sem (não vai poder reprojetar)
-                    log('warning', '⚠️ CORS bloqueado, usando imagem direta (sem reprojeção)');
-                    reject(new Error('CORS'));
-                };
-                img.src = imageUrl;
-            }).catch(async () => {
+            let corsSuccess = false;
+            
+            try {
+                await new Promise((resolve, reject) => {
+                    img.onload = () => {
+                        corsSuccess = true;
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = imageUrl;
+                });
+            } catch (e) {
+                log('warning', '⚠️ CORS bloqueado, tentando sem reprojeção...');
+            }
+            
+            if (corsSuccess && img.complete && img.naturalWidth > 0) {
+                // Reprojetar de Plate Carrée para Web Mercator
+                log('info', '🔄 Reprojetando para Web Mercator...');
+                
+                try {
+                    const mercatorDataUrl = reprojectToMercator(img, -60.0, 15.0);
+                    
+                    // Criar overlay com imagem reprojetada
+                    satelliteLayer = L.imageOverlay(mercatorDataUrl, config.bounds, {
+                        opacity: opacity,
+                        zIndex: 1
+                    });
+                    
+                    satelliteLayer.addTo(map);
+                    log('success', `🛰️ ${config.name} reprojetado com sucesso!`);
+                } catch (reprojectError) {
+                    log('error', `❌ Erro na reprojeção: ${reprojectError.message}`);
+                    // Fallback para imagem original
+                    satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
+                        opacity: opacity,
+                        zIndex: 1
+                    });
+                    satelliteLayer.addTo(map);
+                    log('warning', '⚠️ Usando imagem original (sem reprojeção)');
+                }
+            } else {
                 // Fallback: usar imagem direta sem reprojeção
                 log('info', '📍 Usando imagem direta da NOAA...');
                 satelliteLayer = L.imageOverlay(imageUrl, config.bounds, {
@@ -810,22 +842,8 @@
                     zIndex: 1
                 });
                 satelliteLayer.addTo(map);
-                setStatus('satellite-status', 'active');
-                log('success', `🛰️ ${config.name} carregado (sem reprojeção)`);
-                return;
-            });
-            
-            // Reprojetar de Plate Carrée para Web Mercator
-            log('info', '🔄 Reprojetando para Web Mercator...');
-            const mercatorDataUrl = reprojectToMercator(img, -60.0, 15.0);
-            
-            // Criar overlay com imagem reprojetada
-            satelliteLayer = L.imageOverlay(mercatorDataUrl, config.bounds, {
-                opacity: opacity,
-                zIndex: 1
-            });
-            
-            satelliteLayer.addTo(map);
+                log('warning', '⚠️ Imagem sem reprojeção (pode estar desalinhada)');
+            }
             
             // Pegar horário da imagem via HEAD request
             try {
@@ -837,7 +855,7 @@
                     
                     const infoEl = document.getElementById('satellite-info');
                     if (infoEl) {
-                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ Reprojetado Mercator`;
+                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ ${corsSuccess ? 'Reprojetado' : 'Original'}`;
                     }
                     log('info', `🛰️ Imagem de: ${timeStr}`);
                 }
@@ -846,7 +864,6 @@
             }
             
             setStatus('satellite-status', 'active');
-            log('success', `🛰️ ${config.name} carregado e reprojetado!`);
             
         } catch (error) {
             log('error', `❌ Erro satélite: ${error.message}`);
