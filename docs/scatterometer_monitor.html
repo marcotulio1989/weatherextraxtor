@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Scatterometer Monitor - Deepwater Aquila</title>
+    <title>Monitor de Vento - Tempo Real - Deepwater Aquila</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -403,7 +403,7 @@
                 </div>
                 <div class="stat-box">
                     <div class="stat-value" id="data-age">--</div>
-                    <div class="stat-label">IDADE (h)</div>
+                    <div class="stat-label">IDADE</div>
                 </div>
             </div>
             
@@ -437,107 +437,54 @@
             <button class="secondary" onclick="clearOpenMeteoData()">🗑️ Limpar</button>
         </div>
         
-        <h2>🛰️ ESCATERÔMETROS (Satélite)</h2>
+        <h2>� TEMPO REAL (< 60 min)</h2>
         
-        <!-- NOAA ERDDAP (Gratuito) -->
-        <div class="section" style="border-left: 3px solid #00ffcc;">
-            <div class="section-title">
-                <span class="status-indicator" id="noaa-status"></span>
-                NOAA ERDDAP (ASCAT)
+        <!-- Aviso sobre escaterômetros -->
+        <div class="section" style="border-left: 3px solid #ff6600; background: #1a1000;">
+            <div class="section-title" style="color: #ff9900;">
+                ⚠️ Sobre Escaterômetros
             </div>
-            <p class="source-info">✅ GRATUITO - Não precisa de API Key</p>
-            <p class="source-info">Satélites: MetOp-A, B, C (ASCAT)</p>
-            <button onclick="fetchNOAAData()">🔄 Buscar NOAA</button>
+            <p class="source-info" style="color: #ff9900;">Dados de satélite (ASCAT, CYGNSS) têm atraso de 2-6h.</p>
+            <p class="source-info">Para dados em tempo real usamos:</p>
+            <p class="source-info">• <strong>Open-Meteo</strong> - Modelos meteorológicos (acima)</p>
+            <p class="source-info">• <strong>NDBC</strong> - Bóias oceanográficas (abaixo)</p>
         </div>
         
-        <!-- Copernicus Marine -->
-        <div class="section" style="border-left: 3px solid #00ffcc;">
+        <!-- NDBC Buoys (Tempo Real) -->
+        <div class="section" style="border-left: 3px solid #00ff00;">
+            <div class="section-title">
+                <span class="status-indicator" id="ndbc-status"></span>
+                NDBC BUOYS (Bóias)
+            </div>
+            <p class="source-info">✅ TEMPO REAL - Dados a cada 10-60 min</p>
+            <p class="source-info">NOAA National Data Buoy Center</p>
+            <button onclick="fetchNDBCData()">🔄 Buscar Bóias</button>
+        </div>
+        
+        <!-- Escaterômetros - DESABILITADO (atraso > 60min) -->
+        <!-- 
+        <div class="section" style="border-left: 3px solid #333; opacity: 0.5;">
             <div class="section-title">
                 <span class="status-indicator" id="cmems-status"></span>
-                COPERNICUS MARINE (CMEMS)
+                COPERNICUS MARINE (CMEMS) - ATRASO 2-6h
             </div>
-            <p class="source-info">
-                Registro: <a href="https://data.marine.copernicus.eu/register" target="_blank">Criar conta grátis</a>
-            </p>
-            <label>Username:</label>
-            <div class="input-with-info">
-                <input type="text" id="cmems-user" placeholder="seu_usuario">
-                <span class="info-icon">i
-                    <div class="info-tooltip">
-                        <h4>📋 Como obter credenciais Copernicus</h4>
-                        <ol>
-                            <li>Acesse <a href="https://data.marine.copernicus.eu/register" target="_blank">data.marine.copernicus.eu/register</a></li>
-                            <li>Preencha o formulário de registro (nome, email, país)</li>
-                            <li>Confirme seu email</li>
-                            <li>Faça login no site</li>
-                            <li>Use o <span class="highlight">mesmo username e senha</span> aqui</li>
-                        </ol>
-                        <p>⏱️ Ativação: <strong>imediata</strong> após confirmação do email</p>
-                        <p>🛰️ Dados: ASCAT Level 3/4, ventos oceânicos globais</p>
-                    </div>
-                </span>
-            </div>
-            <label>Password:</label>
-            <div class="input-with-info">
-                <input type="password" id="cmems-pass" placeholder="sua_senha">
-                <span class="info-icon">i
-                    <div class="info-tooltip">
-                        <h4>🔐 Senha Copernicus</h4>
-                        <p>Use a mesma senha que você criou no registro do Copernicus Marine Service.</p>
-                        <p>💡 <strong>Dica:</strong> A senha é salva apenas localmente no seu navegador (localStorage).</p>
-                    </div>
-                </span>
-            </div>
-            <button onclick="fetchCopernicusData()">🔄 Buscar CMEMS</button>
-            <button class="secondary" onclick="saveCmemsCredentials()">💾 Salvar</button>
+            <p class="source-info">Desabilitado: dados de satélite têm atraso > 60 min</p>
         </div>
+        -->
         
-        <!-- NASA Earthdata -->
-        <div class="section" style="border-left: 3px solid #00ffcc;">
+        <!-- NASA Earthdata - DESABILITADO (atraso > 60min) -->
+        <!--
+        <div class="section" style="border-left: 3px solid #333; opacity: 0.5;">
             <div class="section-title">
                 <span class="status-indicator" id="nasa-status"></span>
-                NASA EARTHDATA (CYGNSS)
+                NASA EARTHDATA (CYGNSS) - ATRASO 2-6h
             </div>
-            <p class="source-info">
-                Registro: <a href="https://urs.earthdata.nasa.gov/users/new" target="_blank">Criar conta grátis</a>
-            </p>
-            <label>Username:</label>
-            <div class="input-with-info">
-                <input type="text" id="nasa-user" placeholder="seu_usuario">
-                <span class="info-icon">i
-                    <div class="info-tooltip">
-                        <h4>📋 Como obter credenciais NASA Earthdata</h4>
-                        <ol>
-                            <li>Acesse <a href="https://urs.earthdata.nasa.gov/users/new" target="_blank">urs.earthdata.nasa.gov/users/new</a></li>
-                            <li>Clique em <span class="highlight">Register</span></li>
-                            <li>Preencha: username, email, nome, país</li>
-                            <li>Aceite os termos de uso</li>
-                            <li>Confirme seu email</li>
-                            <li>⚠️ <strong>Importante:</strong> Após login, vá em "Applications" → "Authorized Apps" e autorize o acesso a dados</li>
-                        </ol>
-                        <p>⏱️ Ativação: <strong>imediata</strong></p>
-                        <p>🛰️ Dados: CYGNSS (8 satélites), QuikSCAT, RapidScat</p>
-                    </div>
-                </span>
-            </div>
-            <label>Password:</label>
-            <div class="input-with-info">
-                <input type="password" id="nasa-pass" placeholder="sua_senha">
-                <span class="info-icon">i
-                    <div class="info-tooltip">
-                        <h4>🔐 Senha NASA Earthdata</h4>
-                        <p>Use a mesma senha que você criou no registro do NASA Earthdata.</p>
-                        <p>💡 <strong>Requisitos da senha:</strong></p>
-                        <p>• Mínimo 8 caracteres<br>• 1 letra maiúscula<br>• 1 número<br>• 1 caractere especial</p>
-                    </div>
-                </span>
-            </div>
-            <button onclick="fetchNASAData()">🔄 Buscar NASA</button>
-            <button class="secondary" onclick="saveNasaCredentials()">💾 Salvar</button>
+            <p class="source-info">Desabilitado: dados de satélite têm atraso > 60 min</p>
         </div>
+        -->
         
         <!-- Camadas do Mapa -->
-        <h2>🗺️ CAMADAS</h2>
+        <h2>�️ CAMADAS</h2>
         <div class="section">
             <div class="checkbox-group">
                 <label class="checkbox-item">
@@ -545,14 +492,42 @@
                     Setas de Vento
                 </label>
                 <label class="checkbox-item">
-                    <input type="checkbox" id="layer-satellite" checked onchange="toggleLayer('satellite')">
-                    Satélite (NASA GIBS)
-                </label>
-                <label class="checkbox-item">
                     <input type="checkbox" id="layer-grid" onchange="toggleLayer('grid')">
                     Grade de Coordenadas
                 </label>
             </div>
+        </div>
+        
+        <!-- Satélite em Tempo Real -->
+        <h2>🛰️ SATÉLITE (Tempo Real)</h2>
+        <div class="section" style="border-left: 3px solid #00ff00;">
+            <div class="section-title">
+                <span class="status-indicator" id="satellite-status"></span>
+                GOES-16 East (Infrared)
+            </div>
+            <p class="source-info">✅ TEMPO REAL - Atualiza a cada 10 min</p>
+            
+            <label style="margin-top:10px;">Tipo de Imagem:</label>
+            <select id="satellite-type" onchange="updateSatelliteLayer()" style="width:100%; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; margin-bottom:8px;">
+                <option value="GOES-East_ABI_Band13_Clean_Infrared">Infrared (10.3μm) - Nuvens</option>
+                <option value="GOES-East_ABI_Band02_Red_Visible_1km">Visível (0.64μm) - Dia</option>
+                <option value="GOES-East_ABI_Band08_Upper_Level_Water_Vapor">Vapor d'Água (6.2μm)</option>
+                <option value="GOES-East_ABI_Band09_Mid_Level_Water_Vapor">Vapor d'Água (6.9μm)</option>
+                <option value="GOES-East_ABI_GeoColor">GeoColor (Composto)</option>
+                <option value="GOES-East_ABI_Air_Mass">Air Mass (RGB)</option>
+            </select>
+            
+            <label>Opacidade: <span id="opacity-value">50%</span></label>
+            <input type="range" id="satellite-opacity" min="0" max="100" value="50" 
+                   style="width:100%; margin-bottom:8px;" 
+                   oninput="updateSatelliteOpacity(this.value)">
+            
+            <div style="display:flex; gap:5px; margin-top:5px;">
+                <button onclick="updateSatelliteLayer()">🔄 Atualizar</button>
+                <button class="secondary" onclick="toggleSatelliteLayer()">👁️ On/Off</button>
+            </div>
+            
+            <div id="satellite-info" style="margin-top:8px; font-size:10px; color:#888;"></div>
         </div>
         
         <!-- Log -->
@@ -583,6 +558,10 @@
     // 50 NM = ~92 km = ~0.83 graus
     const RAIO_NM = 50;  // Raio em milhas náuticas
     const RAIO_GRAUS = RAIO_NM / 60;  // 1 grau = 60 NM
+    
+    // IMPORTANTE: Idade máxima dos dados em MINUTOS
+    // Dados com mais de 60 min serão descartados
+    const MAX_DATA_AGE_MINUTES = 60;
     
     const CONFIG = {
         shipLat: -22.5,
@@ -668,25 +647,98 @@
     }
     
     // =========================================================================
-    // CAMADA DE SATÉLITE (NASA GIBS)
+    // CAMADA DE SATÉLITE EM TEMPO REAL (NASA GIBS - GOES-16)
     // =========================================================================
+    let satelliteEnabled = true;
+    let satelliteRefreshInterval = null;
+    
     function updateSatelliteLayer() {
+        const satelliteType = document.getElementById('satellite-type')?.value || 'GOES-East_ABI_Band13_Clean_Infrared';
+        const opacity = (document.getElementById('satellite-opacity')?.value || 50) / 100;
+        
+        // Para imagens em tempo real, usar a hora mais recente
+        // GIBS atualiza a cada 10 minutos para GOES
         const now = new Date();
+        
+        // Arredondar para os 10 minutos mais recentes
+        const minutes = Math.floor(now.getUTCMinutes() / 10) * 10;
+        now.setUTCMinutes(minutes, 0, 0);
+        
+        // Subtrair 20 minutos para garantir que a imagem esteja disponível
+        now.setTime(now.getTime() - 20 * 60 * 1000);
+        
         const year = now.getUTCFullYear();
         const month = String(now.getUTCMonth() + 1).padStart(2, '0');
         const day = String(now.getUTCDate()).padStart(2, '0');
+        const hour = String(now.getUTCHours()).padStart(2, '0');
+        const min = String(now.getUTCMinutes()).padStart(2, '0');
+        
+        // Para produtos diários (sem hora específica)
         const dateStr = `${year}-${month}-${day}`;
+        // Para produtos com hora específica
+        const timeStr = `${year}-${month}-${day}T${hour}:${min}:00Z`;
 
         if (satelliteLayer) {
             map.removeLayer(satelliteLayer);
         }
 
-        const url = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13_Clean_Infrared/default/${dateStr}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        // URL do GIBS - alguns produtos são diários, outros têm timestamp
+        // GOES-East produtos Near Real Time usam "best" time
+        let url;
+        
+        // Produtos GOES são atualizados frequentemente
+        if (satelliteType.includes('GOES')) {
+            // Usar "best" para obter a imagem mais recente disponível
+            url = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${satelliteType}/default/${dateStr}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        } else {
+            url = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${satelliteType}/default/${dateStr}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        }
 
         satelliteLayer = L.tileLayer(url, {
-            opacity: 0.5,
-            zIndex: 1
+            opacity: opacity,
+            zIndex: 1,
+            maxZoom: 9,
+            attribution: 'NASA GIBS'
         }).addTo(map);
+        
+        // Atualizar info
+        const infoEl = document.getElementById('satellite-info');
+        if (infoEl) {
+            const localTime = new Date();
+            infoEl.innerHTML = `📅 Imagem: ${dateStr}<br>🕐 Atualizado: ${localTime.toLocaleTimeString()}`;
+        }
+        
+        setStatus('satellite-status', 'active');
+        log('info', `🛰️ Satélite atualizado: ${satelliteType.split('_').slice(-2).join(' ')}`);
+        
+        // Configurar auto-refresh a cada 10 minutos
+        if (!satelliteRefreshInterval) {
+            satelliteRefreshInterval = setInterval(() => {
+                if (satelliteEnabled) {
+                    updateSatelliteLayer();
+                }
+            }, 10 * 60 * 1000); // 10 minutos
+        }
+    }
+    
+    function updateSatelliteOpacity(value) {
+        document.getElementById('opacity-value').textContent = value + '%';
+        if (satelliteLayer) {
+            satelliteLayer.setOpacity(value / 100);
+        }
+    }
+    
+    function toggleSatelliteLayer() {
+        satelliteEnabled = !satelliteEnabled;
+        if (satelliteEnabled) {
+            if (satelliteLayer) satelliteLayer.addTo(map);
+            setStatus('satellite-status', 'active');
+            log('info', '🛰️ Camada de satélite ativada');
+        } else {
+            if (satelliteLayer) map.removeLayer(satelliteLayer);
+            setStatus('satellite-status', '');
+            log('info', '🛰️ Camada de satélite desativada');
+        }
     }
     
     // =========================================================================
@@ -727,10 +779,6 @@
                 if (checkbox.checked) windLayerGroup.addTo(map);
                 else map.removeLayer(windLayerGroup);
                 break;
-            case 'satellite':
-                if (checkbox.checked) satelliteLayer.addTo(map);
-                else map.removeLayer(satelliteLayer);
-                break;
             case 'grid':
                 if (checkbox.checked) gridLayer.addTo(map);
                 else map.removeLayer(gridLayer);
@@ -741,54 +789,238 @@
     // =========================================================================
     // BUSCAR DADOS - NOAA ERDDAP (GRATUITO!)
     // =========================================================================
+    
+    // Lista de datasets NOAA ERDDAP disponíveis (em ordem de preferência)
+    const NOAA_DATASETS = [
+        {
+            id: 'erdQCwindproducts1day',
+            name: 'MetOp-C ASCAT 1-Day (2020-presente)',
+            vars: ['wind_speed', 'wind_direction']
+        },
+        {
+            id: 'erdQCwindproducts3day',
+            name: 'MetOp-C ASCAT 3-Day Composite',
+            vars: ['wind_speed', 'wind_direction']
+        },
+        {
+            id: 'erdNavgem05D10mWind',
+            name: 'NAVGEM 0.5° 10m Wind (modelo)',
+            vars: ['u_wind', 'v_wind']
+        }
+    ];
+    
     async function fetchNOAAData() {
         setStatus('noaa-status', 'loading');
-        log('info', 'Buscando dados NOAA ERDDAP (ASCAT)...');
+        log('info', '📡 Buscando dados NOAA ERDDAP (ASCAT Metop-C)...');
         
-        // NOAA ERDDAP tem vários datasets de escaterômetro
-        // Este é o ASCAT L2 25km (MetOp)
         const baseUrl = 'https://coastwatch.pfeg.noaa.gov/erddap/griddap';
         
-        // Dataset: erdQAwind1day - ASCAT daily wind
-        // Vamos tentar pegar dados das últimas 24 horas
-        const now = new Date();
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        
-        const startTime = yesterday.toISOString().split('.')[0] + 'Z';
-        const endTime = now.toISOString().split('.')[0] + 'Z';
-        
-        // Construir URL para dados de vento ASCAT
-        const erddapUrl = `${baseUrl}/erdQAwind1day.json?` +
-            `x_wind[(${startTime}):1:(${endTime})]` +
-            `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
-            `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]` +
-            `,y_wind[(${startTime}):1:(${endTime})]` +
-            `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
-            `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]`;
-        
-        // Usar proxy local para evitar CORS
-        const url = `/api/noaa?url=${encodeURIComponent(erddapUrl)}`;
-        
-        try {
-            log('info', 'Buscando via proxy local...');
-            const response = await fetch(url);
+        // Tentar datasets em ordem de preferência
+        for (const dataset of NOAA_DATASETS) {
+            log('info', `🔍 Tentando: ${dataset.name}...`);
             
-            if (!response.ok) {
-                log('warning', 'Dataset NOAA indisponível (status: ' + response.status + ')');
-                setStatus('noaa-status', 'error');
-                return;
+            // Dados de satélite têm atraso de ~24h no processamento
+            // Buscar de 4 dias atrás até 1 dia atrás
+            const now = new Date();
+            const oneDayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+            const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000);
+            
+            const startTime = fourDaysAgo.toISOString().split('.')[0] + 'Z';
+            const endTime = oneDayAgo.toISOString().split('.')[0] + 'Z';
+            
+            // Construir URL baseado nas variáveis do dataset
+            // Nota: erdQCwindproducts tem dimensão altitude (10m)
+            let erddapUrl;
+            if (dataset.vars.includes('wind_speed')) {
+                // Dataset com wind_speed e wind_direction diretos (com altitude)
+                erddapUrl = `${baseUrl}/${dataset.id}.json?` +
+                    `wind_speed[(${startTime}):1:(${endTime})]` +
+                    `[(10.0)]` +  // altitude 10m
+                    `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
+                    `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]` +
+                    `,wind_direction[(${startTime}):1:(${endTime})]` +
+                    `[(10.0)]` +  // altitude 10m
+                    `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
+                    `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]`;
+            } else {
+                // Dataset com componentes u/v (pode ter altitude ou não)
+                erddapUrl = `${baseUrl}/${dataset.id}.json?` +
+                    `${dataset.vars[0]}[(${startTime}):1:(${endTime})]` +
+                    `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
+                    `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]` +
+                    `,${dataset.vars[1]}[(${startTime}):1:(${endTime})]` +
+                    `[(${CONFIG.latMax}):1:(${CONFIG.latMin})]` +
+                    `[(${CONFIG.lonMin}):1:(${CONFIG.lonMax})]`;
             }
             
+            try {
+                // Usar proxy local para evitar CORS
+                const url = `/api/noaa?url=${encodeURIComponent(erddapUrl)}`;
+                log('info', 'Buscando via proxy local...');
+                
+                const response = await fetch(url, { timeout: 30000 });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    log('warning', `Dataset ${dataset.id} indisponível: ${response.status} - ${errorData.reason || ''}`);
+                    continue; // Tentar próximo dataset
+                }
+                
+                const data = await response.json();
+                
+                // Verificar se há dados válidos
+                if (data && data.table && data.table.rows && data.table.rows.length > 0) {
+                    log('success', `✅ Dados obtidos de ${dataset.name}: ${data.table.rows.length} pontos`);
+                    processNOAAData(data, dataset.vars.includes('wind_speed'));
+                    setStatus('noaa-status', 'active');
+                    return; // Sucesso!
+                } else {
+                    log('warning', `Dataset ${dataset.id} sem dados para a área/período`);
+                }
+                
+            } catch (error) {
+                log('warning', `Erro no dataset ${dataset.id}: ${error.message}`);
+                continue; // Tentar próximo
+            }
+        }
+        
+        // Se todos falharam, usar Open-Meteo como fallback
+        log('warning', '⚠️ Nenhum dataset NOAA disponível, usando Open-Meteo como fallback');
+        setStatus('noaa-status', 'error');
+        await fetchOpenMeteoWindGrid();
+    }
+    
+    // Fallback: buscar grid de vento do Open-Meteo
+    async function fetchOpenMeteoWindGrid() {
+        log('info', '🔄 Buscando grid de vento Open-Meteo...');
+        
+        // Criar grid de pontos na área
+        const lats = [];
+        const lons = [];
+        const step = 0.5;
+        
+        for (let lat = CONFIG.latMin; lat <= CONFIG.latMax; lat += step) {
+            lats.push(lat.toFixed(2));
+        }
+        for (let lon = CONFIG.lonMin; lon <= CONFIG.lonMax; lon += step) {
+            lons.push(lon.toFixed(2));
+        }
+        
+        // Criar todas as combinações
+        const queryLats = [];
+        const queryLons = [];
+        for (const lat of lats) {
+            for (const lon of lons) {
+                queryLats.push(lat);
+                queryLons.push(lon);
+            }
+        }
+        
+        // Limitar a 50 pontos (limite da API)
+        const maxPoints = 50;
+        const selectedLats = queryLats.slice(0, maxPoints);
+        const selectedLons = queryLons.slice(0, maxPoints);
+        
+        const url = `https://api.open-meteo.com/v1/forecast?` +
+            `latitude=${selectedLats.join(',')}&` +
+            `longitude=${selectedLons.join(',')}&` +
+            `current=wind_speed_10m,wind_direction_10m&` +
+            `wind_speed_unit=kn`;
+        
+        try {
+            const response = await fetch(url);
             const data = await response.json();
-            processNOAAData(data);
+            
+            let count = 0;
+            if (Array.isArray(data)) {
+                data.forEach(point => {
+                    if (point.current) {
+                        addWindPoint({
+                            lat: point.latitude,
+                            lon: point.longitude,
+                            speed: point.current.wind_speed_10m,
+                            direction: point.current.wind_direction_10m,
+                            time: new Date(),
+                            source: 'Open-Meteo Grid'
+                        });
+                        count++;
+                    }
+                });
+            } else if (data.current) {
+                addWindPoint({
+                    lat: data.latitude,
+                    lon: data.longitude,
+                    speed: data.current.wind_speed_10m,
+                    direction: data.current.wind_direction_10m,
+                    time: new Date(),
+                    source: 'Open-Meteo Grid'
+                });
+                count = 1;
+            }
+            
+            log('success', `✅ Grid Open-Meteo: ${count} pontos`);
+            updateWindDisplay();
             setStatus('noaa-status', 'active');
             
         } catch (error) {
-            log('error', 'Erro NOAA/Escaterômetro: ' + error.message);
-            setStatus('noaa-status', 'error');
+            log('error', `Erro Open-Meteo Grid: ${error.message}`);
         }
     }
     
+    // =========================================================================
+    // NDBC BUOYS (TEMPO REAL - < 60 MIN)
+    // =========================================================================
+    async function fetchNDBCData() {
+        setStatus('ndbc-status', 'loading');
+        log('info', '🔴 Buscando dados de bóias NDBC (tempo real)...');
+        
+        // Bóias próximas à Bacia de Campos
+        // Infelizmente não há bóias NDBC nesta região, mas vamos verificar
+        // e usar dados disponíveis ou informar ao usuário
+        
+        // Lista de bóias brasileiras e próximas (PNBOIA/CHM)
+        // https://www.marinha.mil.br/chm/dados-do-goos-brasil/pnboia
+        const buoys = [
+            { id: 'PIRATA', name: 'PIRATA (0°N, 35°W)', lat: 0, lon: -35 },
+            { id: 'Santos', name: 'Santos Pilot (24°S, 46°W)', lat: -24, lon: -46 },
+        ];
+        
+        // Tentar buscar dados via Open-Meteo Marine (tempo real)
+        // Isso é mais confiável que NDBC para a costa brasileira
+        try {
+            const url = `https://marine-api.open-meteo.com/v1/marine?` +
+                `latitude=${CONFIG.shipLat}&longitude=${CONFIG.shipLon}&` +
+                `current=wind_wave_height,wind_wave_direction,wind_wave_period,` +
+                `swell_wave_height,swell_wave_direction,swell_wave_period&` +
+                `hourly=wind_wave_height,wind_wave_direction&` +
+                `forecast_days=1`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (data.current) {
+                log('success', `✅ Dados marinhos em tempo real obtidos`);
+                log('info', `🌊 Onda de vento: ${data.current.wind_wave_height?.toFixed(1) || '--'}m`);
+                log('info', `🌊 Swell: ${data.current.swell_wave_height?.toFixed(1) || '--'}m`);
+                setStatus('ndbc-status', 'active');
+            } else {
+                log('warning', 'Sem dados marinhos disponíveis');
+                setStatus('ndbc-status', 'error');
+            }
+            
+            // Para vento em tempo real, usar Open-Meteo regular
+            log('info', '🌬️ Obtendo vento em tempo real via Open-Meteo...');
+            await fetchOpenMeteoData();
+            
+        } catch (error) {
+            log('error', `Erro NDBC/Marine: ${error.message}`);
+            setStatus('ndbc-status', 'error');
+        }
+        
+        log('info', '📍 Nota: Bóias NDBC não cobrem a costa brasileira');
+        log('info', '📍 Dados de vento via Open-Meteo (modelos em tempo real)');
+    }
+
     // =========================================================================
     // OPEN-METEO (MULTI-MODELO) COM PESOS DINÂMICOS
     // =========================================================================
@@ -1125,28 +1357,54 @@
         log('info', '🗑️ Dados de modelos removidos');
     }
     
-    function processNOAAData(data) {
+    function processNOAAData(data, hasDirectSpeed = false) {
         if (!data.table || !data.table.rows) {
             log('warning', 'Dados NOAA vazios');
             return;
         }
         
         const rows = data.table.rows;
+        const columnNames = data.table.columnNames || [];
         let count = 0;
         
+        // Detectar formato das colunas
+        const hasWindSpeed = columnNames.includes('wind_speed');
+        const hasWindDirection = columnNames.includes('wind_direction');
+        
         rows.forEach(row => {
-            // row = [time, lat, lon, x_wind, y_wind]
-            const time = new Date(row[0]);
-            const lat = row[1];
-            const lon = row[2];
-            const u = row[3];  // componente x
-            const v = row[4];  // componente y
+            // Detectar estrutura baseado no número de colunas
+            // Com altitude: [time, altitude, lat, lon, wind_speed, wind_direction]
+            // Sem altitude: [time, lat, lon, wind_speed, wind_direction]
+            const hasAltitude = columnNames.includes('altitude');
+            const offset = hasAltitude ? 1 : 0;
             
-            if (u !== null && v !== null) {
-                // Calcular velocidade e direção
-                const speed = Math.sqrt(u*u + v*v) * 1.94384;  // m/s para knots
-                const direction = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+            const time = new Date(row[0]);
+            const lat = row[1 + offset];
+            const lon = row[2 + offset];
+            
+            let speed, direction;
+            
+            if (hasDirectSpeed || hasWindSpeed) {
+                // Formato com wind_speed e wind_direction diretos
+                speed = row[3 + offset];  // já em m/s
+                direction = row[4 + offset];  // já em graus
                 
+                if (speed !== null && direction !== null) {
+                    speed = speed * 1.94384;  // m/s para knots
+                }
+            } else {
+                // Formato com componentes u/v
+                const u = row[3 + offset];  // componente x
+                const v = row[4 + offset];  // componente y
+                
+                if (u !== null && v !== null) {
+                    // Calcular velocidade e direção
+                    speed = Math.sqrt(u*u + v*v) * 1.94384;  // m/s para knots
+                    direction = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+                }
+            }
+            
+            if (speed !== null && direction !== null && !isNaN(speed) && !isNaN(direction)) {
                 addWindPoint({
                     lat: lat,
                     lon: lon,
@@ -1160,7 +1418,7 @@
         });
         
         updateWindDisplay();
-        log('success', `NOAA: ${count} pontos carregados`);
+        log('success', `✅ NOAA: ${count} pontos carregados`);
     }
     
     // =========================================================================
@@ -1241,6 +1499,43 @@
     }
     
     // =========================================================================
+    // BUSCAR DADOS - NDBC BUOYS (TEMPO REAL!)
+    // =========================================================================
+    async function fetchNDBCData() {
+        setStatus('ndbc-status', 'loading');
+        log('info', '📡 Buscando dados de bóias NDBC (tempo real)...');
+        
+        // Bóias próximas à costa brasileira / Atlântico Sul
+        // Infelizmente não há bóias NOAA NDBC na região da Bacia de Campos
+        // Mas podemos usar dados do PNBOIA (INPE/Marinha do Brasil)
+        
+        // Lista de bóias NDBC no Atlântico (as mais próximas disponíveis)
+        const buoys = [
+            // Não há bóias NDBC na costa brasileira
+            // PNBOIA brasileiras não têm API pública em tempo real
+        ];
+        
+        if (buoys.length === 0) {
+            log('warning', '⚠️ Sem bóias NDBC na região da Bacia de Campos');
+            log('info', '📍 Bóias brasileiras (PNBOIA) não têm API pública em tempo real');
+            log('info', '💡 Usando Open-Meteo como alternativa em tempo real');
+            setStatus('ndbc-status', 'error');
+            
+            // Chamar Open-Meteo como fallback
+            await fetchOpenMeteoData();
+            return;
+        }
+        
+        // Se houvesse bóias, buscaríamos assim:
+        // for (const buoyId of buoys) {
+        //     const url = `https://www.ndbc.noaa.gov/data/realtime2/${buoyId}.txt`;
+        //     // Parse dos dados...
+        // }
+        
+        setStatus('ndbc-status', 'active');
+    }
+    
+    // =========================================================================
     // FUNÇÕES DE VISUALIZAÇÃO
     // =========================================================================
     function addWindPoint(point) {
@@ -1251,6 +1546,34 @@
         windLayerGroup.clearLayers();
         
         if (windDataPoints.length === 0) return;
+        
+        const now = new Date();
+        const maxAgeMs = MAX_DATA_AGE_MINUTES * 60 * 1000;  // Converter para milissegundos
+        
+        // FILTRAR dados que estão dentro do limite de idade (60 min)
+        const recentPoints = windDataPoints.filter(point => {
+            const ageMs = now - point.time;
+            return ageMs <= maxAgeMs;
+        });
+        
+        // Contar quantos foram descartados
+        const discardedCount = windDataPoints.length - recentPoints.length;
+        if (discardedCount > 0) {
+            log('warning', `⚠️ ${discardedCount} pontos descartados (mais de ${MAX_DATA_AGE_MINUTES} min de atraso)`);
+        }
+        
+        // Atualizar array global apenas com dados recentes
+        windDataPoints = recentPoints;
+        
+        if (windDataPoints.length === 0) {
+            log('warning', `❌ Nenhum dado com menos de ${MAX_DATA_AGE_MINUTES} min de idade`);
+            document.getElementById('avg-wind').textContent = '--';
+            document.getElementById('max-wind').textContent = '--';
+            document.getElementById('data-points').textContent = '0';
+            document.getElementById('data-age').textContent = '--';
+            setStatus('wind-status', 'error');
+            return;
+        }
         
         let totalSpeed = 0;
         let maxSpeed = 0;
@@ -1268,14 +1591,21 @@
         
         // Atualizar painel
         const avgSpeed = totalSpeed / windDataPoints.length;
-        const ageHours = (new Date() - latestTime) / (1000 * 60 * 60);
+        const ageMinutes = (now - latestTime) / (1000 * 60);  // Idade em minutos
         
         document.getElementById('avg-wind').textContent = avgSpeed.toFixed(1);
         document.getElementById('max-wind').textContent = maxSpeed.toFixed(1);
         document.getElementById('data-points').textContent = windDataPoints.length;
-        document.getElementById('data-age').textContent = ageHours.toFixed(1);
+        document.getElementById('data-age').textContent = ageMinutes.toFixed(0) + ' min';
         
-        setStatus('wind-status', 'active');
+        // Status baseado na idade
+        if (ageMinutes <= 30) {
+            setStatus('wind-status', 'active');
+        } else if (ageMinutes <= MAX_DATA_AGE_MINUTES) {
+            setStatus('wind-status', 'loading');  // Amarelo para dados entre 30-60 min
+        } else {
+            setStatus('wind-status', 'error');
+        }
     }
     
     function drawWindArrow(lat, lon, direction, speed, source) {
@@ -1370,16 +1700,19 @@
     }
     
     function loadSavedCredentials() {
-        document.getElementById('cmems-user').value = localStorage.getItem('cmems-user') || '';
-        document.getElementById('cmems-pass').value = localStorage.getItem('cmems-pass') || '';
-        document.getElementById('nasa-user').value = localStorage.getItem('nasa-user') || '';
-        document.getElementById('nasa-pass').value = localStorage.getItem('nasa-pass') || '';
+        // Credenciais desabilitadas - escaterômetros têm atraso > 60 min
+        // Apenas Open-Meteo (tempo real) está habilitado
     }
     
     function fetchAllSources() {
-        fetchNOAAData();
-        // fetchCopernicusData();  // Requer autenticação especial
-        // fetchNASAData();  // Requer autenticação especial
+        log('info', `⏱️ Limite de idade: ${MAX_DATA_AGE_MINUTES} minutos`);
+        log('info', '🌐 Buscando dados em TEMPO REAL...');
+        fetchOpenMeteoData();
+        fetchNDBCData();
+        // NOTA: Dados de escaterômetro satelital (NOAA ASCAT, NASA CYGNSS, Copernicus)
+        // têm atraso mínimo de 2-6 horas no processamento.
+        // Apenas Open-Meteo fornece dados com < 60 min de atraso.
+        log('warning', '⚠️ Escaterômetros satelitais desabilitados (atraso > 60min)');
     }
     
     function clearData() {

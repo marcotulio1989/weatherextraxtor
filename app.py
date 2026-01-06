@@ -100,6 +100,103 @@ def media_circular_ponderada(angulos, pesos):
     return round((media_graus + 360) % 360, 1)
 
 
+def calcular_pesos_modelos(valores):
+    """
+    Calcula pesos para cada modelo baseado na concordância com os demais.
+    Modelos mais próximos da média recebem peso maior (inverse error weighting).
+    
+    Args:
+        valores: Lista de valores numéricos de cada modelo
+    
+    Returns:
+        Lista de pesos normalizados (somam 1)
+    """
+    # Filtrar valores válidos
+    valores_validos = [(i, v) for i, v in enumerate(valores) 
+                       if v is not None and not pd.isna(v) and v > 0]
+    
+    if len(valores_validos) < 2:
+        # Se há 0-1 modelos válidos, pesos iguais
+        return [1.0 / len(valores) if v is not None and not pd.isna(v) else 0 for v in valores]
+    
+    # Calcular média simples inicial
+    media_simples = sum(v for _, v in valores_validos) / len(valores_validos)
+    
+    # Calcular erro de cada modelo em relação à média
+    # Usar erro relativo (percentual) para normalizar
+    erros = []
+    for i, v in valores_validos:
+        erro_relativo = abs(v - media_simples) / media_simples if media_simples > 0 else 0
+        # Limitar erro mínimo para evitar divisão por zero
+        erro_relativo = max(erro_relativo, 0.01)
+        erros.append((i, v, erro_relativo))
+    
+    # Calcular peso inverso ao erro (menor erro = maior peso)
+    pesos_brutos = {}
+    soma_inversos = 0
+    for i, v, erro in erros:
+        peso = 1.0 / erro
+        pesos_brutos[i] = peso
+        soma_inversos += peso
+    
+    # Normalizar pesos para somar 1
+    pesos_normalizados = [0.0] * len(valores)
+    for i, peso in pesos_brutos.items():
+        pesos_normalizados[i] = peso / soma_inversos
+    
+    # Aplicar limites (nenhum modelo pode ter mais de 40% ou menos de 5% do peso)
+    ajustou = True
+    while ajustou:
+        ajustou = False
+        soma = sum(pesos_normalizados)
+        for i in range(len(pesos_normalizados)):
+            if pesos_normalizados[i] > 0:
+                peso_atual = pesos_normalizados[i] / soma if soma > 0 else 0
+                if peso_atual > 0.40:
+                    pesos_normalizados[i] = 0.40 * soma
+                    ajustou = True
+                elif peso_atual < 0.05 and pesos_normalizados[i] > 0:
+                    pesos_normalizados[i] = 0.05 * soma
+                    ajustou = True
+    
+    # Normalizar novamente
+    soma_final = sum(pesos_normalizados)
+    if soma_final > 0:
+        pesos_normalizados = [p / soma_final for p in pesos_normalizados]
+    
+    return pesos_normalizados
+
+
+def media_ponderada(valores, pesos=None):
+    """
+    Calcula a média ponderada de valores numéricos.
+    Se pesos não forem fornecidos, calcula automaticamente baseado na concordância.
+    
+    Args:
+        valores: Lista de valores numéricos
+        pesos: Lista de pesos (opcional - se None, calcula automaticamente)
+    
+    Returns:
+        Média ponderada ou None se não houver dados válidos
+    """
+    if not valores:
+        return None
+    
+    # Se pesos não fornecidos, calcular automaticamente
+    if pesos is None:
+        pesos = calcular_pesos_modelos(valores)
+    
+    # Calcular média ponderada
+    soma_ponderada = 0
+    soma_pesos = 0
+    for v, p in zip(valores, pesos):
+        if v is not None and not pd.isna(v) and p > 0:
+            soma_ponderada += v * p
+            soma_pesos += p
+    
+    return round(soma_ponderada / soma_pesos, 1) if soma_pesos > 0 else None
+
+
 # --------------------------------------------------------------------------
 # MODELOS DISPONÍVEIS
 # --------------------------------------------------------------------------
@@ -722,9 +819,12 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
     wind_meteofrance = round(get_safe_value(df, 'wind_speed_10m_meteofrance_seamless', current_idx, 0) * KMH_TO_KT, 1)
     wind_jma = round(get_safe_value(df, 'wind_speed_10m_jma_seamless', current_idx, 0) * KMH_TO_KT, 1)
     
-    # Média de velocidades (média aritmética simples)
+    # Calcular pesos para cada modelo baseado na concordância
     wind_speeds = [wind_ecmwf, wind_icon, wind_gfs, wind_meteofrance, wind_jma]
-    wind_media = round(sum(wind_speeds) / len(wind_speeds), 1)
+    pesos_modelos = calcular_pesos_modelos(wind_speeds)
+    
+    # Média ponderada de velocidades (usando mesmos pesos da direção)
+    wind_media = media_ponderada(wind_speeds, pesos_modelos)
     
     # Direções por modelo (para média circular)
     wind_dir_ecmwf = get_safe_value(df, 'wind_direction_10m_ecmwf_ifs025', current_idx, 0)
@@ -733,9 +833,9 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
     wind_dir_meteofrance = get_safe_value(df, 'wind_direction_10m_meteofrance_seamless', current_idx, 0)
     wind_dir_jma = get_safe_value(df, 'wind_direction_10m_jma_seamless', current_idx, 0)
     
-    # Média circular das direções (ponderada pelas velocidades)
+    # Média circular das direções (ponderada pelos mesmos pesos)
     wind_directions = [wind_dir_ecmwf, wind_dir_icon, wind_dir_gfs, wind_dir_meteofrance, wind_dir_jma]
-    wind_dir_media = media_circular_ponderada(wind_directions, wind_speeds)
+    wind_dir_media = media_circular_ponderada(wind_directions, pesos_modelos)
     wind_dir_media_text = get_wind_direction_text(wind_dir_media)
     
     # Calcular tendências (comparar com 1h atrás) - em KNOTS

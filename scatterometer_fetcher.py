@@ -105,24 +105,36 @@ class NOAAErddapSource(ScatterometerSource):
     NOAA ERDDAP - Dados ASCAT gratuitos
     https://coastwatch.pfeg.noaa.gov/erddap/
     
-    Datasets disponíveis:
-    - erdQAwind1day: ASCAT Daily wind
-    - erdQAwind3day: ASCAT 3-day composite
-    - erdQAwind8day: ASCAT 8-day composite
-    - erdQAwindmday: ASCAT Monthly
+    Datasets disponíveis (atualizados em 2026):
+    - erdQCwindproducts1day: MetOp-C ASCAT 1-Day (2020-presente) ✅ ATIVO
+    - erdQCwindproducts3day: MetOp-C ASCAT 3-Day composite ✅ ATIVO
+    - erdQCwindproducts7day: MetOp-C ASCAT 7-Day composite
+    - erdNavgem05D10mWind: NAVGEM model wind (backup)
+    
+    Datasets DESCONTINUADOS:
+    - erdQAwind1day: Dados até 2022 apenas (MetOp-A/B)
     """
     
     BASE_URL = "https://coastwatch.pfeg.noaa.gov/erddap/griddap"
     
     DATASETS = {
-        'ascat_daily': 'erdQAwind1day',
-        'ascat_3day': 'erdQAwind3day', 
-        'ascat_8day': 'erdQAwind8day',
-        'ascat_monthly': 'erdQAwindmday'
+        'ascat_daily': 'erdQCwindproducts1day',    # MetOp-C ASCAT 1-Day (ATIVO!)
+        'ascat_3day': 'erdQCwindproducts3day',     # MetOp-C ASCAT 3-Day
+        'ascat_7day': 'erdQCwindproducts7day',     # MetOp-C ASCAT 7-Day
+        'navgem_10m': 'erdNavgem05D10mWind',       # NAVGEM model (backup)
+    }
+    
+    # Variáveis por dataset
+    DATASET_VARS = {
+        'erdQCwindproducts1day': ('wind_speed', 'wind_direction'),
+        'erdQCwindproducts3day': ('wind_speed', 'wind_direction'),
+        'erdQCwindproducts7day': ('wind_speed', 'wind_direction'),
+        'erdNavgem05D10mWind': ('u_wind', 'v_wind'),
     }
     
     def __init__(self):
         super().__init__("NOAA ERDDAP ASCAT")
+        self.current_dataset = None
         
     def fetch(self, bbox, start_time=None, end_time=None, dataset='ascat_daily'):
         """
@@ -130,34 +142,45 @@ class NOAAErddapSource(ScatterometerSource):
         
         Args:
             bbox: dict com lat_min, lat_max, lon_min, lon_max
-            start_time: datetime de início (default: 24h atrás)
-            end_time: datetime de fim (default: agora)
+            start_time: datetime de início (default: 4 dias atrás)
+            end_time: datetime de fim (default: 1 dia atrás - dados satélite tem delay)
             dataset: qual dataset usar
         """
         if end_time is None:
-            end_time = datetime.utcnow()
+            # Dados de satélite têm atraso de ~24h no processamento
+            end_time = datetime.utcnow() - timedelta(days=1)
         if start_time is None:
-            start_time = end_time - timedelta(days=1)
+            start_time = end_time - timedelta(days=3)  # 3 dias de dados
             
-        dataset_id = self.DATASETS.get(dataset, 'erdQAwind1day')
+        dataset_id = self.DATASETS.get(dataset, 'erdQCwindproducts1day')
+        self.current_dataset = dataset_id
+        vars_tuple = self.DATASET_VARS.get(dataset_id, ('wind_speed', 'wind_direction'))
         
         # Formato de tempo para ERDDAP
         start_str = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         end_str = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
         
-        # Construir URL
+        # Construir URL baseado nas variáveis do dataset
+        # Datasets erdQCwindproducts* têm dimensão altitude (10m)
+        var1, var2 = vars_tuple
+        has_altitude = dataset_id.startswith('erdQCwindproducts')
+        altitude_dim = "[(10.0)]" if has_altitude else ""
+        
         url = (
             f"{self.BASE_URL}/{dataset_id}.json?"
-            f"x_wind[({start_str}):1:({end_str})]"
+            f"{var1}[({start_str}):1:({end_str})]"
+            f"{altitude_dim}"
             f"[({bbox['lat_max']}):1:({bbox['lat_min']})]"
             f"[({bbox['lon_min']}):1:({bbox['lon_max']})]"
-            f",y_wind[({start_str}):1:({end_str})]"
+            f",{var2}[({start_str}):1:({end_str})]"
+            f"{altitude_dim}"
             f"[({bbox['lat_max']}):1:({bbox['lat_min']})]"
             f"[({bbox['lon_min']}):1:({bbox['lon_max']})]"
         )
         
         print(f"📡 Buscando: {self.name}")
         print(f"   Dataset: {dataset_id}")
+        print(f"   Variáveis: {var1}, {var2}")
         print(f"   Período: {start_str} a {end_str}")
         
         try:
@@ -183,38 +206,59 @@ class NOAAErddapSource(ScatterometerSource):
         """Parsear resposta JSON do ERDDAP"""
         if 'table' not in data or 'rows' not in data['table']:
             return
+        
+        # Verificar tipo de variáveis
+        vars_tuple = self.DATASET_VARS.get(self.current_dataset, ('wind_speed', 'wind_direction'))
+        is_direct_speed = vars_tuple[0] == 'wind_speed'
+        
+        # Verificar se há coluna altitude
+        column_names = data['table'].get('columnNames', [])
+        has_altitude = 'altitude' in column_names
+        offset = 1 if has_altitude else 0
+        
+        import math
             
         for row in data['table']['rows']:
-            # row = [time, lat, lon, x_wind, y_wind]
-            if len(row) >= 5 and row[3] is not None and row[4] is not None:
-                u = row[3]  # componente x (m/s)
-                v = row[4]  # componente y (m/s)
+            # Estrutura pode ser:
+            # Com altitude: [time, altitude, lat, lon, var1, var2]
+            # Sem altitude: [time, lat, lon, var1, var2]
+            min_cols = 5 + offset
+            if len(row) < min_cols:
+                continue
+                
+            speed_idx = 3 + offset
+            dir_idx = 4 + offset
+            
+            if row[speed_idx] is None or row[dir_idx] is None:
+                continue
+                
+            if is_direct_speed:
+                # Variáveis são wind_speed (m/s) e wind_direction (graus)
+                speed_ms = row[speed_idx]
+                direction = row[dir_idx]
+                speed_kn = speed_ms * 1.94384
+                u = v = None
+            else:
+                # Variáveis são componentes u, v
+                u = row[speed_idx]  # componente x (m/s)
+                v = row[dir_idx]  # componente y (m/s)
                 
                 # Calcular velocidade e direção
                 speed_ms = (u**2 + v**2)**0.5
                 speed_kn = speed_ms * 1.94384  # m/s para knots
-                direction = (180 + 180/3.14159 * 
-                           (3.14159 + (0 if u == 0 else 
-                            3.14159/2 - (u/abs(u)) * 
-                            (3.14159/2 - abs((v/(abs(u)+abs(v))) * 3.14159/2))
-                           if abs(u) < abs(v) else
-                            (u/abs(u)) * abs((u/(abs(u)+abs(v))) * 3.14159/2)))) % 360
-                
-                # Correção para cálculo de direção
-                import math
                 direction = (math.degrees(math.atan2(-u, -v)) + 360) % 360
-                
-                self.data.append({
-                    'timestamp': row[0],
-                    'latitude': row[1],
-                    'longitude': row[2],
-                    'u_wind_ms': u,
-                    'v_wind_ms': v,
-                    'wind_speed_ms': speed_ms,
-                    'wind_speed_kn': speed_kn,
-                    'wind_direction': direction,
-                    'source': 'NOAA_ASCAT'
-                })
+            
+            self.data.append({
+                'timestamp': row[0],
+                'latitude': row[1 + offset],
+                'longitude': row[2 + offset],
+                'u_wind_ms': u,
+                'v_wind_ms': v,
+                'wind_speed_ms': speed_ms,
+                'wind_speed_kn': speed_kn,
+                'wind_direction': direction,
+                'source': 'NOAA_ASCAT'
+            })
                 
     def _fetch_alternative(self, bbox):
         """Buscar de fonte alternativa (Open-Meteo)"""
