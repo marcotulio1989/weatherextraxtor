@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛰️ Ferramenta de Alinhamento de Imagem Satélite</title>
+    <title>🛰️ Alinhamento de Imagem Satélite - ECDIS</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * {
@@ -14,7 +14,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1a1a2e;
+            background: #0a0a15;
             color: #eee;
             overflow: hidden;
         }
@@ -26,17 +26,18 @@
 
         /* Painel de Controle */
         .control-panel {
-            width: 320px;
+            width: 340px;
             background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
             padding: 20px;
             overflow-y: auto;
             border-right: 2px solid #0f3460;
             z-index: 1000;
+            flex-shrink: 0;
         }
 
         .control-panel h1 {
-            font-size: 1.3em;
-            margin-bottom: 20px;
+            font-size: 1.2em;
+            margin-bottom: 15px;
             color: #e94560;
             text-align: center;
             border-bottom: 1px solid #0f3460;
@@ -44,55 +45,28 @@
         }
 
         .control-section {
-            margin-bottom: 20px;
-            padding: 15px;
+            margin-bottom: 15px;
+            padding: 12px;
             background: rgba(15, 52, 96, 0.5);
             border-radius: 10px;
         }
 
         .control-section h3 {
             color: #00d9ff;
-            margin-bottom: 12px;
-            font-size: 0.95em;
-        }
-
-        .control-row {
-            display: flex;
-            align-items: center;
             margin-bottom: 10px;
-            gap: 10px;
-        }
-
-        .control-row label {
-            flex: 0 0 80px;
-            font-size: 0.85em;
-            color: #aaa;
-        }
-
-        .control-row input[type="range"] {
-            flex: 1;
-            accent-color: #e94560;
-        }
-
-        .control-row input[type="number"] {
-            width: 70px;
-            padding: 5px;
-            border: 1px solid #0f3460;
-            background: #1a1a2e;
-            color: #fff;
-            border-radius: 5px;
-            text-align: center;
+            font-size: 0.9em;
         }
 
         .btn {
             width: 100%;
-            padding: 12px;
-            margin-bottom: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
             border: none;
             border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s;
+            font-size: 0.85em;
         }
 
         .btn-primary {
@@ -138,166 +112,182 @@
             height: 100%;
         }
 
-        /* Área do Mapa */
-        .map-area {
+        /* Área da Imagem */
+        .image-area {
             flex: 1;
             position: relative;
+            background: #000;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Overlay da Imagem */
-        .image-overlay-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 500;
-        }
-
-        .satellite-image {
-            position: absolute;
+        #imageContainer {
+            position: relative;
             transform-origin: center center;
-            pointer-events: auto;
-            cursor: move;
         }
 
-        /* Pontos de Controle */
-        .control-point {
+        #satelliteImage {
+            max-width: none;
+            max-height: none;
+            display: block;
+            image-rendering: auto;
+        }
+
+        /* Pontos de controle na imagem */
+        .image-point {
             position: absolute;
-            width: 20px;
-            height: 20px;
-            background: #e94560;
-            border: 3px solid white;
+            width: 24px;
+            height: 24px;
+            background: #ff00ff;
+            border: 3px solid #fff;
             border-radius: 50%;
-            cursor: grab;
-            z-index: 1000;
-            pointer-events: auto;
-            box-shadow: 0 0 10px rgba(233, 69, 96, 0.8);
-            transition: transform 0.1s;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 0 15px rgba(255,0,255,0.8);
+            transform: translate(-50%, -50%);
+            z-index: 100;
         }
 
-        .control-point:hover {
-            transform: scale(1.3);
-            background: #00d9ff;
+        .image-point:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+            background: #00ffff;
         }
 
-        .control-point:active {
-            cursor: grabbing;
-        }
-
-        .control-point.corner-tl { background: #ff6b6b; }
-        .control-point.corner-tr { background: #4ecdc4; }
-        .control-point.corner-bl { background: #ffe66d; }
-        .control-point.corner-br { background: #95e1d3; }
-
-        /* Info Panel */
-        .info-panel {
-            position: absolute;
-            bottom: 20px;
-            left: 340px;
-            background: rgba(26, 26, 46, 0.95);
-            padding: 15px 20px;
-            border-radius: 10px;
-            border: 1px solid #0f3460;
-            z-index: 1000;
-            max-width: 400px;
-        }
-
-        .info-panel h4 {
-            color: #00d9ff;
-            margin-bottom: 10px;
-        }
-
-        .info-panel pre {
-            font-size: 0.75em;
-            color: #aaa;
-            white-space: pre-wrap;
-            max-height: 150px;
+        /* Lista de GCPs */
+        .gcp-list {
+            max-height: 250px;
             overflow-y: auto;
+            background: #0a0a15;
+            border-radius: 5px;
+            padding: 8px;
         }
 
-        /* Instruções */
-        .instructions {
+        .gcp-item {
+            padding: 8px;
+            margin-bottom: 6px;
+            background: rgba(15, 52, 96, 0.7);
+            border-radius: 5px;
             font-size: 0.8em;
-            color: #888;
-            line-height: 1.5;
-            margin-top: 10px;
+            border-left: 3px solid #ff00ff;
         }
 
-        .instructions li {
+        .gcp-item .gcp-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
             margin-bottom: 5px;
         }
 
-        /* Coordenadas dos pontos */
-        .coords-display {
-            font-family: monospace;
-            font-size: 0.75em;
-            background: #0a0a15;
-            padding: 10px;
-            border-radius: 5px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-
-        /* Toggle para visibilidade */
-        .toggle-container {
+        .gcp-item .gcp-number {
+            background: #ff00ff;
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 10px;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
         }
 
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 26px;
+        .gcp-item .gcp-coords {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
         }
 
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
+        .gcp-item input {
+            width: 100%;
+            padding: 5px;
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            color: #fff;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 0.9em;
         }
 
-        .toggle-slider {
-            position: absolute;
+        .gcp-item label {
+            font-size: 0.75em;
+            color: #888;
+        }
+
+        .gcp-item button.remove-btn {
+            background: #e94560;
+            border: none;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #0f3460;
-            transition: 0.4s;
-            border-radius: 26px;
+            font-size: 12px;
+            margin-left: auto;
         }
 
-        .toggle-slider:before {
+        .gcp-mode-active {
+            background: linear-gradient(135deg, #ff00ff, #cc00cc) !important;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(255,0,255,0.5); }
+            50% { box-shadow: 0 0 20px rgba(255,0,255,0.8); }
+        }
+
+        /* Controles de zoom da imagem */
+        .zoom-controls {
             position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 500;
         }
 
-        input:checked + .toggle-slider {
-            background-color: #00d9ff;
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(22, 33, 62, 0.9);
+            border: 1px solid #0f3460;
+            color: #00d9ff;
+            font-size: 20px;
+            cursor: pointer;
+            border-radius: 5px;
         }
 
-        input:checked + .toggle-slider:before {
-            transform: translateX(24px);
+        .zoom-btn:hover {
+            background: #0f3460;
         }
 
-        /* Modal de Salvamento */
+        .zoom-level {
+            text-align: center;
+            font-size: 0.8em;
+            color: #888;
+            padding: 5px;
+        }
+
+        /* Info de posição do mouse */
+        .mouse-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(22, 33, 62, 0.9);
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            z-index: 500;
+            border: 1px solid #0f3460;
+        }
+
+        /* Modal para preview de alinhamento */
         .modal {
             display: none;
             position: fixed;
@@ -305,7 +295,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             z-index: 2000;
             justify-content: center;
             align-items: center;
@@ -313,34 +303,55 @@
 
         .modal-content {
             background: #16213e;
-            padding: 30px;
             border-radius: 15px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
+            width: 95%;
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
-        .modal-content h2 {
+        .modal-header {
+            padding: 15px 20px;
+            background: #0f3460;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
             color: #00d9ff;
-            margin-bottom: 20px;
-        }
-
-        .modal-content pre {
-            background: #0a0a15;
-            padding: 15px;
-            border-radius: 8px;
-            overflow-x: auto;
-            font-size: 0.8em;
+            font-size: 1.2em;
         }
 
         .close-modal {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 2em;
+            font-size: 1.5em;
             color: #e94560;
             cursor: pointer;
+            background: none;
+            border: none;
+        }
+
+        #previewMap {
+            flex: 1;
+            width: 100%;
+        }
+
+        /* Status */
+        .status-bar {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+        }
+
+        .instructions {
+            font-size: 0.75em;
+            color: #666;
+            line-height: 1.4;
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -348,752 +359,911 @@
     <div class="container">
         <!-- Painel de Controle -->
         <div class="control-panel">
-            <h1>🛰️ Alinhamento de Satélite</h1>
-
-            <!-- Baixar Imagem Satélite -->
-            <div class="control-section">
-                <h3>🛰️ Carregar Imagem Satélite</h3>
-                <select id="satelliteProduct" style="width: 100%; padding: 8px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px; margin-bottom: 10px;">
-                    <optgroup label="GOES-16 América do Sul">
-                        <option value="goes16-ssa-ch13">GOES-16 SSA - Infravermelho (Ch13)</option>
-                        <option value="goes16-ssa-ch02">GOES-16 SSA - Visível (Ch02)</option>
-                        <option value="goes16-ssa-ch08">GOES-16 SSA - Vapor d'Água (Ch08)</option>
-                    </optgroup>
-                    <optgroup label="GOES-16 Brasil">
-                        <option value="goes16-br-ch13">GOES-16 Brasil - Infravermelho</option>
-                    </optgroup>
-                    <optgroup label="Windy.com (Funciona direto!)">
-                        <option value="windy-satellite">Windy Satélite IR</option>
-                        <option value="windy-radar">Windy Radar</option>
-                    </optgroup>
-                </select>
-                <button class="btn btn-primary" onclick="fetchSatelliteImage()" id="btnFetchSat">
-                    🔄 Buscar Imagem do Satélite
-                </button>
-                <button class="btn btn-secondary" onclick="openCPTECPage()" style="margin-top:5px;">
-                    🌐 Abrir CPTEC (salvar manualmente)
-                </button>
-                <div id="satStatus" style="font-size: 0.8em; color: #888; margin-top: 8px;"></div>
-            </div>
+            <h1>🛰️ Alinhamento ECDIS</h1>
 
             <!-- Carregar Imagem -->
             <div class="control-section">
-                <h3>📁 Ou Carregar Imagem Manual</h3>
+                <h3>📁 Carregar Imagem</h3>
                 <div class="file-input-wrapper">
-                    <button class="btn btn-secondary">Selecionar Arquivo</button>
+                    <button class="btn btn-primary">📂 Selecionar Arquivo</button>
                     <input type="file" id="imageInput" accept="image/*">
                 </div>
                 <input type="text" id="imageUrl" placeholder="Ou cole URL da imagem..." 
-                       style="width: 100%; padding: 8px; margin-top: 10px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px;">
-                <button class="btn btn-secondary" onclick="loadImageFromUrl()" style="margin-top: 10px;">Carregar URL</button>
+                       style="width: 100%; padding: 8px; margin-top: 8px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px; font-size: 0.85em;">
+                <button class="btn btn-secondary" onclick="loadImageFromUrl()" style="margin-top: 5px;">🔗 Carregar URL</button>
+                <div class="status-bar" id="imageStatus">Nenhuma imagem carregada</div>
             </div>
 
-            <!-- Transformações Globais -->
+            <!-- Marcar Pontos -->
             <div class="control-section">
-                <h3>🔄 Transformações Globais</h3>
+                <h3>📌 Pontos de Referência (GCP)</h3>
+                <button class="btn btn-primary" id="btnGcpMode" onclick="toggleGcpMode()">
+                    🎯 Marcar Ponto na Imagem
+                </button>
+                <p class="instructions" id="gcpInstructions" style="display:none;">
+                    ✨ Clique na imagem para marcar um ponto.<br>
+                    📍 Digite as coordenadas do ECDIS nos campos.<br>
+                    🔢 Mínimo 2 pontos para alinhar.
+                </p>
                 
-                <div class="control-row">
-                    <label>Rotação:</label>
-                    <input type="range" id="rotation" min="-180" max="180" value="0" step="0.1">
-                    <input type="number" id="rotationValue" value="0" step="0.1">
+                <button class="btn" id="btnMeasureMode" onclick="toggleMeasureMode()" style="background:#6c5ce7; margin-top:8px;">
+                    📏 Medir Distância (Range & Bearing)
+                </button>
+                <p class="instructions" id="measureInstructions" style="display:none;">
+                    📍 Clique no PRIMEIRO ponto de medição.<br>
+                    📍 Clique no SEGUNDO ponto.<br>
+                    📐 Verá a distância e rumo entre eles.
+                </p>
+                <div id="measureResult" style="display:none; background:#2a2a4a; padding:12px; border-radius:8px; margin-top:8px; border:2px solid #6c5ce7;">
                 </div>
-
-                <div class="control-row">
-                    <label>Escala X:</label>
-                    <input type="range" id="scaleX" min="0.1" max="3" value="1" step="0.01">
-                    <input type="number" id="scaleXValue" value="1" step="0.01">
-                </div>
-
-                <div class="control-row">
-                    <label>Escala Y:</label>
-                    <input type="range" id="scaleY" min="0.1" max="3" value="1" step="0.01">
-                    <input type="number" id="scaleYValue" value="1" step="0.01">
-                </div>
-
-                <div class="control-row">
-                    <label>Opacidade:</label>
-                    <input type="range" id="opacity" min="0" max="1" value="0.7" step="0.05">
-                    <input type="number" id="opacityValue" value="0.7" step="0.05">
-                </div>
-
-                <div class="control-row">
-                    <label>Skew X:</label>
-                    <input type="range" id="skewX" min="-45" max="45" value="0" step="0.5">
-                    <input type="number" id="skewXValue" value="0" step="0.5">
-                </div>
-
-                <div class="control-row">
-                    <label>Skew Y:</label>
-                    <input type="range" id="skewY" min="-45" max="45" value="0" step="0.5">
-                    <input type="number" id="skewYValue" value="0" step="0.5">
-                </div>
-            </div>
-
-            <!-- Perspectiva (Distorção 3D) -->
-            <div class="control-section">
-                <h3>📐 Perspectiva 3D</h3>
                 
-                <div class="control-row">
-                    <label>Perspectiva:</label>
-                    <input type="range" id="perspective" min="100" max="2000" value="1000" step="10">
-                    <input type="number" id="perspectiveValue" value="1000" step="10">
+                <div class="gcp-list" id="gcpList">
+                    <p style="color:#666; font-size:0.85em; text-align:center;">
+                        Nenhum ponto marcado
+                    </p>
                 </div>
-
-                <div class="control-row">
-                    <label>Rot. X:</label>
-                    <input type="range" id="rotateX" min="-60" max="60" value="0" step="0.5">
-                    <input type="number" id="rotateXValue" value="0" step="0.5">
-                </div>
-
-                <div class="control-row">
-                    <label>Rot. Y:</label>
-                    <input type="range" id="rotateY" min="-60" max="60" value="0" step="0.5">
-                    <input type="number" id="rotateYValue" value="0" step="0.5">
-                </div>
-            </div>
-
-            <!-- Visibilidade -->
-            <div class="control-section">
-                <h3>👁️ Visibilidade</h3>
                 
-                <div class="toggle-container">
-                    <span>Mostrar Imagem</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="showImage" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="toggle-container">
-                    <span>Mostrar Pontos de Controle</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="showControlPoints" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-
-                <div class="toggle-container">
-                    <span>Bloquear Arraste</span>
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="lockDrag">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
+                <button class="btn btn-warning" onclick="clearAllPoints()" style="margin-top:8px;">
+                    🗑️ Limpar Pontos
+                </button>
             </div>
 
             <!-- Ações -->
             <div class="control-section">
                 <h3>⚡ Ações</h3>
-                <button class="btn btn-warning" onclick="resetTransformations()">🔄 Resetar Tudo</button>
-                <button class="btn btn-success" onclick="saveAlignment()">💾 Salvar Alinhamento</button>
-                <button class="btn btn-secondary" onclick="exportAsJSON()">📤 Exportar JSON</button>
-                <button class="btn btn-secondary" onclick="loadFromJSON()">📥 Importar JSON</button>
+                <button class="btn btn-success" onclick="previewAlignment()" id="btnPreview">
+                    🗺️ Ver Alinhamento no Mapa
+                </button>
+                <button class="btn btn-secondary" onclick="exportAlignment()">
+                    📤 Exportar JSON
+                </button>
+                <button class="btn btn-secondary" onclick="importAlignment()">
+                    📥 Importar JSON
+                </button>
             </div>
 
-            <!-- Coordenadas -->
+            <!-- Resumo -->
             <div class="control-section">
-                <h3>📍 Coordenadas dos Pontos</h3>
-                <div id="coordsDisplay" class="coords-display">
-                    Carregue uma imagem para ver as coordenadas
+                <h3>📊 Resumo</h3>
+                <div id="summaryDisplay" class="status-bar">
+                    Carregue uma imagem e marque os pontos
                 </div>
-            </div>
-
-            <!-- Instruções -->
-            <div class="control-section">
-                <h3>📖 Instruções</h3>
-                <ul class="instructions">
-                    <li>Carregue uma imagem de satélite</li>
-                    <li>Arraste a imagem para posicionar</li>
-                    <li>Use os pontos coloridos nos cantos para distorcer</li>
-                    <li>Ajuste rotação, escala e perspectiva</li>
-                    <li>Clique em "Salvar Alinhamento" quando terminar</li>
-                </ul>
             </div>
         </div>
 
-        <!-- Área do Mapa -->
-        <div class="map-area">
-            <div id="map"></div>
-            <div class="image-overlay-container" id="overlayContainer">
-                <!-- A imagem de satélite será inserida aqui -->
+        <!-- Área da Imagem -->
+        <div class="image-area" id="imageArea">
+            <div id="imageContainer">
+                <img id="satelliteImage" src="" alt="Carregue uma imagem" style="display:none;">
+            </div>
+            
+            <div class="mouse-info" id="mouseInfo">
+                Pixel: -- , --
+            </div>
+
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="zoomImage(1.2)">+</button>
+                <div class="zoom-level" id="zoomLevel">100%</div>
+                <button class="zoom-btn" onclick="zoomImage(0.8)">−</button>
+                <button class="zoom-btn" onclick="resetZoom()" style="font-size:12px;">⟲</button>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Resultado -->
-    <div class="modal" id="resultModal">
+    <!-- Modal de Preview -->
+    <div class="modal" id="previewModal">
         <div class="modal-content">
-            <span class="close-modal" onclick="closeModal()">&times;</span>
-            <h2>✅ Alinhamento Salvo!</h2>
-            <p>Parâmetros de transformação capturados:</p>
-            <pre id="resultJSON"></pre>
-            <button class="btn btn-primary" onclick="copyToClipboard()" style="margin-top: 15px;">📋 Copiar JSON</button>
-            <button class="btn btn-secondary" onclick="downloadJSON()" style="margin-top: 10px;">💾 Baixar Arquivo</button>
+            <div class="modal-header">
+                <h2>🗺️ Preview do Alinhamento</h2>
+                <button class="close-modal" onclick="closePreview()">×</button>
+            </div>
+            <div id="previewMap"></div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // ===== INICIALIZAÇÃO =====
-        let map;
+        // ===== ESTADO GLOBAL =====
         let imageElement = null;
-        let controlPoints = [];
+        let imageLoaded = false;
+        let imageNaturalSize = { width: 0, height: 0 };
+        let currentZoom = 1;
+        let gcpMode = false;
+        let gcpPoints = [];  // {id, pixelX, pixelY, lat, lng, element}
+        let gcpCounter = 0;
         let isDragging = false;
         let dragTarget = null;
         let dragOffset = { x: 0, y: 0 };
-        let imagePosition = { x: 0, y: 0 };
-        let originalImageSize = { width: 0, height: 0 };
+        let imageOffset = { x: 0, y: 0 };
+        let previewMap = null;
+        
+        // Estado para medição
+        let measureMode = false;
+        let measurePoints = []; // {pixelX, pixelY, lat, lng}
+        let measureMarkers = [];
 
-        // Pontos de controle originais (relativos à imagem)
-        let cornerOffsets = {
-            tl: { x: 0, y: 0 },
-            tr: { x: 0, y: 0 },
-            bl: { x: 0, y: 0 },
-            br: { x: 0, y: 0 }
-        };
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            imageElement = document.getElementById('satelliteImage');
+            setupImageDrag();
+            setupMouseTracking();
+        });
 
-        // Inicializar mapa
-        function initMap() {
-            // Centralizado em Campos dos Goytacazes / região costeira
-            map = L.map('map', {
-                center: [-22.0, -41.0],
-                zoom: 7,
-                zoomControl: true
-            });
-
-            // Camadas de mapa
-            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap'
-            });
-
-            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                attribution: '© Esri'
-            });
-
-            const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenTopoMap'
-            });
-
-            // Adicionar camada padrão
-            osmLayer.addTo(map);
-
-            // Controle de camadas
-            L.control.layers({
-                'OpenStreetMap': osmLayer,
-                'Satélite (Esri)': satelliteLayer,
-                'Topográfico': topoLayer
-            }).addTo(map);
-
-            // Adicionar escala
-            L.control.scale({ imperial: false }).addTo(map);
-        }
-
-        // ===== ABRIR CPTEC =====
-        function openCPTECPage() {
-            window.open('http://satelite.cptec.inpe.br/acervo/goes16.formulario.logic?i=br', '_blank');
-        }
-
-        // ===== BUSCAR IMAGEM SATÉLITE =====
-        async function fetchSatelliteImage() {
-            const product = document.getElementById('satelliteProduct').value;
-            const status = document.getElementById('satStatus');
-            const btn = document.getElementById('btnFetchSat');
-            
-            btn.disabled = true;
-            status.innerHTML = '⏳ Buscando imagem...';
-            status.style.color = '#ffff00';
-
-            // URLs que funcionam sem CORS
-            const imageUrls = {
-                // Windy tiles (funciona!)
-                'windy-satellite': 'https://ims.windy.com/sat/satellite/satellite/2026/01/06/12/satellite_2026010612.jpg',
-                'windy-radar': 'https://ims.windy.com/radar/radar/2026/01/06/12/radar_2026010612.jpg',
-                
-                // NOAA GOES (geralmente funciona)
-                'goes16-ssa-ch13': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg',
-                'goes16-ssa-ch02': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/02/latest.jpg',
-                'goes16-ssa-ch08': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/08/latest.jpg',
-                'goes16-br-ch13': 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
-            };
-
-            const url = imageUrls[product];
-            
-            if (!url) {
-                status.innerHTML = '❌ Produto não disponível';
-                status.style.color = '#ff4444';
-                btn.disabled = false;
-                return;
-            }
-
-            try {
-                // Tentar carregar a imagem
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                img.onload = function() {
-                    loadImage(url);
-                    status.innerHTML = '✅ Imagem carregada! Agora alinhe com o mapa.';
-                    status.style.color = '#00ff00';
-                    btn.disabled = false;
-                };
-                
-                img.onerror = function() {
-                    // Se falhar CORS, tentar sem crossOrigin
-                    status.innerHTML = '⚠️ Carregando (pode ter restrição CORS)...';
-                    loadImage(url);
-                    status.style.color = '#ffaa00';
-                    btn.disabled = false;
-                };
-                
-                img.src = url;
-                
-            } catch (error) {
-                status.innerHTML = `❌ Erro: ${error.message}`;
-                status.style.color = '#ff4444';
-                btn.disabled = false;
-            }
-        }
-
-        // ===== CARREGAMENTO DE IMAGEM =====
+        // ===== CARREGAR IMAGEM =====
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(event) {
-                    loadImage(event.target.result);
+                    loadImage(event.target.result, file.name);
                 };
                 reader.readAsDataURL(file);
             }
         });
 
         function loadImageFromUrl() {
-            const url = document.getElementById('imageUrl').value;
+            const url = document.getElementById('imageUrl').value.trim();
             if (url) {
-                loadImage(url);
+                loadImage(url, 'URL');
             }
         }
 
-        function loadImage(src) {
-            const container = document.getElementById('overlayContainer');
-            
-            // Remover imagem anterior
-            if (imageElement) {
-                imageElement.remove();
-                controlPoints.forEach(p => p.remove());
-                controlPoints = [];
-            }
+        function loadImage(src, name) {
+            const status = document.getElementById('imageStatus');
+            status.innerHTML = '⏳ Carregando...';
+            status.style.color = '#ffff00';
 
-            // Criar nova imagem
-            imageElement = document.createElement('img');
-            imageElement.src = src;
-            imageElement.className = 'satellite-image';
-            imageElement.id = 'satelliteImage';
-            
             imageElement.onload = function() {
-                originalImageSize = {
+                imageNaturalSize = {
                     width: this.naturalWidth,
                     height: this.naturalHeight
                 };
-
-                // Ajustar tamanho inicial
-                const containerRect = container.getBoundingClientRect();
-                const scale = Math.min(
-                    containerRect.width * 0.6 / this.naturalWidth,
-                    containerRect.height * 0.6 / this.naturalHeight
-                );
                 
-                this.style.width = (this.naturalWidth * scale) + 'px';
-                this.style.height = (this.naturalHeight * scale) + 'px';
-
-                // Posicionar no centro
-                imagePosition.x = (containerRect.width - this.naturalWidth * scale) / 2;
-                imagePosition.y = (containerRect.height - this.naturalHeight * scale) / 2;
+                imageElement.style.display = 'block';
+                imageLoaded = true;
+                resetZoom();
                 
-                updateImageTransform();
-                createControlPoints();
-                updateCoordsDisplay();
+                status.innerHTML = `✅ ${name}<br>📐 ${imageNaturalSize.width} × ${imageNaturalSize.height} px`;
+                status.style.color = '#00ff00';
+                
+                updateSummary();
             };
 
-            container.appendChild(imageElement);
-            setupImageDrag();
-        }
-
-        // ===== PONTOS DE CONTROLE =====
-        function createControlPoints() {
-            const container = document.getElementById('overlayContainer');
-            const corners = ['tl', 'tr', 'bl', 'br'];
-            const labels = ['Top-Left', 'Top-Right', 'Bottom-Left', 'Bottom-Right'];
-            const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
-
-            corners.forEach((corner, index) => {
-                const point = document.createElement('div');
-                point.className = `control-point corner-${corner}`;
-                point.dataset.corner = corner;
-                point.title = labels[index];
-                container.appendChild(point);
-                controlPoints.push(point);
-
-                // Reset offset
-                cornerOffsets[corner] = { x: 0, y: 0 };
-
-                setupControlPointDrag(point, corner);
-            });
-
-            updateControlPointsPosition();
-        }
-
-        function updateControlPointsPosition() {
-            if (!imageElement) return;
-
-            const rect = imageElement.getBoundingClientRect();
-            const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-
-            const positions = {
-                tl: { x: rect.left - containerRect.left, y: rect.top - containerRect.top },
-                tr: { x: rect.right - containerRect.left, y: rect.top - containerRect.top },
-                bl: { x: rect.left - containerRect.left, y: rect.bottom - containerRect.top },
-                br: { x: rect.right - containerRect.left, y: rect.bottom - containerRect.top }
+            imageElement.onerror = function() {
+                status.innerHTML = '❌ Erro ao carregar imagem';
+                status.style.color = '#ff4444';
             };
 
-            controlPoints.forEach(point => {
-                const corner = point.dataset.corner;
-                const pos = positions[corner];
-                const offset = cornerOffsets[corner];
-                
-                point.style.left = (pos.x + offset.x - 10) + 'px';
-                point.style.top = (pos.y + offset.y - 10) + 'px';
-            });
+            imageElement.src = src;
         }
 
-        function setupControlPointDrag(point, corner) {
-            point.addEventListener('mousedown', function(e) {
-                if (document.getElementById('lockDrag').checked) return;
-                e.stopPropagation();
-                isDragging = true;
-                dragTarget = { type: 'control', corner: corner, element: point };
-                
-                const rect = point.getBoundingClientRect();
-                dragOffset = {
-                    x: e.clientX - rect.left - 10,
-                    y: e.clientY - rect.top - 10
-                };
-            });
+        // ===== ZOOM DA IMAGEM =====
+        function zoomImage(factor) {
+            currentZoom *= factor;
+            currentZoom = Math.max(0.1, Math.min(10, currentZoom));
+            applyZoom();
         }
 
-        // ===== ARRASTE DA IMAGEM =====
+        function resetZoom() {
+            if (!imageLoaded) return;
+            
+            const area = document.getElementById('imageArea');
+            const areaRect = area.getBoundingClientRect();
+            
+            // Calcular zoom para caber na área
+            const scaleX = (areaRect.width - 100) / imageNaturalSize.width;
+            const scaleY = (areaRect.height - 100) / imageNaturalSize.height;
+            currentZoom = Math.min(scaleX, scaleY, 1);
+            
+            imageOffset = { x: 0, y: 0 };
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const container = document.getElementById('imageContainer');
+            container.style.transform = `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            updatePointPositions();
+        }
+
+        // ===== ARRASTAR IMAGEM =====
         function setupImageDrag() {
-            imageElement.addEventListener('mousedown', function(e) {
-                if (document.getElementById('lockDrag').checked) return;
-                if (e.target.classList.contains('control-point')) return;
+            const area = document.getElementById('imageArea');
+            
+            area.addEventListener('mousedown', function(e) {
+                if (e.target.classList.contains('image-point')) return;
+                if (gcpMode) return;
                 
                 isDragging = true;
-                dragTarget = { type: 'image', element: imageElement };
+                dragTarget = 'image';
                 dragOffset = {
-                    x: e.clientX - imagePosition.x,
-                    y: e.clientY - imagePosition.y
+                    x: e.clientX - imageOffset.x,
+                    y: e.clientY - imageOffset.y
                 };
+                area.style.cursor = 'grabbing';
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                if (dragTarget === 'image') {
+                    imageOffset.x = e.clientX - dragOffset.x;
+                    imageOffset.y = e.clientY - dragOffset.y;
+                    applyZoom();
+                } else if (dragTarget && dragTarget.type === 'point') {
+                    updatePointDrag(e, dragTarget.point);
+                }
+            });
+
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                dragTarget = null;
+                document.getElementById('imageArea').style.cursor = gcpMode ? 'crosshair' : 'grab';
             });
         }
 
-        // ===== EVENT LISTENERS GLOBAIS =====
-        document.addEventListener('mousemove', function(e) {
-            if (!isDragging || !dragTarget) return;
-
-            if (dragTarget.type === 'image') {
-                imagePosition.x = e.clientX - dragOffset.x;
-                imagePosition.y = e.clientY - dragOffset.y;
-                updateImageTransform();
-                updateControlPointsPosition();
-            } else if (dragTarget.type === 'control') {
-                const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-                const imageRect = imageElement.getBoundingClientRect();
+        // ===== RASTREAR MOUSE =====
+        function setupMouseTracking() {
+            const area = document.getElementById('imageArea');
+            
+            area.addEventListener('mousemove', function(e) {
+                if (!imageLoaded) return;
                 
-                const corner = dragTarget.corner;
-                let basePos;
-                
-                switch(corner) {
-                    case 'tl':
-                        basePos = { x: imageRect.left - containerRect.left, y: imageRect.top - containerRect.top };
-                        break;
-                    case 'tr':
-                        basePos = { x: imageRect.right - containerRect.left, y: imageRect.top - containerRect.top };
-                        break;
-                    case 'bl':
-                        basePos = { x: imageRect.left - containerRect.left, y: imageRect.bottom - containerRect.top };
-                        break;
-                    case 'br':
-                        basePos = { x: imageRect.right - containerRect.left, y: imageRect.bottom - containerRect.top };
-                        break;
+                const pixel = clientToImagePixel(e.clientX, e.clientY);
+                if (pixel) {
+                    document.getElementById('mouseInfo').innerHTML = 
+                        `Pixel: <b>${Math.round(pixel.x)}</b> , <b>${Math.round(pixel.y)}</b>`;
                 }
+            });
 
-                const newX = e.clientX - containerRect.left - dragOffset.x;
-                const newY = e.clientY - containerRect.top - dragOffset.y;
+            area.addEventListener('click', function(e) {
+                if (gcpMode && !e.target.classList.contains('image-point')) {
+                    addGcpPoint(e);
+                }
+                if (measureMode && !e.target.classList.contains('measure-marker')) {
+                    addMeasurePoint(e);
+                }
+            });
+        }
 
-                cornerOffsets[corner] = {
-                    x: newX - basePos.x + 10,
-                    y: newY - basePos.y + 10
-                };
+        function clientToImagePixel(clientX, clientY) {
+            const container = document.getElementById('imageContainer');
+            const rect = container.getBoundingClientRect();
+            const imgRect = imageElement.getBoundingClientRect();
+            
+            // Posição relativa à imagem escalada
+            const relX = clientX - imgRect.left;
+            const relY = clientY - imgRect.top;
+            
+            // Converter para coordenadas de pixel original
+            const pixelX = relX / currentZoom;
+            const pixelY = relY / currentZoom;
+            
+            if (pixelX >= 0 && pixelX <= imageNaturalSize.width &&
+                pixelY >= 0 && pixelY <= imageNaturalSize.height) {
+                return { x: pixelX, y: pixelY };
+            }
+            return null;
+        }
 
-                updateControlPointsPosition();
-                applyPerspectiveDistortion();
+        // ===== GCP POINTS =====
+        function toggleGcpMode() {
+            gcpMode = !gcpMode;
+            const btn = document.getElementById('btnGcpMode');
+            const instructions = document.getElementById('gcpInstructions');
+            const area = document.getElementById('imageArea');
+            
+            if (gcpMode) {
+                // Desativar modo medição se estiver ativo
+                if (measureMode) toggleMeasureMode();
+                
+                btn.classList.add('gcp-mode-active');
+                btn.innerHTML = '🎯 CLIQUE NA IMAGEM!';
+                instructions.style.display = 'block';
+                area.style.cursor = 'crosshair';
+            } else {
+                btn.classList.remove('gcp-mode-active');
+                btn.innerHTML = '🎯 Marcar Ponto na Imagem';
+                instructions.style.display = 'none';
+                area.style.cursor = 'grab';
+            }
+        }
+
+        // ===== FUNÇÕES DE MEDIÇÃO (RANGE & BEARING) =====
+        function toggleMeasureMode() {
+            measureMode = !measureMode;
+            const btn = document.getElementById('btnMeasureMode');
+            const instructions = document.getElementById('measureInstructions');
+            const area = document.getElementById('imageArea');
+            
+            if (measureMode) {
+                // Desativar modo GCP se estiver ativo
+                if (gcpMode) toggleGcpMode();
+                
+                // Limpar medição anterior
+                clearMeasurePoints();
+                
+                btn.style.background = '#00b894';
+                btn.innerHTML = '📏 CLIQUE 2 PONTOS NA IMAGEM!';
+                instructions.style.display = 'block';
+                area.style.cursor = 'crosshair';
+            } else {
+                btn.style.background = '#6c5ce7';
+                btn.innerHTML = '📏 Medir Distância (Range & Bearing)';
+                instructions.style.display = 'none';
+                area.style.cursor = 'grab';
+            }
+        }
+
+        function clearMeasurePoints() {
+            measureMarkers.forEach(m => m.remove());
+            measureMarkers = [];
+            measurePoints = [];
+            document.getElementById('measureResult').style.display = 'none';
+            
+            // Remover linha de medição se existir
+            const existingLine = document.getElementById('measureLine');
+            if (existingLine) existingLine.remove();
+        }
+
+        function addMeasurePoint(e) {
+            if (!imageLoaded) return;
+            if (measurePoints.length >= 2) {
+                clearMeasurePoints();
             }
 
-            updateCoordsDisplay();
-        });
+            const pixel = clientToImagePixel(e.clientX, e.clientY);
+            if (!pixel) return;
 
-        document.addEventListener('mouseup', function() {
-            isDragging = false;
-            dragTarget = null;
-        });
+            // Calcular coordenada geográfica deste pixel usando alinhamento
+            const geo = pixelToGeo(pixel.x, pixel.y);
+            if (!geo) {
+                alert('Configure pelo menos 2 pontos GCP com coordenadas primeiro!');
+                return;
+            }
 
-        // ===== TRANSFORMAÇÕES =====
-        function updateImageTransform() {
-            if (!imageElement) return;
+            const pointNum = measurePoints.length + 1;
 
-            const rotation = parseFloat(document.getElementById('rotation').value);
-            const scaleX = parseFloat(document.getElementById('scaleX').value);
-            const scaleY = parseFloat(document.getElementById('scaleY').value);
-            const opacity = parseFloat(document.getElementById('opacity').value);
-            const skewX = parseFloat(document.getElementById('skewX').value);
-            const skewY = parseFloat(document.getElementById('skewY').value);
-            const perspective = parseFloat(document.getElementById('perspective').value);
-            const rotateX = parseFloat(document.getElementById('rotateX').value);
-            const rotateY = parseFloat(document.getElementById('rotateY').value);
-
-            imageElement.style.left = imagePosition.x + 'px';
-            imageElement.style.top = imagePosition.y + 'px';
-            imageElement.style.opacity = opacity;
-
-            const transform = `
-                perspective(${perspective}px)
-                rotateX(${rotateX}deg)
-                rotateY(${rotateY}deg)
-                rotate(${rotation}deg)
-                scaleX(${scaleX})
-                scaleY(${scaleY})
-                skewX(${skewX}deg)
-                skewY(${skewY}deg)
+            // Criar marcador visual
+            const marker = document.createElement('div');
+            marker.className = 'measure-marker';
+            marker.innerHTML = pointNum;
+            marker.style.cssText = `
+                position: absolute;
+                width: 24px;
+                height: 24px;
+                background: #6c5ce7;
+                border: 2px solid white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                transform: translate(-50%, -50%);
+                z-index: 200;
+                pointer-events: none;
+                left: ${pixel.x * currentZoom}px;
+                top: ${pixel.y * currentZoom}px;
             `;
+            document.getElementById('imageContainer').appendChild(marker);
+            measureMarkers.push(marker);
 
-            imageElement.style.transform = transform;
-            
-            setTimeout(updateControlPointsPosition, 10);
-        }
-
-        function applyPerspectiveDistortion() {
-            if (!imageElement) return;
-
-            // Calcular matriz de transformação baseada nos offsets dos cantos
-            const tl = cornerOffsets.tl;
-            const tr = cornerOffsets.tr;
-            const bl = cornerOffsets.bl;
-            const br = cornerOffsets.br;
-
-            // Usar CSS matrix3d para distorção baseada nos pontos de controle
-            // Isso é uma aproximação - distorção real requer cálculos mais complexos
-            const avgSkewX = ((tr.x - tl.x) + (br.x - bl.x)) / 2;
-            const avgSkewY = ((bl.y - tl.y) + (br.y - tr.y)) / 2;
-            
-            // Atualizar skew baseado nos pontos
-            // document.getElementById('skewX').value = avgSkewX / 5;
-            // document.getElementById('skewXValue').value = avgSkewX / 5;
-        }
-
-        // ===== SINCRONIZAÇÃO DE CONTROLES =====
-        const controls = ['rotation', 'scaleX', 'scaleY', 'opacity', 'skewX', 'skewY', 'perspective', 'rotateX', 'rotateY'];
-
-        controls.forEach(control => {
-            const slider = document.getElementById(control);
-            const value = document.getElementById(control + 'Value');
-
-            slider.addEventListener('input', function() {
-                value.value = this.value;
-                updateImageTransform();
+            measurePoints.push({
+                pixelX: pixel.x,
+                pixelY: pixel.y,
+                lat: geo.lat,
+                lng: geo.lng
             });
 
-            value.addEventListener('change', function() {
-                slider.value = this.value;
-                updateImageTransform();
-            });
-        });
-
-        // Toggles
-        document.getElementById('showImage').addEventListener('change', function() {
-            if (imageElement) {
-                imageElement.style.display = this.checked ? 'block' : 'none';
+            // Se temos 2 pontos, calcular e mostrar resultado
+            if (measurePoints.length === 2) {
+                drawMeasureLine();
+                showMeasureResult();
+                toggleMeasureMode();
             }
-        });
-
-        document.getElementById('showControlPoints').addEventListener('change', function() {
-            controlPoints.forEach(p => {
-                p.style.display = this.checked ? 'block' : 'none';
-            });
-        });
-
-        // ===== FUNÇÕES DE AÇÃO =====
-        function resetTransformations() {
-            document.getElementById('rotation').value = 0;
-            document.getElementById('rotationValue').value = 0;
-            document.getElementById('scaleX').value = 1;
-            document.getElementById('scaleXValue').value = 1;
-            document.getElementById('scaleY').value = 1;
-            document.getElementById('scaleYValue').value = 1;
-            document.getElementById('opacity').value = 0.7;
-            document.getElementById('opacityValue').value = 0.7;
-            document.getElementById('skewX').value = 0;
-            document.getElementById('skewXValue').value = 0;
-            document.getElementById('skewY').value = 0;
-            document.getElementById('skewYValue').value = 0;
-            document.getElementById('perspective').value = 1000;
-            document.getElementById('perspectiveValue').value = 1000;
-            document.getElementById('rotateX').value = 0;
-            document.getElementById('rotateXValue').value = 0;
-            document.getElementById('rotateY').value = 0;
-            document.getElementById('rotateYValue').value = 0;
-
-            cornerOffsets = {
-                tl: { x: 0, y: 0 },
-                tr: { x: 0, y: 0 },
-                bl: { x: 0, y: 0 },
-                br: { x: 0, y: 0 }
-            };
-
-            if (imageElement) {
-                const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-                imagePosition.x = (containerRect.width - imageElement.offsetWidth) / 2;
-                imagePosition.y = (containerRect.height - imageElement.offsetHeight) / 2;
-            }
-
-            updateImageTransform();
-            updateControlPointsPosition();
-            updateCoordsDisplay();
         }
 
-        function getAlignmentData() {
-            if (!imageElement) return null;
+        function pixelToGeo(pixelX, pixelY) {
+            // Calcular coordenadas geográficas a partir do alinhamento GCP
+            const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
+            if (validPoints.length < 2) return null;
 
-            const containerRect = document.getElementById('overlayContainer').getBoundingClientRect();
-            const imageRect = imageElement.getBoundingClientRect();
-            
-            // Converter posições de pixel para coordenadas do mapa
-            const mapBounds = map.getBounds();
-            const mapContainer = map.getContainer().getBoundingClientRect();
+            // Usar mesma lógica do calculateAlignment
+            let minPixelX = Infinity, maxPixelX = -Infinity;
+            let minPixelY = Infinity, maxPixelY = -Infinity;
 
-            function pixelToLatLng(x, y) {
-                const point = map.containerPointToLatLng([
-                    x - mapContainer.left + containerRect.left,
-                    y - mapContainer.top + containerRect.top
-                ]);
-                return { lat: point.lat, lng: point.lng };
-            }
+            validPoints.forEach(p => {
+                minPixelX = Math.min(minPixelX, p.pixelX);
+                maxPixelX = Math.max(maxPixelX, p.pixelX);
+                minPixelY = Math.min(minPixelY, p.pixelY);
+                maxPixelY = Math.max(maxPixelY, p.pixelY);
+            });
 
-            // Posições dos cantos em pixels relativos ao container
-            const corners = {
-                tl: { 
-                    x: imageRect.left - containerRect.left + cornerOffsets.tl.x,
-                    y: imageRect.top - containerRect.top + cornerOffsets.tl.y
-                },
-                tr: { 
-                    x: imageRect.right - containerRect.left + cornerOffsets.tr.x,
-                    y: imageRect.top - containerRect.top + cornerOffsets.tr.y
-                },
-                bl: { 
-                    x: imageRect.left - containerRect.left + cornerOffsets.bl.x,
-                    y: imageRect.bottom - containerRect.top + cornerOffsets.bl.y
-                },
-                br: { 
-                    x: imageRect.right - containerRect.left + cornerOffsets.br.x,
-                    y: imageRect.bottom - containerRect.top + cornerOffsets.br.y
-                }
-            };
+            const pixelRangeX = maxPixelX - minPixelX;
+            const pixelRangeY = maxPixelY - minPixelY;
 
-            // Converter para coordenadas geográficas
-            const geoCorners = {};
-            for (const [key, pos] of Object.entries(corners)) {
-                const point = map.containerPointToLatLng([pos.x, pos.y]);
-                geoCorners[key] = { lat: point.lat, lng: point.lng };
-            }
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+
+            validPoints.forEach(p => {
+                minLat = Math.min(minLat, p.lat);
+                maxLat = Math.max(maxLat, p.lat);
+                minLng = Math.min(minLng, p.lng);
+                maxLng = Math.max(maxLng, p.lng);
+            });
+
+            const latRange = maxLat - minLat;
+            const lngRange = maxLng - minLng;
+
+            const scaleX = pixelRangeX > 0 ? lngRange / pixelRangeX : 0;
+            const scaleY = pixelRangeY > 0 ? latRange / pixelRangeY : 0;
+
+            const refPoint = validPoints[0];
+            const offsetLng = refPoint.lng - (refPoint.pixelX * scaleX);
+            const offsetLat = refPoint.lat + (refPoint.pixelY * scaleY);
 
             return {
-                timestamp: new Date().toISOString(),
-                mapCenter: { 
-                    lat: map.getCenter().lat, 
-                    lng: map.getCenter().lng 
-                },
-                mapZoom: map.getZoom(),
-                originalImageSize: originalImageSize,
-                displayedImageSize: {
-                    width: imageElement.offsetWidth,
-                    height: imageElement.offsetHeight
-                },
-                imagePosition: imagePosition,
-                transformations: {
-                    rotation: parseFloat(document.getElementById('rotation').value),
-                    scaleX: parseFloat(document.getElementById('scaleX').value),
-                    scaleY: parseFloat(document.getElementById('scaleY').value),
-                    skewX: parseFloat(document.getElementById('skewX').value),
-                    skewY: parseFloat(document.getElementById('skewY').value),
-                    perspective: parseFloat(document.getElementById('perspective').value),
-                    rotateX: parseFloat(document.getElementById('rotateX').value),
-                    rotateY: parseFloat(document.getElementById('rotateY').value),
-                    opacity: parseFloat(document.getElementById('opacity').value)
-                },
-                cornerOffsets: cornerOffsets,
-                cornerPositionsPixel: corners,
-                cornerPositionsGeo: geoCorners,
-                boundingBox: {
-                    north: Math.max(geoCorners.tl.lat, geoCorners.tr.lat),
-                    south: Math.min(geoCorners.bl.lat, geoCorners.br.lat),
-                    east: Math.max(geoCorners.tr.lng, geoCorners.br.lng),
-                    west: Math.min(geoCorners.tl.lng, geoCorners.bl.lng)
-                }
+                lat: offsetLat - (pixelY * scaleY),
+                lng: offsetLng + (pixelX * scaleX)
             };
         }
 
-        function saveAlignment() {
-            const data = getAlignmentData();
-            if (!data) {
+        function drawMeasureLine() {
+            const container = document.getElementById('imageContainer');
+            
+            // Remover linha anterior
+            const existingLine = document.getElementById('measureLine');
+            if (existingLine) existingLine.remove();
+
+            const p1 = measurePoints[0];
+            const p2 = measurePoints[1];
+
+            const x1 = p1.pixelX * currentZoom;
+            const y1 = p1.pixelY * currentZoom;
+            const x2 = p2.pixelX * currentZoom;
+            const y2 = p2.pixelY * currentZoom;
+
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.id = 'measureLine';
+            svg.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 150;
+            `;
+            svg.innerHTML = `
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                            refX="10" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#6c5ce7" />
+                    </marker>
+                </defs>
+                <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" 
+                      stroke="#6c5ce7" stroke-width="3" stroke-dasharray="8,4"
+                      marker-end="url(#arrowhead)" />
+            `;
+            container.appendChild(svg);
+        }
+
+        function showMeasureResult() {
+            const p1 = measurePoints[0];
+            const p2 = measurePoints[1];
+
+            // Calcular distância usando fórmula de Haversine
+            const distance = haversineDistance(p1.lat, p1.lng, p2.lat, p2.lng);
+            
+            // Calcular bearing (rumo)
+            const bearing = calculateBearing(p1.lat, p1.lng, p2.lat, p2.lng);
+
+            const resultEl = document.getElementById('measureResult');
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = `
+                <div style="text-align:center; margin-bottom:10px;">
+                    <span style="font-size:1.5em; color:#6c5ce7;">📏 Resultado da Medição</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.85em;">
+                    <div style="background:#1a1a2e; padding:8px; border-radius:4px;">
+                        <div style="color:#888; font-size:0.8em;">Ponto 1</div>
+                        <div style="color:#00ff00;">${formatCoord(p1.lat, p1.lng)}</div>
+                    </div>
+                    <div style="background:#1a1a2e; padding:8px; border-radius:4px;">
+                        <div style="color:#888; font-size:0.8em;">Ponto 2</div>
+                        <div style="color:#00ff00;">${formatCoord(p2.lat, p2.lng)}</div>
+                    </div>
+                </div>
+                <div style="margin-top:12px; padding:12px; background:#1a1a2e; border-radius:8px; text-align:center;">
+                    <div style="font-size:1.8em; color:#00ff00; font-weight:bold;">
+                        ${distance.toFixed(2)} NM
+                    </div>
+                    <div style="color:#888; font-size:0.85em;">Distância (${(distance * 1.852).toFixed(2)} km)</div>
+                    <div style="margin-top:10px; font-size:1.5em; color:#6c5ce7; font-weight:bold;">
+                        ${bearing.toFixed(1)}°
+                    </div>
+                    <div style="color:#888; font-size:0.85em;">Rumo (Bearing)</div>
+                </div>
+                <button onclick="clearMeasurePoints()" style="width:100%; margin-top:10px; padding:8px; background:#e74c3c; border:none; border-radius:4px; color:white; cursor:pointer;">
+                    🗑️ Limpar Medição
+                </button>
+            `;
+        }
+
+        function formatCoord(lat, lng) {
+            const latDir = lat >= 0 ? 'N' : 'S';
+            const lngDir = lng >= 0 ? 'E' : 'W';
+            return `${Math.abs(lat).toFixed(6)}°${latDir}, ${Math.abs(lng).toFixed(6)}°${lngDir}`;
+        }
+
+        function haversineDistance(lat1, lng1, lat2, lng2) {
+            // Raio da Terra em milhas náuticas
+            const R = 3440.065; // NM
+            
+            const dLat = toRad(lat2 - lat1);
+            const dLng = toRad(lng2 - lng1);
+            
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+
+        function calculateBearing(lat1, lng1, lat2, lng2) {
+            const dLng = toRad(lng2 - lng1);
+            const lat1Rad = toRad(lat1);
+            const lat2Rad = toRad(lat2);
+            
+            const y = Math.sin(dLng) * Math.cos(lat2Rad);
+            const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+                      Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+            
+            let bearing = toDeg(Math.atan2(y, x));
+            return (bearing + 360) % 360; // Normalizar para 0-360
+        }
+
+        function toRad(deg) {
+            return deg * Math.PI / 180;
+        }
+
+        function toDeg(rad) {
+            return rad * 180 / Math.PI;
+        }
+
+        function addGcpPoint(e) {
+            if (!imageLoaded) {
                 alert('Carregue uma imagem primeiro!');
                 return;
             }
 
-            const json = JSON.stringify(data, null, 2);
-            document.getElementById('resultJSON').textContent = json;
-            document.getElementById('resultModal').style.display = 'flex';
+            const pixel = clientToImagePixel(e.clientX, e.clientY);
+            if (!pixel) return;
 
-            // Salvar no localStorage também
-            localStorage.setItem('satelliteAlignment', json);
-            console.log('Alinhamento salvo:', data);
+            gcpCounter++;
+            const id = gcpCounter;
+
+            // Criar elemento visual
+            const pointEl = document.createElement('div');
+            pointEl.className = 'image-point';
+            pointEl.innerHTML = id;
+            pointEl.dataset.id = id;
+            document.getElementById('imageContainer').appendChild(pointEl);
+
+            // Posicionar
+            pointEl.style.left = (pixel.x * currentZoom) + 'px';
+            pointEl.style.top = (pixel.y * currentZoom) + 'px';
+
+            // Permitir arrastar
+            setupPointDrag(pointEl);
+
+            // Adicionar ao array
+            const point = {
+                id: id,
+                pixelX: pixel.x,
+                pixelY: pixel.y,
+                lat: 0,
+                lng: 0,
+                element: pointEl
+            };
+            gcpPoints.push(point);
+
+            updateGcpList();
+            updateSummary();
+            
+            // Desativar modo após adicionar
+            toggleGcpMode();
         }
 
-        function exportAsJSON() {
-            const data = getAlignmentData();
-            if (!data) {
-                alert('Carregue uma imagem primeiro!');
+        function setupPointDrag(pointEl) {
+            pointEl.addEventListener('mousedown', function(e) {
+                e.stopPropagation();
+                isDragging = true;
+                const id = parseInt(pointEl.dataset.id);
+                const point = gcpPoints.find(p => p.id === id);
+                dragTarget = { type: 'point', point: point };
+            });
+        }
+
+        function updatePointDrag(e, point) {
+            const pixel = clientToImagePixel(e.clientX, e.clientY);
+            if (pixel) {
+                point.pixelX = pixel.x;
+                point.pixelY = pixel.y;
+                point.element.style.left = (pixel.x * currentZoom) + 'px';
+                point.element.style.top = (pixel.y * currentZoom) + 'px';
+                updateGcpList();
+            }
+        }
+
+        function updatePointPositions() {
+            gcpPoints.forEach(point => {
+                point.element.style.left = (point.pixelX * currentZoom) + 'px';
+                point.element.style.top = (point.pixelY * currentZoom) + 'px';
+            });
+            
+            // Atualizar posição dos marcadores de medição
+            measureMarkers.forEach((marker, i) => {
+                if (measurePoints[i]) {
+                    marker.style.left = (measurePoints[i].pixelX * currentZoom) + 'px';
+                    marker.style.top = (measurePoints[i].pixelY * currentZoom) + 'px';
+                }
+            });
+            
+            // Redesenhar linha de medição se existir
+            if (measurePoints.length === 2) {
+                drawMeasureLine();
+            }
+        }
+
+        function updateGcpList() {
+            const listEl = document.getElementById('gcpList');
+            
+            if (gcpPoints.length === 0) {
+                listEl.innerHTML = '<p style="color:#666; font-size:0.85em; text-align:center;">Nenhum ponto marcado</p>';
                 return;
             }
-            downloadJSONData(data);
+            
+            let html = '';
+            gcpPoints.forEach(point => {
+                html += `
+                    <div class="gcp-item" data-id="${point.id}">
+                        <div class="gcp-header">
+                            <span class="gcp-number">${point.id}</span>
+                            <span style="color:#888; font-size:0.8em;">Pixel: ${Math.round(point.pixelX)}, ${Math.round(point.pixelY)}</span>
+                            <button class="remove-btn" onclick="removePoint(${point.id})">×</button>
+                        </div>
+                        <div class="gcp-coords">
+                            <div>
+                                <label>Latitude</label>
+                                <input type="number" step="0.000001" value="${point.lat}" 
+                                       placeholder="-22.123456"
+                                       onchange="updatePointCoord(${point.id}, 'lat', this.value)">
+                            </div>
+                            <div>
+                                <label>Longitude</label>
+                                <input type="number" step="0.000001" value="${point.lng}" 
+                                       placeholder="-41.567890"
+                                       onchange="updatePointCoord(${point.id}, 'lng', this.value)">
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            listEl.innerHTML = html;
         }
 
-        function downloadJSONData(data) {
+        function updatePointCoord(id, field, value) {
+            const point = gcpPoints.find(p => p.id === id);
+            if (point) {
+                point[field] = parseFloat(value) || 0;
+                updateSummary();
+            }
+        }
+
+        function removePoint(id) {
+            const index = gcpPoints.findIndex(p => p.id === id);
+            if (index !== -1) {
+                gcpPoints[index].element.remove();
+                gcpPoints.splice(index, 1);
+                updateGcpList();
+                updateSummary();
+            }
+        }
+
+        function clearAllPoints() {
+            gcpPoints.forEach(p => p.element.remove());
+            gcpPoints = [];
+            gcpCounter = 0;
+            updateGcpList();
+            updateSummary();
+        }
+
+        // ===== CALCULAR ALINHAMENTO =====
+        function calculateAlignment() {
+            if (gcpPoints.length < 2) {
+                return null;
+            }
+
+            // Verificar se todos os pontos têm coordenadas
+            const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
+            if (validPoints.length < 2) {
+                return null;
+            }
+
+            // Calcular transformação linear simples (escala + offset)
+            // Usando os pontos para calcular bounds geográficos
+
+            let minPixelX = Infinity, maxPixelX = -Infinity;
+            let minPixelY = Infinity, maxPixelY = -Infinity;
+            let minLat = Infinity, maxLat = -Infinity;
+            let minLng = Infinity, maxLng = -Infinity;
+
+            validPoints.forEach(p => {
+                minPixelX = Math.min(minPixelX, p.pixelX);
+                maxPixelX = Math.max(maxPixelX, p.pixelX);
+                minPixelY = Math.min(minPixelY, p.pixelY);
+                maxPixelY = Math.max(maxPixelY, p.pixelY);
+                minLat = Math.min(minLat, p.lat);
+                maxLat = Math.max(maxLat, p.lat);
+                minLng = Math.min(minLng, p.lng);
+                maxLng = Math.max(maxLng, p.lng);
+            });
+
+            // Calcular escala (graus por pixel)
+            const pixelRangeX = maxPixelX - minPixelX;
+            const pixelRangeY = maxPixelY - minPixelY;
+            const latRange = maxLat - minLat;
+            const lngRange = maxLng - minLng;
+
+            // Escala
+            const scaleX = pixelRangeX > 0 ? lngRange / pixelRangeX : 0;
+            const scaleY = pixelRangeY > 0 ? latRange / pixelRangeY : 0;
+
+            // Extrapolar para os cantos da imagem
+            // Pixel (0,0) está no topo-esquerdo
+            // Lat aumenta para cima (Norte), Y de pixel aumenta para baixo
+            
+            // Calcular offset usando um ponto de referência
+            const refPoint = validPoints[0];
+            const offsetLng = refPoint.lng - (refPoint.pixelX * scaleX);
+            const offsetLat = refPoint.lat + (refPoint.pixelY * scaleY); // + porque Y é invertido
+
+            // Calcular bounds da imagem completa
+            const north = offsetLat;  // Y=0
+            const south = offsetLat - (imageNaturalSize.height * scaleY);
+            const west = offsetLng;   // X=0
+            const east = offsetLng + (imageNaturalSize.width * scaleX);
+
+            return {
+                bounds: { north, south, east, west },
+                scale: { x: scaleX, y: scaleY },
+                gcpPoints: validPoints.map(p => ({
+                    pixelX: p.pixelX,
+                    pixelY: p.pixelY,
+                    lat: p.lat,
+                    lng: p.lng
+                })),
+                imageSize: imageNaturalSize
+            };
+        }
+
+        function updateSummary() {
+            const el = document.getElementById('summaryDisplay');
+            const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
+            
+            if (!imageLoaded) {
+                el.innerHTML = 'Carregue uma imagem';
+                return;
+            }
+            
+            if (gcpPoints.length === 0) {
+                el.innerHTML = `📐 Imagem: ${imageNaturalSize.width}×${imageNaturalSize.height}px<br>📌 Marque pontos de referência`;
+                return;
+            }
+
+            let html = `📐 Imagem: ${imageNaturalSize.width}×${imageNaturalSize.height}px<br>`;
+            html += `📌 Pontos: ${validPoints.length} com coordenadas / ${gcpPoints.length} total<br>`;
+
+            const alignment = calculateAlignment();
+            if (alignment) {
+                html += `<br><b style="color:#00ff00;">✅ Pronto para alinhar!</b><br>`;
+                html += `N: ${alignment.bounds.north.toFixed(6)}°<br>`;
+                html += `S: ${alignment.bounds.south.toFixed(6)}°<br>`;
+                html += `E: ${alignment.bounds.east.toFixed(6)}°<br>`;
+                html += `W: ${alignment.bounds.west.toFixed(6)}°`;
+            } else {
+                html += `<span style="color:#ffaa00;">⚠️ Adicione coordenadas aos pontos</span>`;
+            }
+
+            el.innerHTML = html;
+        }
+
+        // ===== PREVIEW NO MAPA =====
+        function previewAlignment() {
+            const alignment = calculateAlignment();
+            
+            if (!alignment) {
+                alert('Você precisa de pelo menos 2 pontos com coordenadas para ver o alinhamento!');
+                return;
+            }
+
+            document.getElementById('previewModal').style.display = 'flex';
+
+            // Inicializar mapa se não existir
+            setTimeout(() => {
+                if (!previewMap) {
+                    previewMap = L.map('previewMap', {
+                        zoomControl: true
+                    });
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap'
+                    }).addTo(previewMap);
+                }
+
+                // Limpar camadas anteriores
+                previewMap.eachLayer(layer => {
+                    if (layer instanceof L.ImageOverlay || layer instanceof L.Marker) {
+                        previewMap.removeLayer(layer);
+                    }
+                });
+
+                // Adicionar overlay da imagem
+                const bounds = L.latLngBounds(
+                    [alignment.bounds.south, alignment.bounds.west],
+                    [alignment.bounds.north, alignment.bounds.east]
+                );
+
+                L.imageOverlay(imageElement.src, bounds, {
+                    opacity: 0.8
+                }).addTo(previewMap);
+
+                // Adicionar marcadores dos GCPs
+                alignment.gcpPoints.forEach((p, i) => {
+                    L.marker([p.lat, p.lng])
+                        .bindPopup(`GCP ${i+1}: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`)
+                        .addTo(previewMap);
+                });
+
+                previewMap.fitBounds(bounds);
+                previewMap.invalidateSize();
+            }, 100);
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').style.display = 'none';
+        }
+
+        // ===== EXPORTAR/IMPORTAR =====
+        function exportAlignment() {
+            const alignment = calculateAlignment();
+            if (!alignment) {
+                alert('Configure os pontos de referência primeiro!');
+                return;
+            }
+
+            const data = {
+                timestamp: new Date().toISOString(),
+                ...alignment
+            };
+
             const json = JSON.stringify(data, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `satellite_alignment_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+            a.download = `alignment_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
             a.click();
             URL.revokeObjectURL(url);
         }
 
-        function downloadJSON() {
-            const data = getAlignmentData();
-            if (data) {
-                downloadJSONData(data);
-            }
-        }
-
-        function loadFromJSON() {
+        function importAlignment() {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.json';
@@ -1104,9 +1274,9 @@
                     reader.onload = function(event) {
                         try {
                             const data = JSON.parse(event.target.result);
-                            applyAlignmentData(data);
+                            applyImportedAlignment(data);
                         } catch (err) {
-                            alert('Erro ao ler arquivo JSON: ' + err.message);
+                            alert('Erro ao ler arquivo: ' + err.message);
                         }
                     };
                     reader.readAsText(file);
@@ -1115,117 +1285,41 @@
             input.click();
         }
 
-        function applyAlignmentData(data) {
-            // Aplicar transformações
-            if (data.transformations) {
-                document.getElementById('rotation').value = data.transformations.rotation;
-                document.getElementById('rotationValue').value = data.transformations.rotation;
-                document.getElementById('scaleX').value = data.transformations.scaleX;
-                document.getElementById('scaleXValue').value = data.transformations.scaleX;
-                document.getElementById('scaleY').value = data.transformations.scaleY;
-                document.getElementById('scaleYValue').value = data.transformations.scaleY;
-                document.getElementById('skewX').value = data.transformations.skewX;
-                document.getElementById('skewXValue').value = data.transformations.skewX;
-                document.getElementById('skewY').value = data.transformations.skewY;
-                document.getElementById('skewYValue').value = data.transformations.skewY;
-                document.getElementById('perspective').value = data.transformations.perspective;
-                document.getElementById('perspectiveValue').value = data.transformations.perspective;
-                document.getElementById('rotateX').value = data.transformations.rotateX;
-                document.getElementById('rotateXValue').value = data.transformations.rotateX;
-                document.getElementById('rotateY').value = data.transformations.rotateY;
-                document.getElementById('rotateYValue').value = data.transformations.rotateY;
-                document.getElementById('opacity').value = data.transformations.opacity;
-                document.getElementById('opacityValue').value = data.transformations.opacity;
-            }
+        function applyImportedAlignment(data) {
+            if (data.gcpPoints) {
+                clearAllPoints();
+                data.gcpPoints.forEach(p => {
+                    gcpCounter++;
+                    const id = gcpCounter;
+                    
+                    const pointEl = document.createElement('div');
+                    pointEl.className = 'image-point';
+                    pointEl.innerHTML = id;
+                    pointEl.dataset.id = id;
+                    document.getElementById('imageContainer').appendChild(pointEl);
+                    pointEl.style.left = (p.pixelX * currentZoom) + 'px';
+                    pointEl.style.top = (p.pixelY * currentZoom) + 'px';
+                    setupPointDrag(pointEl);
 
-            // Aplicar posição
-            if (data.imagePosition) {
-                imagePosition = data.imagePosition;
+                    gcpPoints.push({
+                        id: id,
+                        pixelX: p.pixelX,
+                        pixelY: p.pixelY,
+                        lat: p.lat,
+                        lng: p.lng,
+                        element: pointEl
+                    });
+                });
+                updateGcpList();
+                updateSummary();
             }
-
-            // Aplicar offsets dos cantos
-            if (data.cornerOffsets) {
-                cornerOffsets = data.cornerOffsets;
-            }
-
-            // Aplicar view do mapa
-            if (data.mapCenter && data.mapZoom) {
-                map.setView([data.mapCenter.lat, data.mapCenter.lng], data.mapZoom);
-            }
-
-            updateImageTransform();
-            updateControlPointsPosition();
-            updateCoordsDisplay();
         }
 
-        function copyToClipboard() {
-            const text = document.getElementById('resultJSON').textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('JSON copiado para a área de transferência!');
-            });
-        }
-
-        function closeModal() {
-            document.getElementById('resultModal').style.display = 'none';
-        }
-
-        function updateCoordsDisplay() {
-            const data = getAlignmentData();
-            if (!data) {
-                document.getElementById('coordsDisplay').innerHTML = 'Carregue uma imagem para ver as coordenadas';
-                return;
-            }
-
-            const geo = data.cornerPositionsGeo;
-            const html = `
-<b>Cantos (Lat, Lng):</b>
-TL: ${geo.tl.lat.toFixed(4)}, ${geo.tl.lng.toFixed(4)}
-TR: ${geo.tr.lat.toFixed(4)}, ${geo.tr.lng.toFixed(4)}
-BL: ${geo.bl.lat.toFixed(4)}, ${geo.bl.lng.toFixed(4)}
-BR: ${geo.br.lat.toFixed(4)}, ${geo.br.lng.toFixed(4)}
-
-<b>Bounding Box:</b>
-N: ${data.boundingBox.north.toFixed(4)}
-S: ${data.boundingBox.south.toFixed(4)}
-E: ${data.boundingBox.east.toFixed(4)}
-W: ${data.boundingBox.west.toFixed(4)}
-
-<b>Distorções:</b>
-TL: (${cornerOffsets.tl.x.toFixed(1)}, ${cornerOffsets.tl.y.toFixed(1)})
-TR: (${cornerOffsets.tr.x.toFixed(1)}, ${cornerOffsets.tr.y.toFixed(1)})
-BL: (${cornerOffsets.bl.x.toFixed(1)}, ${cornerOffsets.bl.y.toFixed(1)})
-BR: (${cornerOffsets.br.x.toFixed(1)}, ${cornerOffsets.br.y.toFixed(1)})
-            `;
-            document.getElementById('coordsDisplay').innerHTML = html;
-        }
-
-        // Atualizar coords quando o mapa mover
-        function onMapMove() {
-            updateCoordsDisplay();
-        }
-
-        // ===== INICIALIZAÇÃO =====
-        document.addEventListener('DOMContentLoaded', function() {
-            initMap();
-            map.on('move', onMapMove);
-            map.on('zoom', onMapMove);
-
-            // Carregar alinhamento anterior se existir
-            const saved = localStorage.getItem('satelliteAlignment');
-            if (saved) {
-                console.log('Alinhamento anterior encontrado no localStorage');
-            }
-        });
-
-        // Prevenir que o mapa capture eventos quando arrastando a imagem
-        document.getElementById('overlayContainer').addEventListener('mousedown', function(e) {
-            if (e.target.id === 'satelliteImage' || e.target.classList.contains('control-point')) {
-                map.dragging.disable();
-            }
-        });
-
-        document.addEventListener('mouseup', function() {
-            map.dragging.enable();
+        // Scroll para zoom
+        document.getElementById('imageArea').addEventListener('wheel', function(e) {
+            e.preventDefault();
+            const factor = e.deltaY > 0 ? 0.9 : 1.1;
+            zoomImage(factor);
         });
     </script>
 </body>
