@@ -2,3 +2,6 @@ requests
 pandas
 pytz
 jinja2
+copernicusmarine
+xarray
+netCDF4

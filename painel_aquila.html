@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Monitor DP - Deepwater Aquila</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; background: #0f0f0f; font-family: 'Segoe UI', monospace; color: white; }
+        #map { height: 100vh; width: 100%; }
+        
+        /* Painel Flutuante de Dados */
+        .dashboard-panel {
+            position: absolute;
+            top: 20px; left: 20px;
+            width: 280px;
+            background: rgba(0, 0, 0, 0.85);
+            border-left: 4px solid #00ffcc;
+            padding: 15px;
+            z-index: 9999;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
+            backdrop-filter: blur(5px);
+        }
+        
+        h2 { margin: 0 0 10px 0; font-size: 18px; color: #00ffcc; text-transform: uppercase; }
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .label { color: #aaa; font-size: 12px; }
+        .value { font-weight: bold; font-size: 14px; }
+        .status-dot { height: 10px; width: 10px; background-color: #00ff00; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        
+        /* Relógio e Status */
+        .system-status { position: absolute; bottom: 20px; right: 20px; z-index: 9999; background: rgba(0,0,0,0.7); padding: 5px 10px; font-size: 12px; color: #888; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-panel">
+        <h2>Deepwater Aquila</h2>
+        <div class="data-row">
+            <span class="label">Localização</span>
+            <span class="value">-22.5, -40.5</span>
+        </div>
+        <div class="data-row">
+            <span class="label">Vento (GFS)</span>
+            <span class="value" id="wind-speed">-- kn</span>
+        </div>
+        <div class="data-row">
+            <span class="label">Direção</span>
+            <span class="value" id="wind-dir">-- °</span>
+        </div>
+        <div class="data-row">
+            <span class="label">Rajada (Gust)</span>
+            <span class="value" id="wind-gust">-- kn</span>
+        </div>
+        <div class="data-row">
+            <span class="label">Satélite (NASA)</span>
+            <span class="value" id="sat-time">Carregando...</span>
+        </div>
+        <div style="margin-top:10px; font-size:11px; color:#666;">
+            <span class="status-dot" id="connection-dot"></span>Atualização Automática (10m)
+        </div>
+    </div>
+
+    <div class="system-status" id="last-update">Aguardando dados...</div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        const shipLat = -22.5;
+        const shipLon = -40.5;
+        let map;
+        let windLayerGroup = L.layerGroup();
+        let satelliteLayer;
+
+        function initMap() {
+            map = L.map('map', {
+                center: [shipLat, shipLon],
+                zoom: 8,
+                zoomControl: false,
+                attributionControl: false
+            });
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            // Mapa Base Escuro
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19, opacity: 0.8
+            }).addTo(map);
+
+            // Ícone do Navio
+            var shipIcon = L.divIcon({
+                className: 'custom-ship',
+                html: '<svg viewBox="0 0 24 24" width="40" height="40" fill="#00ffcc"><path d="M12 2L2 22h20L12 2zm0 3.5L18.5 20h-13L12 5.5z"/></svg>',
+                iconSize: [40, 40],
+                iconAnchor: [20, 20]
+            });
+            L.marker([shipLat, shipLon], { icon: shipIcon }).addTo(map);
+
+            windLayerGroup.addTo(map);
+            
+            // Iniciar Loops de Atualização
+            updateSatellite();
+            updateWindGrid();
+            
+            // Atualizar a cada 10 minutos (600.000 ms)
+            setInterval(updateSatellite, 600000);
+            setInterval(updateWindGrid, 600000);
+        }
+
+        // --- MÓDULO 1: SATÉLITE (NASA GIBS) ---
+        function updateSatellite() {
+            const now = new Date();
+            // NASA geralmente tem um delay, então tentamos pegar a data de hoje.
+            // Se falhar (meia noite UTC), o ideal seria voltar um dia, mas vamos simplificar.
+            const year = now.getUTCFullYear();
+            const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(now.getUTCDate()).padStart(2, '0');
+            const dateStr = `${year}-${month}-${day}`;
+
+            if (satelliteLayer) {
+                map.removeLayer(satelliteLayer);
+            }
+
+            // Layer Infravermelho (Band 13) - Funciona 24h
+            const url = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13_Clean_Infrared/default/${dateStr}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+
+            satelliteLayer = L.tileLayer(url, {
+                opacity: 0.65,
+                zIndex: 1
+            }).addTo(map);
+            
+            document.getElementById('sat-time').innerText = dateStr + " (UTC)";
+        }
+
+        // --- MÓDULO 2: VENTO (Open-Meteo API) ---
+        async function updateWindGrid() {
+            document.getElementById('connection-dot').style.backgroundColor = 'yellow';
+            
+            // Vamos criar um GRID de pontos ao redor do navio para desenhar várias setas
+            // 4 pontos de latitude x 4 pontos de longitude
+            const lats = [];
+            const lons = [];
+            const step = 0.5; // Distância entre setas (graus)
+            
+            for(let la = shipLat - 1.5; la <= shipLat + 1.5; la += step) {
+                lats.push(la.toFixed(2));
+            }
+            for(let lo = shipLon - 1.5; lo <= shipLon + 1.5; lo += step) {
+                lons.push(lo.toFixed(2));
+            }
+
+            // Construir a URL de Grid para a API
+            // A API aceita listas separadas por vírgula. Vamos fazer o produto cartesiano manualmente no loop de desenho,
+            // mas a API precisa das listas de coordenadas que queremos consultar.
+            // Truque: Passamos todas as combinações na URL.
+            
+            let queryLats = [];
+            let queryLons = [];
+            
+            lats.forEach(la => {
+                lons.forEach(lo => {
+                    queryLats.push(la);
+                    queryLons.push(lo);
+                });
+            });
+
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${queryLats.join(',')}&longitude=${queryLons.join(',')}&current_weather=true&windspeed_unit=kn`;
+
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                // Limpar setas antigas
+                windLayerGroup.clearLayers();
+
+                // Se a API retornar um array (múltiplos pontos)
+                if (Array.isArray(data)) {
+                    data.forEach((point, index) => {
+                        drawWindArrow(point.latitude, point.longitude, point.current_weather.winddirection, point.current_weather.windspeed);
+                        
+                        // Se for o ponto mais próximo do navio (centro), atualiza o painel
+                        // (Simplificação grosseira: pegamos o ponto do meio do array)
+                        if (index === Math.floor(data.length / 2)) {
+                            updatePanel(point.current_weather);
+                        }
+                    });
+                } else {
+                    // Fallback para ponto único
+                    drawWindArrow(data.latitude, data.longitude, data.current_weather.winddirection, data.current_weather.windspeed);
+                    updatePanel(data.current_weather);
+                }
+                
+                document.getElementById('connection-dot').style.backgroundColor = '#00ff00';
+                updateStatusTime();
+
+            } catch (e) {
+                console.error("Erro vento:", e);
+                document.getElementById('connection-dot').style.backgroundColor = 'red';
+            }
+        }
+
+        function drawWindArrow(lat, lon, dir, speed) {
+            let color = '#00ff00';
+            if (speed > 15) color = '#ffff00';
+            if (speed > 25) color = '#ff9900';
+            if (speed > 35) color = '#ff0000';
+
+            const arrowHtml = `
+                <div style="transform: rotate(${dir + 180}deg); width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" width="24" height="24">
+                        <path fill="${color}" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                    </svg>
+                </div>
+                <div style="text-align:center; font-size:10px; font-weight:bold; color:white; text-shadow: 1px 1px 2px black;">${speed}</div>
+            `;
+
+            const icon = L.divIcon({
+                className: 'wind-arrow',
+                html: arrowHtml,
+                iconSize: [30, 40],
+                iconAnchor: [15, 20]
+            });
+
+            L.marker([lat, lon], { icon: icon, interactive: false }).addTo(windLayerGroup);
+        }
+
+        function updatePanel(weather) {
+            document.getElementById('wind-speed').innerText = weather.windspeed + ' kn';
+            document.getElementById('wind-dir').innerText = weather.winddirection + '°';
+            // Open-Meteo basic não dá rajada no current_weather, mas ok para demo
+            document.getElementById('wind-gust').innerText = (weather.windspeed * 1.3).toFixed(1) + ' kn (Est)'; 
+        }
+
+        function updateStatusTime() {
+            const now = new Date();
+            document.getElementById('last-update').innerText = "Atualizado: " + now.toLocaleTimeString();
+        }
+
+        // Start
+        initMap();
+
+    </script>
+</body>
+</html>

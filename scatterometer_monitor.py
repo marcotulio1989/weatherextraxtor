@@ -1,0 +1,1159 @@
+"""
+=============================================================================
+SCATTEROMETER WIND MONITOR
+=============================================================================
+Sistema para capturar e visualizar dados de satélites escaterômetros.
+
+FONTES DE DADOS DISPONÍVEIS:
+-----------------------------
+1. NOAA ERDDAP (GRATUITO - SEM API KEY)
+   - ASCAT MetOp-A, B, C
+   - Dados globais de vento oceânico
+   
+2. Copernicus Marine Service (CMEMS) - PRECISA REGISTRO GRATUITO
+   - ASCAT L2/L3 winds
+   - Melhor qualidade e cobertura
+   
+3. NASA Earthdata (PRECISA REGISTRO GRATUITO)  
+   - QuikSCAT (histórico)
+   - RapidScat (histórico)
+   - CYGNSS (atual)
+
+4. KNMI ASCAT (GRATUITO)
+   - Processamento holandês do ASCAT
+   - Boa qualidade
+
+COMO REGISTRAR:
+---------------
+- Copernicus: https://data.marine.copernicus.eu/register
+- NASA Earthdata: https://urs.earthdata.nasa.gov/users/new
+=============================================================================
+"""
+
+import os
+import webbrowser
+from datetime import datetime, timedelta
+
+# Configurações do Navio
+NOME_NAVIO = "Deepwater Aquila"
+LAT_NAVIO = -22.50
+LON_NAVIO = -40.50
+
+# Área de interesse (100 NM ao redor do navio)
+# 1 grau = 60 NM, então 100 NM = ~1.67 graus
+RAIO_NM = 100
+RAIO_GRAUS = RAIO_NM / 60
+LAT_MIN = LAT_NAVIO - RAIO_GRAUS
+LAT_MAX = LAT_NAVIO + RAIO_GRAUS
+LON_MIN = LON_NAVIO - RAIO_GRAUS
+LON_MAX = LON_NAVIO + RAIO_GRAUS
+
+html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scatterometer Monitor - {NOME_NAVIO}</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {{ box-sizing: border-box; }}
+        body {{ 
+            margin: 0; padding: 0; 
+            background: #0a0a0a; 
+            font-family: 'Consolas', 'Monaco', monospace; 
+            color: #e0e0e0; 
+        }}
+        
+        /* Layout Principal */
+        .container {{
+            display: flex;
+            height: 100vh;
+        }}
+        
+        /* Painel Lateral */
+        .sidebar {{
+            width: 380px;
+            background: #111;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+            padding: 15px;
+        }}
+        
+        /* Mapa */
+        #map {{ 
+            flex: 1;
+            height: 100vh;
+        }}
+        
+        /* Estilos do Painel */
+        h1 {{
+            font-size: 16px;
+            color: #00ffcc;
+            border-bottom: 2px solid #00ffcc;
+            padding-bottom: 10px;
+            margin: 0 0 15px 0;
+        }}
+        
+        h2 {{
+            font-size: 13px;
+            color: #ff9900;
+            margin: 20px 0 10px 0;
+            text-transform: uppercase;
+        }}
+        
+        .section {{
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }}
+        
+        .section-title {{
+            font-size: 12px;
+            color: #00ffcc;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .status-indicator {{
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }}
+        
+        .status-indicator.active {{ background: #00ff00; }}
+        .status-indicator.loading {{ background: #ffff00; animation: pulse 1s infinite; }}
+        .status-indicator.error {{ background: #ff0000; }}
+        
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.5; }}
+        }}
+        
+        /* Inputs */
+        label {{
+            display: block;
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 4px;
+        }}
+        
+        input[type="text"], input[type="password"] {{
+            width: 100%;
+            padding: 8px;
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 3px;
+            font-family: inherit;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }}
+        
+        input:focus {{
+            outline: none;
+            border-color: #00ffcc;
+        }}
+        
+        button {{
+            padding: 8px 16px;
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }}
+        
+        button:hover {{
+            background: #00ddaa;
+        }}
+        
+        button.secondary {{
+            background: #444;
+            color: #fff;
+        }}
+        
+        button.secondary:hover {{
+            background: #555;
+        }}
+        
+        button:disabled {{
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+        }}
+        
+        /* Log de Status */
+        .log-area {{
+            background: #000;
+            border: 1px solid #333;
+            padding: 10px;
+            height: 150px;
+            overflow-y: auto;
+            font-size: 11px;
+            border-radius: 3px;
+        }}
+        
+        .log-entry {{
+            margin-bottom: 4px;
+            padding-left: 10px;
+            border-left: 2px solid #444;
+        }}
+        
+        .log-entry.info {{ border-left-color: #00ffcc; }}
+        .log-entry.success {{ border-left-color: #00ff00; }}
+        .log-entry.error {{ border-left-color: #ff0000; }}
+        .log-entry.warning {{ border-left-color: #ffff00; }}
+        
+        /* Dados de Vento */
+        .wind-stats {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }}
+        
+        .stat-box {{
+            background: #222;
+            padding: 10px;
+            text-align: center;
+            border-radius: 3px;
+        }}
+        
+        .stat-value {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #00ffcc;
+        }}
+        
+        .stat-label {{
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+        }}
+        
+        /* Legenda */
+        .legend {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }}
+        
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+        }}
+        
+        .legend-color {{
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+        }}
+        
+        /* Checkbox customizado */
+        .checkbox-group {{
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }}
+        
+        .checkbox-item {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }}
+        
+        .checkbox-item input {{
+            width: 16px;
+            height: 16px;
+        }}
+        
+        /* Fonte info */
+        .source-info {{
+            font-size: 10px;
+            color: #666;
+            margin-top: 5px;
+        }}
+        
+        .source-info a {{
+            color: #00aaff;
+        }}
+        
+        /* Info Icon com Tooltip */
+        .input-with-info {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        
+        .input-with-info input {{
+            flex: 1;
+            margin-bottom: 0;
+        }}
+        
+        .info-icon {{
+            width: 20px;
+            height: 20px;
+            background: #0088ff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: help;
+            position: relative;
+            flex-shrink: 0;
+        }}
+        
+        .info-icon:hover {{
+            background: #00aaff;
+        }}
+        
+        .info-tooltip {{
+            display: none;
+            position: absolute;
+            left: 30px;
+            top: -10px;
+            background: #222;
+            border: 1px solid #00aaff;
+            border-radius: 6px;
+            padding: 12px;
+            width: 280px;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }}
+        
+        .info-icon:hover .info-tooltip {{
+            display: block;
+        }}
+        
+        .info-tooltip h4 {{
+            color: #00ffcc;
+            margin: 0 0 8px 0;
+            font-size: 12px;
+        }}
+        
+        .info-tooltip p {{
+            color: #ccc;
+            font-size: 11px;
+            margin: 6px 0;
+            line-height: 1.4;
+        }}
+        
+        .info-tooltip ol {{
+            color: #aaa;
+            font-size: 11px;
+            margin: 8px 0;
+            padding-left: 16px;
+            line-height: 1.6;
+        }}
+        
+        .info-tooltip a {{
+            color: #00aaff;
+            text-decoration: underline;
+        }}
+        
+        .info-tooltip .highlight {{
+            background: #333;
+            padding: 4px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #ffcc00;
+        }}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- PAINEL LATERAL -->
+    <div class="sidebar">
+        <h1>🛰️ SCATTEROMETER MONITOR</h1>
+        
+        <!-- POSIÇÃO DO NAVIO -->
+        <div class="section">
+            <div class="section-title">
+                <span class="status-indicator active"></span>
+                POSIÇÃO: {NOME_NAVIO}
+            </div>
+            <div class="wind-stats">
+                <div class="stat-box">
+                    <div class="stat-value">{LAT_NAVIO}°</div>
+                    <div class="stat-label">LATITUDE</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{LON_NAVIO}°</div>
+                    <div class="stat-label">LONGITUDE</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ESTATÍSTICAS DE VENTO -->
+        <div class="section">
+            <div class="section-title">
+                <span class="status-indicator" id="wind-status"></span>
+                DADOS DE VENTO (Escaterômetro)
+            </div>
+            <div class="wind-stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="avg-wind">--</div>
+                    <div class="stat-label">VENTO MÉDIO (kn)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="max-wind">--</div>
+                    <div class="stat-label">VENTO MÁX (kn)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="data-points">--</div>
+                    <div class="stat-label">PONTOS</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="data-age">--</div>
+                    <div class="stat-label">IDADE (h)</div>
+                </div>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-item"><div class="legend-color" style="background:#00ff00"></div> &lt;10 kn</div>
+                <div class="legend-item"><div class="legend-color" style="background:#88ff00"></div> 10-15 kn</div>
+                <div class="legend-item"><div class="legend-color" style="background:#ffff00"></div> 15-20 kn</div>
+                <div class="legend-item"><div class="legend-color" style="background:#ff9900"></div> 20-25 kn</div>
+                <div class="legend-item"><div class="legend-color" style="background:#ff0000"></div> 25-30 kn</div>
+                <div class="legend-item"><div class="legend-color" style="background:#ff00ff"></div> &gt;30 kn</div>
+            </div>
+        </div>
+        
+        <!-- FONTES DE DADOS -->
+        <h2>📡 FONTES DE DADOS</h2>
+        
+        <!-- NOAA ERDDAP (Gratuito) -->
+        <div class="section">
+            <div class="section-title">
+                <span class="status-indicator" id="noaa-status"></span>
+                NOAA ERDDAP (ASCAT)
+            </div>
+            <p class="source-info">✅ GRATUITO - Não precisa de API Key</p>
+            <p class="source-info">Satélites: MetOp-A, B, C (ASCAT)</p>
+            <button onclick="fetchNOAAData()">🔄 Buscar NOAA</button>
+        </div>
+        
+        <!-- Copernicus Marine -->
+        <div class="section">
+            <div class="section-title">
+                <span class="status-indicator" id="cmems-status"></span>
+                COPERNICUS MARINE (CMEMS)
+            </div>
+            <p class="source-info">
+                Registro: <a href="https://data.marine.copernicus.eu/register" target="_blank">Criar conta grátis</a>
+            </p>
+            <label>Username:</label>
+            <div class="input-with-info">
+                <input type="text" id="cmems-user" placeholder="seu_usuario">
+                <span class="info-icon">i
+                    <div class="info-tooltip">
+                        <h4>📋 Como obter credenciais Copernicus</h4>
+                        <ol>
+                            <li>Acesse <a href="https://data.marine.copernicus.eu/register" target="_blank">data.marine.copernicus.eu/register</a></li>
+                            <li>Preencha o formulário de registro (nome, email, país)</li>
+                            <li>Confirme seu email</li>
+                            <li>Faça login no site</li>
+                            <li>Use o <span class="highlight">mesmo username e senha</span> aqui</li>
+                        </ol>
+                        <p>⏱️ Ativação: <strong>imediata</strong> após confirmação do email</p>
+                        <p>🛰️ Dados: ASCAT Level 3/4, ventos oceânicos globais</p>
+                    </div>
+                </span>
+            </div>
+            <label>Password:</label>
+            <div class="input-with-info">
+                <input type="password" id="cmems-pass" placeholder="sua_senha">
+                <span class="info-icon">i
+                    <div class="info-tooltip">
+                        <h4>🔐 Senha Copernicus</h4>
+                        <p>Use a mesma senha que você criou no registro do Copernicus Marine Service.</p>
+                        <p>💡 <strong>Dica:</strong> A senha é salva apenas localmente no seu navegador (localStorage).</p>
+                    </div>
+                </span>
+            </div>
+            <button onclick="fetchCopernicusData()">🔄 Buscar CMEMS</button>
+            <button class="secondary" onclick="saveCmemsCredentials()">💾 Salvar</button>
+        </div>
+        
+        <!-- NASA Earthdata -->
+        <div class="section">
+            <div class="section-title">
+                <span class="status-indicator" id="nasa-status"></span>
+                NASA EARTHDATA (CYGNSS)
+            </div>
+            <p class="source-info">
+                Registro: <a href="https://urs.earthdata.nasa.gov/users/new" target="_blank">Criar conta grátis</a>
+            </p>
+            <label>Username:</label>
+            <div class="input-with-info">
+                <input type="text" id="nasa-user" placeholder="seu_usuario">
+                <span class="info-icon">i
+                    <div class="info-tooltip">
+                        <h4>📋 Como obter credenciais NASA Earthdata</h4>
+                        <ol>
+                            <li>Acesse <a href="https://urs.earthdata.nasa.gov/users/new" target="_blank">urs.earthdata.nasa.gov/users/new</a></li>
+                            <li>Clique em <span class="highlight">Register</span></li>
+                            <li>Preencha: username, email, nome, país</li>
+                            <li>Aceite os termos de uso</li>
+                            <li>Confirme seu email</li>
+                            <li>⚠️ <strong>Importante:</strong> Após login, vá em "Applications" → "Authorized Apps" e autorize o acesso a dados</li>
+                        </ol>
+                        <p>⏱️ Ativação: <strong>imediata</strong></p>
+                        <p>🛰️ Dados: CYGNSS (8 satélites), QuikSCAT, RapidScat</p>
+                    </div>
+                </span>
+            </div>
+            <label>Password:</label>
+            <div class="input-with-info">
+                <input type="password" id="nasa-pass" placeholder="sua_senha">
+                <span class="info-icon">i
+                    <div class="info-tooltip">
+                        <h4>🔐 Senha NASA Earthdata</h4>
+                        <p>Use a mesma senha que você criou no registro do NASA Earthdata.</p>
+                        <p>💡 <strong>Requisitos da senha:</strong></p>
+                        <p>• Mínimo 8 caracteres<br>• 1 letra maiúscula<br>• 1 número<br>• 1 caractere especial</p>
+                    </div>
+                </span>
+            </div>
+            <button onclick="fetchNASAData()">🔄 Buscar NASA</button>
+            <button class="secondary" onclick="saveNasaCredentials()">💾 Salvar</button>
+        </div>
+        
+        <!-- Camadas do Mapa -->
+        <h2>🗺️ CAMADAS</h2>
+        <div class="section">
+            <div class="checkbox-group">
+                <label class="checkbox-item">
+                    <input type="checkbox" id="layer-arrows" checked onchange="toggleLayer('arrows')">
+                    Setas de Vento
+                </label>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="layer-satellite" checked onchange="toggleLayer('satellite')">
+                    Satélite (NASA GIBS)
+                </label>
+                <label class="checkbox-item">
+                    <input type="checkbox" id="layer-grid" onchange="toggleLayer('grid')">
+                    Grade de Coordenadas
+                </label>
+            </div>
+        </div>
+        
+        <!-- Log -->
+        <h2>📋 LOG</h2>
+        <div class="log-area" id="log-area">
+            <div class="log-entry info">Sistema iniciado...</div>
+        </div>
+        
+        <!-- Ações -->
+        <div style="margin-top: 15px;">
+            <button onclick="fetchAllSources()">🔄 BUSCAR TODOS</button>
+            <button class="secondary" onclick="clearData()">🗑️ Limpar</button>
+            <button class="secondary" onclick="exportData()">📥 Exportar CSV</button>
+        </div>
+        
+    </div>
+    
+    <!-- MAPA -->
+    <div id="map"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    // =========================================================================
+    // CONFIGURAÇÃO
+    // =========================================================================
+    const CONFIG = {{
+        shipLat: {LAT_NAVIO},
+        shipLon: {LON_NAVIO},
+        latMin: {LAT_MIN},
+        latMax: {LAT_MAX},
+        lonMin: {LON_MIN},
+        lonMax: {LON_MAX},
+        shipName: "{NOME_NAVIO}"
+    }};
+    
+    let map;
+    let windDataPoints = [];  // Armazena todos os dados de vento
+    let windLayerGroup;
+    let satelliteLayer;
+    let gridLayer;
+    
+    // =========================================================================
+    // INICIALIZAÇÃO DO MAPA
+    // =========================================================================
+    function initMap() {{
+        map = L.map('map', {{
+            center: [CONFIG.shipLat, CONFIG.shipLon],
+            zoom: 7,
+            zoomControl: false
+        }});
+
+        L.control.zoom({{ position: 'topright' }}).addTo(map);
+        L.control.scale({{ position: 'bottomright', imperial: false }}).addTo(map);
+
+        // Mapa Base Escuro
+        L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+            maxZoom: 19
+        }}).addTo(map);
+        
+        // Camada de satélite
+        updateSatelliteLayer();
+        
+        // Grupos de camadas
+        windLayerGroup = L.layerGroup().addTo(map);
+        gridLayer = L.layerGroup();
+
+        // Ícone do Navio
+        const shipIcon = L.divIcon({{
+            className: 'ship-icon',
+            html: `<svg viewBox="0 0 24 24" width="50" height="50">
+                <circle cx="12" cy="12" r="10" fill="rgba(0,255,204,0.3)" stroke="#00ffcc" stroke-width="2"/>
+                <circle cx="12" cy="12" r="4" fill="#00ffcc"/>
+            </svg>`,
+            iconSize: [50, 50],
+            iconAnchor: [25, 25]
+        }});
+        L.marker([CONFIG.shipLat, CONFIG.shipLon], {{ icon: shipIcon }})
+            .bindPopup(`<b>${{CONFIG.shipName}}</b><br>Lat: ${{CONFIG.shipLat}}<br>Lon: ${{CONFIG.shipLon}}`)
+            .addTo(map);
+        
+        // Área de interesse (retângulo)
+        L.rectangle([[CONFIG.latMin, CONFIG.lonMin], [CONFIG.latMax, CONFIG.lonMax]], {{
+            color: "#00ffcc",
+            weight: 1,
+            fillOpacity: 0.05,
+            dashArray: '5, 5'
+        }}).addTo(map);
+        
+        // Criar grade
+        createGrid();
+        
+        // Carregar credenciais salvas
+        loadSavedCredentials();
+        
+        log('info', 'Mapa inicializado');
+        log('info', `Área: ${{CONFIG.latMin}}° a ${{CONFIG.latMax}}° lat, ${{CONFIG.lonMin}}° a ${{CONFIG.lonMax}}° lon`);
+        
+        // Buscar dados NOAA automaticamente (é gratuito)
+        setTimeout(() => fetchNOAAData(), 1000);
+    }}
+    
+    // =========================================================================
+    // CAMADA DE SATÉLITE (NASA GIBS)
+    // =========================================================================
+    function updateSatelliteLayer() {{
+        const now = new Date();
+        const year = now.getUTCFullYear();
+        const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(now.getUTCDate()).padStart(2, '0');
+        const dateStr = `${{year}}-${{month}}-${{day}}`;
+
+        if (satelliteLayer) {{
+            map.removeLayer(satelliteLayer);
+        }}
+
+        const url = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13_Clean_Infrared/default/${{dateStr}}/GoogleMapsCompatible_Level9/{{z}}/{{y}}/{{x}}.jpg`;
+
+        satelliteLayer = L.tileLayer(url, {{
+            opacity: 0.5,
+            zIndex: 1
+        }}).addTo(map);
+    }}
+    
+    // =========================================================================
+    // GRADE DE COORDENADAS
+    // =========================================================================
+    function createGrid() {{
+        for (let lat = -30; lat <= -15; lat += 1) {{
+            L.polyline([[lat, CONFIG.lonMin - 2], [lat, CONFIG.lonMax + 2]], {{
+                color: '#333',
+                weight: 1,
+                opacity: 0.5
+            }}).addTo(gridLayer);
+            
+            L.marker([lat, CONFIG.lonMin - 1], {{
+                icon: L.divIcon({{
+                    className: 'grid-label',
+                    html: `<span style="color:#666;font-size:10px">${{lat}}°</span>`
+                }})
+            }}).addTo(gridLayer);
+        }}
+        
+        for (let lon = -50; lon <= -35; lon += 1) {{
+            L.polyline([[CONFIG.latMin - 2, lon], [CONFIG.latMax + 2, lon]], {{
+                color: '#333',
+                weight: 1,
+                opacity: 0.5
+            }}).addTo(gridLayer);
+        }}
+    }}
+    
+    // =========================================================================
+    // TOGGLE DE CAMADAS
+    // =========================================================================
+    function toggleLayer(layer) {{
+        const checkbox = document.getElementById(`layer-${{layer}}`);
+        switch(layer) {{
+            case 'arrows':
+                if (checkbox.checked) windLayerGroup.addTo(map);
+                else map.removeLayer(windLayerGroup);
+                break;
+            case 'satellite':
+                if (checkbox.checked) satelliteLayer.addTo(map);
+                else map.removeLayer(satelliteLayer);
+                break;
+            case 'grid':
+                if (checkbox.checked) gridLayer.addTo(map);
+                else map.removeLayer(gridLayer);
+                break;
+        }}
+    }}
+    
+    // =========================================================================
+    // BUSCAR DADOS - NOAA ERDDAP (GRATUITO!)
+    // =========================================================================
+    async function fetchNOAAData() {{
+        setStatus('noaa-status', 'loading');
+        log('info', 'Buscando dados NOAA ERDDAP (ASCAT)...');
+        
+        // NOAA ERDDAP tem vários datasets de escaterômetro
+        // Este é o ASCAT L2 25km (MetOp)
+        const baseUrl = 'https://coastwatch.pfeg.noaa.gov/erddap/griddap';
+        
+        // Dataset: erdQAwind1day - ASCAT daily wind
+        // Vamos tentar pegar dados das últimas 24 horas
+        const now = new Date();
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        
+        const startTime = yesterday.toISOString().split('.')[0] + 'Z';
+        const endTime = now.toISOString().split('.')[0] + 'Z';
+        
+        // Construir URL para dados de vento ASCAT
+        // Formato: dataset.json?variavel[(time_start):(time_end)][(lat_start):(lat_end)][(lon_start):(lon_end)]
+        const url = `${{baseUrl}}/erdQAwind1day.json?` +
+            `x_wind[(${{startTime}}):1:(${{endTime}})]` +
+            `[(${{CONFIG.latMax}}):1:(${{CONFIG.latMin}})]` +
+            `[(${{CONFIG.lonMin}}):1:(${{CONFIG.lonMax}})]` +
+            `,y_wind[(${{startTime}}):1:(${{endTime}})]` +
+            `[(${{CONFIG.latMax}}):1:(${{CONFIG.latMin}})]` +
+            `[(${{CONFIG.lonMin}}):1:(${{CONFIG.lonMax}})]`;
+        
+        try {{
+            log('info', 'URL: ' + url.substring(0, 80) + '...');
+            const response = await fetch(url);
+            
+            if (!response.ok) {{
+                // Tentar dataset alternativo
+                log('warning', 'Dataset primário indisponível, tentando alternativo...');
+                await fetchNOAAAlternative();
+                return;
+            }}
+            
+            const data = await response.json();
+            processNOAAData(data);
+            setStatus('noaa-status', 'active');
+            
+        }} catch (error) {{
+            log('error', 'Erro NOAA: ' + error.message);
+            log('info', 'Tentando fonte alternativa...');
+            await fetchNOAAAlternative();
+        }}
+    }}
+    
+    // Fonte alternativa: ASCAT MetOp via coastwatch
+    async function fetchNOAAAlternative() {{
+        try {{
+            // Tentar Open-Meteo como fallback (sempre funciona)
+            log('info', 'Usando Open-Meteo (raio 100 NM)...');
+            
+            const lats = [];
+            const lons = [];
+            const step = 0.6;  // ~36 NM entre pontos
+            
+            for (let la = CONFIG.latMin; la <= CONFIG.latMax; la += step) {{
+                lats.push(la.toFixed(2));
+            }}
+            for (let lo = CONFIG.lonMin; lo <= CONFIG.lonMax; lo += step) {{
+                lons.push(lo.toFixed(2));
+            }}
+            
+            let queryLats = [];
+            let queryLons = [];
+            
+            lats.forEach(la => {{
+                lons.forEach(lo => {{
+                    queryLats.push(la);
+                    queryLons.push(lo);
+                }});
+            }});
+            
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${{queryLats.join(',')}}&longitude=${{queryLons.join(',')}}&current_weather=true&windspeed_unit=kn`;
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            
+            if (Array.isArray(data)) {{
+                data.forEach(point => {{
+                    if (point.current_weather) {{
+                        addWindPoint({{
+                            lat: point.latitude,
+                            lon: point.longitude,
+                            speed: point.current_weather.windspeed,
+                            direction: point.current_weather.winddirection,
+                            time: new Date(),
+                            source: 'Open-Meteo'
+                        }});
+                    }}
+                }});
+            }}
+            
+            updateWindDisplay();
+            setStatus('noaa-status', 'active');
+            log('success', `Open-Meteo: ${{windDataPoints.length}} pontos carregados`);
+            
+        }} catch (error) {{
+            log('error', 'Fallback também falhou: ' + error.message);
+            setStatus('noaa-status', 'error');
+        }}
+    }}
+    
+    function processNOAAData(data) {{
+        if (!data.table || !data.table.rows) {{
+            log('warning', 'Dados NOAA vazios');
+            return;
+        }}
+        
+        const rows = data.table.rows;
+        let count = 0;
+        
+        rows.forEach(row => {{
+            // row = [time, lat, lon, x_wind, y_wind]
+            const time = new Date(row[0]);
+            const lat = row[1];
+            const lon = row[2];
+            const u = row[3];  // componente x
+            const v = row[4];  // componente y
+            
+            if (u !== null && v !== null) {{
+                // Calcular velocidade e direção
+                const speed = Math.sqrt(u*u + v*v) * 1.94384;  // m/s para knots
+                const direction = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+                
+                addWindPoint({{
+                    lat: lat,
+                    lon: lon,
+                    speed: speed,
+                    direction: direction,
+                    time: time,
+                    source: 'NOAA ASCAT'
+                }});
+                count++;
+            }}
+        }});
+        
+        updateWindDisplay();
+        log('success', `NOAA: ${{count}} pontos carregados`);
+    }}
+    
+    // =========================================================================
+    // BUSCAR DADOS - COPERNICUS MARINE
+    // =========================================================================
+    async function fetchCopernicusData() {{
+        const user = document.getElementById('cmems-user').value;
+        const pass = document.getElementById('cmems-pass').value;
+        
+        if (!user || !pass) {{
+            log('warning', 'CMEMS: Insira usuário e senha');
+            return;
+        }}
+        
+        setStatus('cmems-status', 'loading');
+        log('info', 'Buscando dados Copernicus Marine...');
+        
+        // CMEMS usa WMS/WCS - precisamos de uma abordagem diferente
+        // Para uso real, seria necessário usar o copernicusmarine Python client
+        // Aqui vamos mostrar como seria a URL
+        
+        const datasetId = 'WIND_GLO_PHY_L4_NRT_012_004';  // Global wind L4
+        
+        log('info', `Dataset: ${{datasetId}}`);
+        log('warning', 'CMEMS requer autenticação OAuth - use o Python client');
+        log('info', 'Comando: pip install copernicusmarine');
+        log('info', 'copernicusmarine subset -i ' + datasetId);
+        
+        // Mostrar instruções
+        alert(`Para acessar dados Copernicus Marine:
+
+1. Instale o cliente Python:
+   pip install copernicusmarine
+
+2. Configure credenciais:
+   copernicusmarine login
+
+3. Baixe dados de vento:
+   copernicusmarine subset \\
+     --dataset-id WIND_GLO_PHY_L4_NRT_012_004 \\
+     --variable eastward_wind \\
+     --variable northward_wind \\
+     --minimum-longitude ${{CONFIG.lonMin}} \\
+     --maximum-longitude ${{CONFIG.lonMax}} \\
+     --minimum-latitude ${{CONFIG.latMin}} \\
+     --maximum-latitude ${{CONFIG.latMax}}`);
+        
+        setStatus('cmems-status', 'error');
+    }}
+    
+    // =========================================================================
+    // BUSCAR DADOS - NASA EARTHDATA
+    // =========================================================================
+    async function fetchNASAData() {{
+        const user = document.getElementById('nasa-user').value;
+        const pass = document.getElementById('nasa-pass').value;
+        
+        if (!user || !pass) {{
+            log('warning', 'NASA: Insira usuário e senha');
+            return;
+        }}
+        
+        setStatus('nasa-status', 'loading');
+        log('info', 'Buscando dados NASA Earthdata (CYGNSS)...');
+        
+        // NASA Earthdata também requer autenticação especial
+        // CYGNSS é um constelação de 8 satélites que mede vento oceânico
+        
+        log('info', 'Datasets disponíveis:');
+        log('info', '- CYGNSS L2 Ocean Surface Wind Speed');
+        log('info', '- QuikSCAT Level 2B (histórico)');
+        log('info', '- RapidSCAT Level 2B (histórico)');
+        
+        log('warning', 'NASA Earthdata requer token de autenticação');
+        log('info', 'Use: https://search.earthdata.nasa.gov');
+        
+        setStatus('nasa-status', 'error');
+    }}
+    
+    // =========================================================================
+    // FUNÇÕES DE VISUALIZAÇÃO
+    // =========================================================================
+    function addWindPoint(point) {{
+        windDataPoints.push(point);
+    }}
+    
+    function updateWindDisplay() {{
+        windLayerGroup.clearLayers();
+        
+        if (windDataPoints.length === 0) return;
+        
+        let totalSpeed = 0;
+        let maxSpeed = 0;
+        let latestTime = new Date(0);
+        
+        windDataPoints.forEach(point => {{
+            // Desenhar seta
+            drawWindArrow(point.lat, point.lon, point.direction, point.speed, point.source);
+            
+            // Estatísticas
+            totalSpeed += point.speed;
+            if (point.speed > maxSpeed) maxSpeed = point.speed;
+            if (point.time > latestTime) latestTime = point.time;
+        }});
+        
+        // Atualizar painel
+        const avgSpeed = totalSpeed / windDataPoints.length;
+        const ageHours = (new Date() - latestTime) / (1000 * 60 * 60);
+        
+        document.getElementById('avg-wind').textContent = avgSpeed.toFixed(1);
+        document.getElementById('max-wind').textContent = maxSpeed.toFixed(1);
+        document.getElementById('data-points').textContent = windDataPoints.length;
+        document.getElementById('data-age').textContent = ageHours.toFixed(1);
+        
+        setStatus('wind-status', 'active');
+    }}
+    
+    function drawWindArrow(lat, lon, direction, speed, source) {{
+        // Cor baseada na velocidade
+        let color;
+        if (speed < 10) color = '#00ff00';
+        else if (speed < 15) color = '#88ff00';
+        else if (speed < 20) color = '#ffff00';
+        else if (speed < 25) color = '#ff9900';
+        else if (speed < 30) color = '#ff0000';
+        else color = '#ff00ff';
+        
+        const arrowHtml = `
+            <div style="transform: rotate(${{direction}}deg); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" width="20" height="20">
+                    <path fill="${{color}}" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                </svg>
+            </div>
+            <div style="text-align:center; font-size:9px; font-weight:bold; color:${{color}}; text-shadow: 1px 1px 1px black;">${{speed.toFixed(0)}}</div>
+        `;
+
+        const icon = L.divIcon({{
+            className: 'wind-arrow',
+            html: arrowHtml,
+            iconSize: [24, 30],
+            iconAnchor: [12, 15]
+        }});
+
+        L.marker([lat, lon], {{ icon: icon }})
+            .bindPopup(`
+                <b>Dados de Vento</b><br>
+                Velocidade: ${{speed.toFixed(1)}} kn<br>
+                Direção: ${{direction.toFixed(0)}}°<br>
+                Fonte: ${{source}}<br>
+                Lat: ${{lat.toFixed(3)}}<br>
+                Lon: ${{lon.toFixed(3)}}
+            `)
+            .addTo(windLayerGroup);
+    }}
+    
+    // =========================================================================
+    // FUNÇÕES AUXILIARES
+    // =========================================================================
+    function log(type, message) {{
+        const logArea = document.getElementById('log-area');
+        const time = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${{type}}`;
+        entry.textContent = `[${{time}}] ${{message}}`;
+        logArea.appendChild(entry);
+        logArea.scrollTop = logArea.scrollHeight;
+    }}
+    
+    function setStatus(elementId, status) {{
+        const el = document.getElementById(elementId);
+        if (el) {{
+            el.className = 'status-indicator ' + status;
+        }}
+    }}
+    
+    function saveCmemsCredentials() {{
+        const user = document.getElementById('cmems-user').value;
+        const pass = document.getElementById('cmems-pass').value;
+        localStorage.setItem('cmems-user', user);
+        localStorage.setItem('cmems-pass', pass);
+        log('success', 'Credenciais CMEMS salvas');
+    }}
+    
+    function saveNasaCredentials() {{
+        const user = document.getElementById('nasa-user').value;
+        const pass = document.getElementById('nasa-pass').value;
+        localStorage.setItem('nasa-user', user);
+        localStorage.setItem('nasa-pass', pass);
+        log('success', 'Credenciais NASA salvas');
+    }}
+    
+    function loadSavedCredentials() {{
+        document.getElementById('cmems-user').value = localStorage.getItem('cmems-user') || '';
+        document.getElementById('cmems-pass').value = localStorage.getItem('cmems-pass') || '';
+        document.getElementById('nasa-user').value = localStorage.getItem('nasa-user') || '';
+        document.getElementById('nasa-pass').value = localStorage.getItem('nasa-pass') || '';
+    }}
+    
+    function fetchAllSources() {{
+        fetchNOAAData();
+        // fetchCopernicusData();  // Requer autenticação especial
+        // fetchNASAData();  // Requer autenticação especial
+    }}
+    
+    function clearData() {{
+        windDataPoints = [];
+        windLayerGroup.clearLayers();
+        document.getElementById('avg-wind').textContent = '--';
+        document.getElementById('max-wind').textContent = '--';
+        document.getElementById('data-points').textContent = '--';
+        document.getElementById('data-age').textContent = '--';
+        setStatus('wind-status', '');
+        log('info', 'Dados limpos');
+    }}
+    
+    function exportData() {{
+        if (windDataPoints.length === 0) {{
+            log('warning', 'Nenhum dado para exportar');
+            return;
+        }}
+        
+        let csv = 'latitude,longitude,wind_speed_kn,wind_direction,source,timestamp\\n';
+        windDataPoints.forEach(p => {{
+            csv += `${{p.lat}},${{p.lon}},${{p.speed.toFixed(2)}},${{p.direction.toFixed(1)}},${{p.source}},${{p.time.toISOString()}}\\n`;
+        }});
+        
+        const blob = new Blob([csv], {{ type: 'text/csv' }});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `scatterometer_data_${{new Date().toISOString().slice(0,10)}}.csv`;
+        a.click();
+        
+        log('success', 'Dados exportados para CSV');
+    }}
+    
+    // =========================================================================
+    // INICIAR
+    // =========================================================================
+    initMap();
+</script>
+
+</body>
+</html>
+"""
+
+# Salvar arquivo
+file_path = os.path.abspath("scatterometer_monitor.html")
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print("=" * 70)
+print("SCATTEROMETER WIND MONITOR")
+print("=" * 70)
+print(f"\n✅ Arquivo gerado: {file_path}")
+print(f"\n📍 Posição configurada: {LAT_NAVIO}, {LON_NAVIO}")
+print(f"📍 Área de cobertura: {LAT_MIN}° a {LAT_MAX}° lat, {LON_MIN}° a {LON_MAX}° lon")
+print("\n" + "=" * 70)
+print("FONTES DE DADOS DE ESCATERÔMETROS:")
+print("=" * 70)
+print("""
+1. NOAA ERDDAP (GRATUITO - SEM REGISTRO)
+   ✅ Funciona direto! Dados ASCAT MetOp
+   URL: https://coastwatch.pfeg.noaa.gov/erddap
+
+2. COPERNICUS MARINE SERVICE (GRATUITO - PRECISA REGISTRO)
+   Datasets disponíveis:
+   - WIND_GLO_PHY_L4_NRT_012_004 (Global wind L4)
+   - WIND_GLO_PHY_L3_NRT_012_002 (ASCAT Level 3)
+   Registro: https://data.marine.copernicus.eu/register
+   
+3. NASA EARTHDATA (GRATUITO - PRECISA REGISTRO)  
+   Satélites:
+   - CYGNSS (8 microsatélites, dados atuais)
+   - QuikSCAT (histórico)
+   - RapidScat (histórico)
+   Registro: https://urs.earthdata.nasa.gov/users/new
+
+4. KNMI (GRATUITO)
+   Processamento holandês do ASCAT
+   URL: https://scatterometer.knmi.nl
+""")
+print("=" * 70)
+print(f"\n🌐 Para abrir, use: file://{file_path}")
+print("   Ou abra o arquivo scatterometer_monitor.html no navegador")
