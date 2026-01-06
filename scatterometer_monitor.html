@@ -664,6 +664,11 @@
             satelliteData = await jsonResponse.json();
             log('success', `✅ Metadados: ${satelliteData.points_count} pontos`);
             
+            // Mostrar horário real da imagem de satélite
+            if (satelliteData.image_time_utc) {
+                log('info', `🛰️ Imagem capturada: ${satelliteData.image_time_utc}`);
+            }
+            
             // Usar bounds do JSON processado
             const bounds = satelliteData.leaflet_bounds;
             log('info', `📍 Área: ${bounds[0][0].toFixed(2)}° a ${bounds[1][0].toFixed(2)}° lat`);
@@ -679,11 +684,11 @@
             
             satelliteLayer.addTo(map);
             
-            // Atualizar info
-            const timestamp = new Date(satelliteData.timestamp);
+            // Atualizar info com horário da captura do satélite
+            const imageTimeStr = satelliteData.image_time_utc || 'Desconhecido';
             const infoEl = document.getElementById('satellite-info');
             if (infoEl) {
-                infoEl.innerHTML = `📡 GOES-19 IR (Processado)<br>📅 ${timestamp.toLocaleString()}<br>📏 ${satelliteData.ship.radius_nm} NM`;
+                infoEl.innerHTML = `📡 GOES-19 IR<br>🛰️ Captura: ${imageTimeStr}<br>📏 ${satelliteData.ship.radius_nm} NM`;
             }
             
             setStatus('satellite-status', 'active');

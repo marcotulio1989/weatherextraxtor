@@ -61,6 +61,17 @@ def download_goes_image():
                 total_size = int(response.headers.get('content-length', 0))
                 print(f"📦 Tamanho: {total_size / 1024 / 1024:.2f} MB")
                 
+                # Pegar horário real da imagem do header Last-Modified
+                last_modified = response.headers.get('last-modified', None)
+                image_time = None
+                if last_modified:
+                    from email.utils import parsedate_to_datetime
+                    try:
+                        image_time = parsedate_to_datetime(last_modified)
+                        print(f"📅 Imagem capturada: {image_time.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                    except:
+                        pass
+                
                 # Download com progresso
                 data = b''
                 downloaded = 0
@@ -71,12 +82,12 @@ def download_goes_image():
                     print(f"   {pct:.0f}% ({downloaded / 1024 / 1024:.1f} MB)", end='\r')
                 
                 print(f"\n✅ Download completo: {len(data) / 1024 / 1024:.2f} MB")
-                return data, url
+                return data, url, image_time
         except Exception as e:
             print(f"❌ Erro: {e}")
             continue
     
-    return None, None
+    return None, None, None
 
 
 def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
@@ -177,7 +188,7 @@ def main():
     """Processa e salva imagem de satélite."""
     
     # Baixar imagem
-    raw_data, source_url = download_goes_image()
+    raw_data, source_url, image_time = download_goes_image()
     if raw_data is None:
         print("❌ Falha ao baixar imagem")
         sys.exit(1)
@@ -203,9 +214,14 @@ def main():
     # Gerar pontos para JSON
     points = image_to_points(processed_img, bounds, step=8)
     
+    # Timestamps
+    now = datetime.now(tz=None)  # Hora local do processamento
+    
     # Salvar JSON
     json_data = {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "processed_at": now.isoformat(),
+        "image_time": image_time.isoformat() if image_time else None,
+        "image_time_utc": image_time.strftime('%Y-%m-%d %H:%M:%S UTC') if image_time else "Desconhecido",
         "source": source_url,
         "ship": {
             "lat": SHIP_LAT,
@@ -232,6 +248,8 @@ def main():
     print(f"   PNG: {os.path.getsize(png_path) / 1024:.1f} KB")
     print(f"   JSON: {os.path.getsize(json_path) / 1024:.1f} KB ({len(points)} pontos)")
     print(f"   Bounds: {bounds}")
+    if image_time:
+        print(f"   🛰️ Horário da imagem: {image_time.strftime('%Y-%m-%d %H:%M:%S')} UTC")
 
 
 if __name__ == '__main__':
