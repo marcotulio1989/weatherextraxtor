@@ -22,7 +22,7 @@ import sys
 # =========================================================================
 SHIP_LAT = -22.50
 SHIP_LON = -40.50
-RADIUS_NM = 150  # Milhas náuticas
+RADIUS_NM = 100  # Milhas náuticas
 
 # Converter NM para graus (1 grau ≈ 60 NM)
 RADIUS_DEG = RADIUS_NM / 60
