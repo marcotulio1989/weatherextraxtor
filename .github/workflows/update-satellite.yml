@@ -2,8 +2,8 @@ name: 🛰️ Atualizar Imagens de Satélite
 
 on:
   schedule:
-    # Roda a cada 15 minutos
-    - cron: '*/15 * * * *'
+    # Roda a cada 10 minutos nos horários com final 3 (08:03, 08:13, 08:23...)
+    - cron: '3,13,23,33,43,53 * * * *'
   workflow_dispatch:  # Permite rodar manualmente
 
 jobs:
