@@ -660,13 +660,18 @@
                         currentPresetName = 'Full Disk Reprojetado';
                         document.getElementById('currentArea').textContent = currentPresetName;
                         
-                        // Ajustar visão do mapa
-                        map.fitBounds([
-                            [imageBounds.north, imageBounds.west],
-                            [imageBounds.south, imageBounds.east]
-                        ], { padding: [20, 20] });
-                        
+                        // Atualizar overlay primeiro
                         updateImageOverlay();
+                        
+                        // Ajustar visão do mapa para a área da imagem
+                        const bounds = L.latLngBounds(
+                            [imageBounds.south, imageBounds.west],
+                            [imageBounds.north, imageBounds.east]
+                        );
+                        map.fitBounds(bounds, { 
+                            padding: [20, 20],
+                            animate: true 
+                        });
                     };
                     imageElement.src = reprojectedCanvas.toDataURL('image/png');
                     
