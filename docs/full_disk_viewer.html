@@ -196,8 +196,7 @@
         <div class="control-group">
             <label>📷 Tipo de Imagem</label>
             <select id="imageType">
-                <option value="ssa">SSA (América do Sul)</option>
-                <option value="fd">Full Disk (Disco Completo)</option>
+                <option value="fd" selected>Full Disk (Disco Completo)</option>
             </select>
         </div>
         
@@ -356,15 +355,15 @@
                 
                 // Adicionar ao mapa
                 if (overlay) map.removeLayer(overlay);
-                const bounds = [[-35, -75], [6, -34]];
+                const bounds = [[-81, -156], [81, 6]];
                 overlay = L.imageOverlay(dataUrl1, bounds, {opacity: 0.8}).addTo(map);
                 debugLog('✅ TESTE 1 OK: Overlay canvas vermelho adicionado!');
                 
                 await sleep(2000);
                 
-                // TESTE 2: Carregar imagem externa
-                debugLog('TESTE 2: Carregando imagem da NOAA...');
-                const imgUrl = 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg';
+                // TESTE 2: Carregar imagem Full Disk externa
+                debugLog('TESTE 2: Carregando imagem Full Disk da NOAA...');
+                const imgUrl = 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg';
                 const img = await loadImg(imgUrl + '?t=' + Date.now());
                 debugLog('Imagem carregada: ' + img.width + 'x' + img.height);
                 
@@ -372,11 +371,11 @@
                 debugLog('TESTE 3: Reprojetando para canvas...');
                 const canvas2 = document.createElement('canvas');
                 canvas2.width = 600;
-                canvas2.height = 450;
+                canvas2.height = 600;
                 const ctx2 = canvas2.getContext('2d');
                 
                 // Desenhar imagem redimensionada
-                ctx2.drawImage(img, 0, 0, 600, 450);
+                ctx2.drawImage(img, 0, 0, 600, 600);
                 debugLog('drawImage OK');
                 
                 const dataUrl2 = canvas2.toDataURL('image/png');
@@ -395,16 +394,12 @@
             }
         }
         
-        // URLs das imagens
+        // URLs das imagens - Apenas Full Disk
         const IMAGES = {
             goes19: {
-                local: 'satellite_goes19.png',
-                ssa: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
                 fd: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg'
             },
             goes16: {
-                local: 'satellite_goes16.png',
-                ssa: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
                 fd: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg'
             }
         };
@@ -419,19 +414,13 @@
                 west: null,
                 east: null
             },
-            ssa: {
-                // Bounds da imagem SSA calibrados
-                north: 17,
-                south: -82,
-                west: -115,
-                east: -15
-            },
             fd: {
-                // Extremidades do Brasil (com margem)
-                north: 6,
-                south: -35,
-                west: -75,
-                east: -34
+                // Bounds visíveis do satélite GOES-East Full Disk
+                // Disco completo cobre aproximadamente 81° em cada direção do ponto subsatélite
+                north: 81,
+                south: -81,
+                west: -156,  // -75 - 81
+                east: 6      // -75 + 81
             }
         };
         
@@ -649,28 +638,21 @@
                     // Calcular posição na imagem fonte
                     let srcX, srcY;
                     
-                    if (type === 'ssa') {
-                        // Para SSA, mapeamento direto
-                        srcX = ((lon - bounds.west) / (bounds.east - bounds.west)) * img.width;
-                        srcY = ((bounds.north - lat) / (bounds.north - bounds.south)) * img.height;
-                        pixelsVisible++;
-                    } else {
-                        // Para Full Disk, usar projeção geoestacionária
-                        const scan = latLonToScan(lat, lon, sat_lon);
-                        if (!scan) {
-                            continue; // Pular pixel invisível
-                        }
-                        
-                        // Log primeiro scan válido
-                        if (!firstScan) {
-                            firstScan = {lat, lon, scan, x, y};
-                            console.log('🎯 Primeiro pixel válido:', firstScan);
-                        }
-                        
-                        srcX = centerX + scan.x * scale;
-                        srcY = centerY - scan.y * scale;
-                        pixelsVisible++;
+                    // Para Full Disk, usar projeção geoestacionária
+                    const scan = latLonToScan(lat, lon, sat_lon);
+                    if (!scan) {
+                        continue; // Pular pixel invisível (fora do disco)
                     }
+                    
+                    // Log primeiro scan válido
+                    if (!firstScan) {
+                        firstScan = {lat, lon, scan, x, y};
+                        console.log('🎯 Primeiro pixel válido:', firstScan);
+                    }
+                    
+                    srcX = centerX + scan.x * scale;
+                    srcY = centerY - scan.y * scale;
+                    pixelsVisible++;
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
                         continue;
