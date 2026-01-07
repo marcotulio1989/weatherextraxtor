@@ -286,6 +286,33 @@
                 <div class="status-bar" id="imageStatus">Nenhuma imagem carregada</div>
             </div>
 
+            <!-- Mapa de Fundo -->
+            <div class="control-section">
+                <h3>🗺️ Mapa de Fundo</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                    <button class="btn btn-secondary map-layer-btn active" data-layer="contornos" onclick="setMapLayer('contornos')" style="font-size:0.65em;">
+                        📍 Contornos
+                    </button>
+                    <button class="btn btn-secondary map-layer-btn" data-layer="contornosEscuro" onclick="setMapLayer('contornosEscuro')" style="font-size:0.65em;">
+                        🌑 Escuro
+                    </button>
+                    <button class="btn btn-secondary map-layer-btn" data-layer="fronteiras" onclick="setMapLayer('fronteiras')" style="font-size:0.65em;">
+                        🔲 Fronteiras
+                    </button>
+                    <button class="btn btn-secondary map-layer-btn" data-layer="osm" onclick="setMapLayer('osm')" style="font-size:0.65em;">
+                        🏙️ OSM
+                    </button>
+                    <button class="btn btn-secondary map-layer-btn" data-layer="satelite" onclick="setMapLayer('satelite')" style="font-size:0.65em; grid-column: span 2;">
+                        🛰️ Satélite ESRI
+                    </button>
+                </div>
+                <div class="slider-row" style="margin-top: 8px;">
+                    <label>Opac. Mapa:</label>
+                    <input type="range" id="mapOpacity" min="10" max="100" step="5" value="60" oninput="updateMapOpacity()">
+                    <span class="value" id="mapOpacityVal">60%</span>
+                </div>
+            </div>
+
             <!-- NOVO: Cantos Arrastáveis -->
             <div class="control-section">
                 <h3>📍 Cantos da Imagem (ARRASTE NO MAPA!)</h3>
@@ -374,6 +401,89 @@
                 <div class="status-bar">Pontos: <span id="pointCount">0</span> | Triângulos: <span id="triangleCount">0</span></div>
             </div>
 
+            <!-- NOVO: Deslocamento Global -->
+            <div class="control-section">
+                <h3>🎯 Mover Imagem Toda</h3>
+                <div class="instructions" style="margin-bottom: 8px;">
+                    Use os botões ou sliders para deslocar toda a imagem de satélite.
+                </div>
+                
+                <!-- Botões direcionais -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 10px;">
+                    <div></div>
+                    <button class="btn btn-secondary" onclick="moveImage(0, -1)" style="font-size: 1.2em; padding: 8px;">⬆️</button>
+                    <div></div>
+                    <button class="btn btn-secondary" onclick="moveImage(-1, 0)" style="font-size: 1.2em; padding: 8px;">⬅️</button>
+                    <button class="btn btn-warning" onclick="resetOffset()" style="font-size: 0.7em; padding: 8px;">🎯</button>
+                    <button class="btn btn-secondary" onclick="moveImage(1, 0)" style="font-size: 1.2em; padding: 8px;">➡️</button>
+                    <div></div>
+                    <button class="btn btn-secondary" onclick="moveImage(0, 1)" style="font-size: 1.2em; padding: 8px;">⬇️</button>
+                    <div></div>
+                </div>
+                
+                <!-- Sliders de offset -->
+                <div class="slider-row">
+                    <label>Offset X:</label>
+                    <input type="range" id="offsetX" min="-500" max="500" step="1" value="0" oninput="redraw()">
+                    <span class="value" id="offsetXVal">0px</span>
+                </div>
+                <div class="slider-row">
+                    <label>Offset Y:</label>
+                    <input type="range" id="offsetY" min="-500" max="500" step="1" value="0" oninput="redraw()">
+                    <span class="value" id="offsetYVal">0px</span>
+                </div>
+                
+                <!-- Passo do movimento -->
+                <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+                    <label style="font-size: 0.7em; color: #aaa;">Passo (px):</label>
+                    <input type="number" id="moveStep" min="1" max="100" value="10" 
+                           style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #0f3460; 
+                                  background: #0a0a15; color: #00d9ff; font-size: 0.8em; text-align: center;">
+                </div>
+            </div>
+
+            <!-- NOVO: Perspectiva/Trapézio -->
+            <div class="control-section">
+                <h3>📐 Perspectiva (Esticar/Encolher)</h3>
+                <div class="instructions" style="margin-bottom: 8px;">
+                    Ajuste a largura da parte superior ou inferior separadamente.
+                </div>
+                
+                <!-- Parte Superior -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.7em; color: #e74c3c; margin-bottom: 4px;">🔺 Parte Superior</div>
+                    <div class="slider-row">
+                        <label>Largura:</label>
+                        <input type="range" id="topScale" min="0.5" max="1.5" step="0.01" value="1" oninput="redraw()">
+                        <span class="value" id="topScaleVal">1.00</span>
+                    </div>
+                    <div class="slider-row">
+                        <label>Offset Y:</label>
+                        <input type="range" id="topOffsetY" min="-200" max="200" step="1" value="0" oninput="redraw()">
+                        <span class="value" id="topOffsetYVal">0px</span>
+                    </div>
+                </div>
+                
+                <!-- Parte Inferior -->
+                <div style="margin-bottom: 10px;">
+                    <div style="font-size: 0.7em; color: #27ae60; margin-bottom: 4px;">🔻 Parte Inferior</div>
+                    <div class="slider-row">
+                        <label>Largura:</label>
+                        <input type="range" id="bottomScale" min="0.5" max="1.5" step="0.01" value="1" oninput="redraw()">
+                        <span class="value" id="bottomScaleVal">1.00</span>
+                    </div>
+                    <div class="slider-row">
+                        <label>Offset Y:</label>
+                        <input type="range" id="bottomOffsetY" min="-200" max="200" step="1" value="0" oninput="redraw()">
+                        <span class="value" id="bottomOffsetYVal">0px</span>
+                    </div>
+                </div>
+                
+                <button class="btn btn-warning" onclick="resetPerspective()" style="font-size:0.7em;">
+                    ↩️ Resetar Perspectiva
+                </button>
+            </div>
+
             <!-- Ajustes Finos -->
             <div class="control-section">
                 <h3>🔧 Ajustes Finos</h3>
@@ -394,8 +504,8 @@
                 </div>
                 <div class="slider-row">
                     <label>Opacidade:</label>
-                    <input type="range" id="opacity" min="10" max="100" step="1" value="70" oninput="redraw()">
-                    <span class="value" id="opacityVal">70%</span>
+                    <input type="range" id="opacity" min="10" max="100" step="1" value="95" oninput="redraw()">
+                    <span class="value" id="opacityVal">95%</span>
                 </div>
                 <button class="btn btn-warning" onclick="resetFineAdjust()" style="font-size:0.7em;">
                     ↩️ Resetar Ajustes
@@ -509,18 +619,79 @@
             setupEvents();
         });
 
+        // Opções de mapa de fundo
+        const MAP_LAYERS = {
+            contornos: {
+                name: 'Contornos',
+                url: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+                attribution: '© CartoDB'
+            },
+            contornosEscuro: {
+                name: 'Contornos Escuro',
+                url: 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+                attribution: '© CartoDB'
+            },
+            fronteiras: {
+                name: 'Só Fronteiras',
+                url: 'https://stamen-tiles-{s}.a.ssl.fastly.net/toner-lines/{z}/{x}/{y}{r}.png',
+                attribution: '© Stamen'
+            },
+            osm: {
+                name: 'OpenStreetMap',
+                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                attribution: '© OSM'
+            },
+            satelite: {
+                name: 'Satélite ESRI',
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                attribution: '© ESRI'
+            }
+        };
+        let currentBaseLayer = null;
+
         function initMap() {
             map = L.map('map', {
                 center: [-20, -55],
                 zoom: 4
             });
 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OSM',
-                opacity: 0.8
-            }).addTo(map);
+            // Usar mapa de contornos por padrão (sem cidades/labels)
+            setMapLayer('contornos');
 
             map.on('move zoom moveend zoomend', redraw);
+        }
+
+        function setMapLayer(layerKey) {
+            const layer = MAP_LAYERS[layerKey];
+            if (!layer) return;
+            
+            if (currentBaseLayer) {
+                map.removeLayer(currentBaseLayer);
+            }
+            
+            const opacity = parseFloat(document.getElementById('mapOpacity').value) / 100;
+            
+            currentBaseLayer = L.tileLayer(layer.url, {
+                attribution: layer.attribution,
+                opacity: opacity,
+                subdomains: 'abcd'
+            }).addTo(map);
+            
+            // Atualizar botões ativos
+            document.querySelectorAll('.map-layer-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.layer === layerKey) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+        
+        function updateMapOpacity() {
+            const opacity = parseFloat(document.getElementById('mapOpacity').value) / 100;
+            document.getElementById('mapOpacityVal').textContent = document.getElementById('mapOpacity').value + '%';
+            if (currentBaseLayer) {
+                currentBaseLayer.setOpacity(opacity);
+            }
         }
 
         function initCanvas() {
@@ -898,15 +1069,45 @@
         function getTransformedPoint(lat, lng, scaleX, scaleY, rotation) {
             const pt = map.latLngToContainerPoint([lat, lng]);
             
+            // Offset global (deslocamento da imagem toda)
+            const offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
+            const offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
+            
+            // Perspectiva (esticar/encolher topo e base separadamente)
+            const topScale = parseFloat(document.getElementById('topScale').value) || 1;
+            const bottomScale = parseFloat(document.getElementById('bottomScale').value) || 1;
+            const topOffsetY = parseFloat(document.getElementById('topOffsetY').value) || 0;
+            const bottomOffsetY = parseFloat(document.getElementById('bottomOffsetY').value) || 0;
+            
             // Centro = centro dos 4 cantos
             const centerLat = (cornerBounds.nw.lat + cornerBounds.se.lat) / 2;
             const centerLng = (cornerBounds.nw.lng + cornerBounds.se.lng) / 2;
             const center = map.latLngToContainerPoint([centerLat, centerLng]);
             
+            // Calcular a posição vertical relativa (0 = topo, 1 = base)
+            const topPt = map.latLngToContainerPoint([cornerBounds.nw.lat, centerLng]);
+            const bottomPt = map.latLngToContainerPoint([cornerBounds.sw.lat, centerLng]);
+            const totalHeight = bottomPt.y - topPt.y;
+            
+            let verticalRatio = 0.5; // padrão no centro
+            if (totalHeight > 0) {
+                verticalRatio = (pt.y - topPt.y) / totalHeight;
+                verticalRatio = Math.max(0, Math.min(1, verticalRatio));
+            }
+            
+            // Calcular escala horizontal baseada na posição vertical (interpolação linear)
+            const perspectiveScaleX = topScale * (1 - verticalRatio) + bottomScale * verticalRatio;
+            
+            // Calcular offset Y baseado na posição vertical
+            const perspectiveOffsetY = topOffsetY * (1 - verticalRatio) + bottomOffsetY * verticalRatio;
+            
             let x = pt.x - center.x;
             let y = pt.y - center.y;
             
-            // Escala
+            // Aplicar escala de perspectiva (apenas horizontal, baseado na posição vertical)
+            x *= perspectiveScaleX;
+            
+            // Escala global
             x *= scaleX;
             y *= scaleY;
             
@@ -916,7 +1117,8 @@
             const rx = x * cos - y * sin;
             const ry = x * sin + y * cos;
             
-            return [rx + center.x, ry + center.y];
+            // Aplicar offset global + offset de perspectiva APÓS escala e rotação
+            return [rx + center.x + offsetX, ry + center.y + offsetY + perspectiveOffsetY];
         }
 
         function drawTriangle(ctx, img, src0, src1, src2, dst0, dst1, dst2) {
@@ -1076,11 +1278,45 @@
         }
 
         // ===== AJUSTES =====
+        function moveImage(dx, dy) {
+            const step = parseInt(document.getElementById('moveStep').value) || 10;
+            const offsetXEl = document.getElementById('offsetX');
+            const offsetYEl = document.getElementById('offsetY');
+            
+            let newX = parseInt(offsetXEl.value) + (dx * step);
+            let newY = parseInt(offsetYEl.value) + (dy * step);
+            
+            // Limitar aos valores do slider
+            newX = Math.max(-500, Math.min(500, newX));
+            newY = Math.max(-500, Math.min(500, newY));
+            
+            offsetXEl.value = newX;
+            offsetYEl.value = newY;
+            
+            redraw();
+        }
+        
+        function resetOffset() {
+            document.getElementById('offsetX').value = 0;
+            document.getElementById('offsetY').value = 0;
+            redraw();
+        }
+        
+        function resetPerspective() {
+            document.getElementById('topScale').value = 1;
+            document.getElementById('bottomScale').value = 1;
+            document.getElementById('topOffsetY').value = 0;
+            document.getElementById('bottomOffsetY').value = 0;
+            redraw();
+        }
+        
         function resetFineAdjust() {
             document.getElementById('rotation').value = 0;
             document.getElementById('scaleX').value = 1;
             document.getElementById('scaleY').value = 1;
-            redraw();
+            document.getElementById('offsetX').value = 0;
+            document.getElementById('offsetY').value = 0;
+            resetPerspective();
         }
 
         function updateSliderDisplays() {
@@ -1088,6 +1324,12 @@
             document.getElementById('scaleYVal').textContent = parseFloat(document.getElementById('scaleY').value).toFixed(2);
             document.getElementById('rotationVal').textContent = parseFloat(document.getElementById('rotation').value).toFixed(1) + '°';
             document.getElementById('opacityVal').textContent = document.getElementById('opacity').value + '%';
+            document.getElementById('offsetXVal').textContent = document.getElementById('offsetX').value + 'px';
+            document.getElementById('offsetYVal').textContent = document.getElementById('offsetY').value + 'px';
+            document.getElementById('topScaleVal').textContent = parseFloat(document.getElementById('topScale').value).toFixed(2);
+            document.getElementById('bottomScaleVal').textContent = parseFloat(document.getElementById('bottomScale').value).toFixed(2);
+            document.getElementById('topOffsetYVal').textContent = document.getElementById('topOffsetY').value + 'px';
+            document.getElementById('bottomOffsetYVal').textContent = document.getElementById('bottomOffsetY').value + 'px';
         }
 
         // ===== EXPORT/IMPORT =====
@@ -1103,7 +1345,13 @@
                     scaleX: document.getElementById('scaleX').value,
                     scaleY: document.getElementById('scaleY').value,
                     rotation: document.getElementById('rotation').value,
-                    opacity: document.getElementById('opacity').value
+                    opacity: document.getElementById('opacity').value,
+                    offsetX: document.getElementById('offsetX').value,
+                    offsetY: document.getElementById('offsetY').value,
+                    topScale: document.getElementById('topScale').value,
+                    bottomScale: document.getElementById('bottomScale').value,
+                    topOffsetY: document.getElementById('topOffsetY').value,
+                    bottomOffsetY: document.getElementById('bottomOffsetY').value
                 }
             };
             

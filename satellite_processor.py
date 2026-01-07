@@ -44,31 +44,41 @@ print(f"📏 Raio: {RADIUS_NM} NM ({RADIUS_DEG:.2f}°)")
 print(f"📦 BBOX: {BBOX}")
 
 # =========================================================================
-# BOUNDS DO SETOR SSA (South America) - GOES-19
+# PARÂMETROS DA PROJEÇÃO GEOESTACIONÁRIA GOES-19
 # =========================================================================
-# Bounds calculados empiricamente a partir da imagem JPG do CDN STAR/NOAA
-# A imagem SSA é reprojetada para coordenadas geográficas (lat/lon)
-# Dimensões: 7200 x 4320 pixels
-# Aspect ratio: 1.6667 (125°/75° = 7200/4320)
+# Valores extraídos do NetCDF oficial da NOAA (ABI L2 CMI)
+# A imagem SSA usa projeção geoestacionária, NÃO lat/lon linear!
 
-SSA_BOUNDS = {
-    "lat_north": -12.0,     # Norte: 12°S (inclui Salvador, Lima)
-    "lat_south": -72.0,     # Sul: 72°S (inclui Antártica)
-    "lon_west": -96.0,      # Oeste: 96°W (Oceano Pacífico)
-    "lon_east": 4.0,        # Leste: 4°E (Oceano Atlântico)
+GOES_PARAMS = {
+    "H": 35786023.0,           # Altura do satélite em metros
+    "r_eq": 6378137.0,         # Raio equatorial da Terra em metros
+    "r_pol": 6356752.31414,    # Raio polar da Terra em metros
+    "lon_0": -75.0,            # Longitude do ponto sub-satélite em graus
+}
+
+# Scan angles da imagem SSA (em radianos)
+# Calculados usando conversão lat/lon -> scan angle:
+# Topo: -12° lat -> y ≈ -0.036
+# Base: -70° lat -> y ≈ -0.147 (depois é espaço)
+SSA_SCAN_ANGLES = {
+    "x_min": -0.035,    # Oeste (radianos)
+    "x_max": 0.125,     # Leste (radianos)
+    "y_min": -0.147,    # Sul - ~70°S (radianos)
+    "y_max": -0.036,    # Norte - ~12°S (radianos)
 }
 
 # Dimensões da imagem SSA original
 SSA_WIDTH = 7200
 SSA_HEIGHT = 4320
 
-# Resolução em graus por pixel
-SSA_RES_LAT = (SSA_BOUNDS["lat_north"] - SSA_BOUNDS["lat_south"]) / SSA_HEIGHT  # ~0.0169°/px
-SSA_RES_LON = (SSA_BOUNDS["lon_east"] - SSA_BOUNDS["lon_west"]) / SSA_WIDTH     # ~0.0169°/px
+# Resolução em radianos por pixel
+SSA_RES_X = (SSA_SCAN_ANGLES["x_max"] - SSA_SCAN_ANGLES["x_min"]) / SSA_WIDTH
+SSA_RES_Y = (SSA_SCAN_ANGLES["y_max"] - SSA_SCAN_ANGLES["y_min"]) / SSA_HEIGHT
 
-print(f"📐 SSA Bounds: Lat [{SSA_BOUNDS['lat_south']}° a {SSA_BOUNDS['lat_north']}°]")
-print(f"              Lon [{SSA_BOUNDS['lon_west']}° a {SSA_BOUNDS['lon_east']}°]")
-print(f"📏 Resolução: {SSA_RES_LAT:.4f}°/px x {SSA_RES_LON:.4f}°/px (~1.9 km/px)")
+print(f"🛰️ GOES-19 Geostationary Projection")
+print(f"📐 Scan Angles: X [{SSA_SCAN_ANGLES['x_min']:.3f}, {SSA_SCAN_ANGLES['x_max']:.3f}] rad")
+print(f"              Y [{SSA_SCAN_ANGLES['y_min']:.3f}, {SSA_SCAN_ANGLES['y_max']:.3f}] rad")
+print(f"📏 Resolução: {np.degrees(SSA_RES_X)*3600:.2f} arcsec/px x {np.degrees(SSA_RES_Y)*3600:.2f} arcsec/px")
 
 
 def download_goes_image():
@@ -92,63 +102,132 @@ def download_goes_image():
     return None, None
 
 
-def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
+def latlon_to_scan(lat, lon):
     """
-    Converte lat/lon para coordenadas de pixel na imagem SSA.
-    A imagem SSA usa projeção equirectangular (lat/lon linear).
+    Converte lat/lon para coordenadas de scan (radianos) da projeção geoestacionária.
+    Baseado no GOES-R Product User's Guide (PUG).
     
     Args:
-        lat: Latitude em graus (-58 a 15 para SSA)
-        lon: Longitude em graus (-116.83 a 4.83 para SSA)
+        lat: Latitude em graus
+        lon: Longitude em graus
+        
+    Returns:
+        (x_rad, y_rad): Coordenadas de scan em radianos
+    """
+    H = GOES_PARAMS["H"]
+    r_eq = GOES_PARAMS["r_eq"]
+    r_pol = GOES_PARAMS["r_pol"]
+    lon_0 = GOES_PARAMS["lon_0"]
+    
+    lat_rad = np.radians(lat)
+    lon_rad = np.radians(lon - lon_0)
+    
+    # Raio geocêntrico
+    r_c = r_eq / np.sqrt(1 + ((r_eq**2 - r_pol**2) / r_pol**2) * np.sin(lat_rad)**2)
+    
+    # Coordenadas geocêntricas
+    s_x = (H + r_eq) - r_c * np.cos(lat_rad) * np.cos(lon_rad)
+    s_y = -r_c * np.cos(lat_rad) * np.sin(lon_rad)
+    s_z = r_c * (r_pol/r_eq)**2 * np.sin(lat_rad)
+    
+    # Scan angles
+    x_rad = np.arcsin(-s_y / np.sqrt(s_x**2 + s_y**2 + s_z**2))
+    y_rad = np.arctan(s_z / s_x)
+    
+    return x_rad, y_rad
+
+
+def scan_to_latlon(x_rad, y_rad):
+    """
+    Converte coordenadas de scan (radianos) para lat/lon.
+    Baseado no GOES-R Product User's Guide (PUG).
+    
+    Args:
+        x_rad, y_rad: Coordenadas de scan em radianos
+        
+    Returns:
+        (lat, lon): Coordenadas em graus, ou (NaN, NaN) se fora da Terra
+    """
+    H = GOES_PARAMS["H"]
+    r_eq = GOES_PARAMS["r_eq"]
+    r_pol = GOES_PARAMS["r_pol"]
+    lon_0 = GOES_PARAMS["lon_0"]
+    
+    # Calcular discriminante para verificar se o ponto está na Terra
+    a = np.sin(x_rad)**2 + np.cos(x_rad)**2 * (np.cos(y_rad)**2 + (r_eq/r_pol)**2 * np.sin(y_rad)**2)
+    b = -2 * (H + r_eq) * np.cos(x_rad) * np.cos(y_rad)
+    c = (H + r_eq)**2 - r_eq**2
+    
+    discriminant = b**2 - 4*a*c
+    
+    if discriminant < 0:
+        return np.nan, np.nan  # Ponto está no espaço
+    
+    # Distância do satélite ao ponto
+    rs = (-b - np.sqrt(discriminant)) / (2*a)
+    
+    # Coordenadas do ponto
+    sx = rs * np.cos(x_rad) * np.cos(y_rad)
+    sy = -rs * np.sin(x_rad)
+    sz = rs * np.cos(x_rad) * np.sin(y_rad)
+    
+    # Latitude geodésica
+    lat = np.degrees(np.arctan((r_eq/r_pol)**2 * sz / np.sqrt((H + r_eq - sx)**2 + sy**2)))
+    
+    # Longitude
+    lon = lon_0 - np.degrees(np.arctan(sy / (H + r_eq - sx)))
+    
+    return lat, lon
+
+
+def latlon_to_pixel(lat, lon, img_width=SSA_WIDTH, img_height=SSA_HEIGHT, bounds=None):
+    """
+    Converte lat/lon para coordenadas de pixel na imagem SSA.
+    Usa projeção geoestacionária (scan angles em radianos).
+    
+    Args:
+        lat: Latitude em graus
+        lon: Longitude em graus
         img_width: Largura da imagem em pixels
         img_height: Altura da imagem em pixels
-        bounds: Dicionário com lat_north, lat_south, lon_west, lon_east
+        bounds: Ignorado (mantido por compatibilidade)
     
     Returns:
         (x, y): Coordenadas do pixel
     """
-    # Usar nomes corretos das chaves
-    lon_west = bounds.get("lon_west", bounds.get("lon_min"))
-    lon_east = bounds.get("lon_east", bounds.get("lon_max"))
-    lat_north = bounds.get("lat_north", bounds.get("lat_max"))
-    lat_south = bounds.get("lat_south", bounds.get("lat_min"))
+    # Converter lat/lon para scan angles
+    x_rad, y_rad = latlon_to_scan(lat, lon)
     
-    # Normalizar para 0-1
-    x_norm = (lon - lon_west) / (lon_east - lon_west)
-    y_norm = (lat_north - lat) / (lat_north - lat_south)
-    
-    # Converter para pixels
-    x = int(x_norm * img_width)
-    y = int(y_norm * img_height)
+    # Converter scan angles para pixels
+    # X: linear de x_min para x_max
+    x = int((x_rad - SSA_SCAN_ANGLES["x_min"]) / SSA_RES_X)
+    # Y: y_max é menos negativo (topo), y_min é mais negativo (base)
+    # Pixel 0 = topo (y_max), Pixel H = base (y_min)
+    y = int((SSA_SCAN_ANGLES["y_max"] - y_rad) / SSA_RES_Y)
     
     return x, y
 
 
-def pixel_to_latlon(x, y, img_width, img_height, bounds):
+def pixel_to_latlon(x, y, img_width=SSA_WIDTH, img_height=SSA_HEIGHT, bounds=None):
     """
     Converte coordenadas de pixel para lat/lon.
-    A imagem SSA usa projeção equirectangular (lat/lon linear).
+    Usa projeção geoestacionária (scan angles em radianos).
     
     Args:
         x, y: Coordenadas do pixel
         img_width: Largura da imagem em pixels
         img_height: Altura da imagem em pixels
-        bounds: Dicionário com lat_north, lat_south, lon_west, lon_east
+        bounds: Ignorado (mantido por compatibilidade)
     
     Returns:
-        (lat, lon): Coordenadas geográficas em graus
+        (lat, lon): Coordenadas geográficas em graus, ou (NaN, NaN) se no espaço
     """
-    # Usar nomes corretos das chaves
-    lon_west = bounds.get("lon_west", bounds.get("lon_min"))
-    lon_east = bounds.get("lon_east", bounds.get("lon_max"))
-    lat_north = bounds.get("lat_north", bounds.get("lat_max"))
-    lat_south = bounds.get("lat_south", bounds.get("lat_min"))
+    # Converter pixels para scan angles
+    x_rad = SSA_SCAN_ANGLES["x_min"] + x * SSA_RES_X
+    y_rad = SSA_SCAN_ANGLES["y_max"] - y * SSA_RES_Y
     
-    x_norm = x / img_width
-    y_norm = y / img_height
-    
-    lon = lon_west + x_norm * (lon_east - lon_west)
-    lat = lat_north - y_norm * (lat_north - lat_south)
+    # Converter scan angles para lat/lon
+    lat, lon = scan_to_latlon(x_rad, y_rad)
     
     return lat, lon
 
@@ -172,11 +251,9 @@ def extract_region(image_data, center_lat, center_lon, radius_deg, output_size=5
             "lon_max": center_lon + radius_deg,
         }
         
-        # Converter corners para pixels
-        x1, y1 = latlon_to_pixel(roi_bounds["lat_max"], roi_bounds["lon_min"], 
-                                  img_width, img_height, SSA_BOUNDS)
-        x2, y2 = latlon_to_pixel(roi_bounds["lat_min"], roi_bounds["lon_max"], 
-                                  img_width, img_height, SSA_BOUNDS)
+        # Converter corners para pixels (usando projeção geoestacionária)
+        x1, y1 = latlon_to_pixel(roi_bounds["lat_max"], roi_bounds["lon_min"])
+        x2, y2 = latlon_to_pixel(roi_bounds["lat_min"], roi_bounds["lon_max"])
         
         # Garantir que está dentro da imagem
         x1 = max(0, min(x1, img_width - 1))
