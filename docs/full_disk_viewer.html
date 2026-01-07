@@ -203,8 +203,8 @@
         <div class="control-group">
             <label>🔧 Método de Reprojeção</label>
             <select id="method">
+                <option value="reproject" selected>Reprojeção REAL</option>
                 <option value="direct">Direto (SEM reprojeção)</option>
-                <option value="reproject">Reprojeção REAL</option>
             </select>
         </div>
         
@@ -355,7 +355,7 @@
                 
                 // Adicionar ao mapa
                 if (overlay) map.removeLayer(overlay);
-                const bounds = [[-81, -156], [81, 6]];
+                const bounds = [[-60, -90], [15, -25]];
                 overlay = L.imageOverlay(dataUrl1, bounds, {opacity: 0.8}).addTo(map);
                 debugLog('✅ TESTE 1 OK: Overlay canvas vermelho adicionado!');
                 
@@ -367,24 +367,14 @@
                 const img = await loadImg(imgUrl + '?t=' + Date.now());
                 debugLog('Imagem carregada: ' + img.width + 'x' + img.height);
                 
-                // TESTE 3: Reprojetar imagem
-                debugLog('TESTE 3: Reprojetando para canvas...');
-                const canvas2 = document.createElement('canvas');
-                canvas2.width = 600;
-                canvas2.height = 600;
-                const ctx2 = canvas2.getContext('2d');
+                // TESTE 3: Fazer reprojeção simples
+                debugLog('TESTE 3: Iniciando reprojeção...');
                 
-                // Desenhar imagem redimensionada
-                ctx2.drawImage(img, 0, 0, 600, 600);
-                debugLog('drawImage OK');
-                
-                const dataUrl2 = canvas2.toDataURL('image/png');
-                debugLog('toDataURL OK, length: ' + dataUrl2.length);
-                
-                // Adicionar ao mapa
-                map.removeLayer(overlay);
-                overlay = L.imageOverlay(dataUrl2, bounds, {opacity: 0.75}).addTo(map);
-                debugLog('✅ TESTE 3 OK: Overlay com imagem reprojetada!');
+                // Usar a função loadImage diretamente
+                document.getElementById('satellite').value = 'goes19';
+                document.getElementById('imageType').value = 'fd';
+                document.getElementById('method').value = 'reproject';
+                await loadImage();
                 
                 debugLog('=== TODOS OS TESTES OK! ===');
                 
@@ -415,12 +405,12 @@
                 east: null
             },
             fd: {
-                // Bounds visíveis do satélite GOES-East Full Disk
-                // Disco completo cobre aproximadamente 81° em cada direção do ponto subsatélite
-                north: 81,
-                south: -81,
-                west: -156,  // -75 - 81
-                east: 6      // -75 + 81
+                // Bounds para visualização focada na América do Sul
+                // A reprojeção vai mapear a área visível do satélite para esta região
+                north: 15,
+                south: -60,
+                west: -90,
+                east: -25
             }
         };
         
@@ -577,10 +567,10 @@
                 console.log('✅ Imagem carregada:', img.width, 'x', img.height);
                 setProgress(50);
                 
-                showLoading('Reprojetando (simplificado)...');
+                showLoading('Reprojetando para Plate Carrée...');
                 
-                // Criar canvas MENOR para testar
-                const outWidth = 800;  // MUITO menor para testar
+                // Canvas de saída - maior resolução para qualidade
+                const outWidth = 1200;
                 const outHeight = Math.round(outWidth * (bounds.north - bounds.south) / (bounds.east - bounds.west));
                 console.log('📏 Canvas saída:', outWidth, 'x', outHeight);
                 
@@ -601,101 +591,81 @@
                 // Canvas destino
                 const outData = ctx.createImageData(outWidth, outHeight);
                 
-                // Parâmetros de reprojeção
-                // GOES-East (GOES-16 ou GOES-19) está em -75.0° W
-                const sat_lon = (sat === 'goes16' || sat === 'goes19') ? -75.0 : -75.0;
+                // GOES-East está em -75.0° W
+                const sat_lon = -75.0;
                 console.log('🛰️ Satélite longitude:', sat_lon);
             
-            // Processar pixel a pixel
-            // Para imagens Full Disk GEOCOLOR da NOAA STAR:
-            // O disco da Terra ocupa toda a imagem (inscrito no quadrado)
-            // Raio angular do limbo terrestre visto do GOES: ~8.7° = 0.1518 rad
-            
-            // O disco da Terra ocupa praticamente toda a imagem
-            // Então scanMax corresponde a metade da dimensão da imagem
-            const scanMax = 0.1518;  // Raio angular do disco em radianos
+            // Parâmetros da imagem Full Disk GEOCOLOR
+            // O disco terrestre ocupa a maior parte da imagem quadrada
+            // Raio angular do limbo: ~8.7° = 0.1518 rad
+            const scanMax = 0.1518;
             const imgRadius = Math.min(img.width, img.height) / 2;
-            const scale = imgRadius / scanMax;  // pixels por radiano
+            const scale = imgRadius / scanMax;
             const centerX = img.width / 2;
             const centerY = img.height / 2;
             
             console.log('🎯 Reprojeção params:', {scanMax, imgRadius, scale, centerX, centerY});
             
-            let pixelsProcessed = 0;
             let pixelsVisible = 0;
-            let firstScan = null;
             
-            console.log('🔄 Iniciando loop de reprojeção...');
+            console.log('🔄 Iniciando reprojeção pixel a pixel...');
             
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
-                    // Lat/lon do pixel de saída
+                    // Coordenadas geográficas do pixel de saída (Plate Carrée)
                     const lon = bounds.west + (x / outWidth) * (bounds.east - bounds.west);
                     const lat = bounds.north - (y / outHeight) * (bounds.north - bounds.south);
                     
-                    pixelsProcessed++;
-                    
-                    // Calcular posição na imagem fonte
-                    let srcX, srcY;
-                    
-                    // Para Full Disk, usar projeção geoestacionária
+                    // Converter lat/lon para coordenadas de scan do satélite
                     const scan = latLonToScan(lat, lon, sat_lon);
-                    if (!scan) {
-                        continue; // Pular pixel invisível (fora do disco)
-                    }
+                    if (!scan) continue; // Ponto fora da visão do satélite
                     
-                    // Log primeiro scan válido
-                    if (!firstScan) {
-                        firstScan = {lat, lon, scan, x, y};
-                        console.log('🎯 Primeiro pixel válido:', firstScan);
-                    }
+                    // Mapear coordenadas de scan para pixels da imagem fonte
+                    const srcX = centerX + scan.x * scale;
+                    const srcY = centerY - scan.y * scale;
                     
-                    srcX = centerX + scan.x * scale;
-                    srcY = centerY - scan.y * scale;
-                    pixelsVisible++;
+                    // Verificar limites
+                    if (srcX < 0 || srcX >= img.width - 1 || srcY < 0 || srcY >= img.height - 1) continue;
                     
-                    if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
-                        continue;
-                    }
+                    // Interpolação bilinear para qualidade
+                    const pixel = bilinear(srcData, srcX, srcY);
                     
-                    // Nearest neighbor simples
-                    const sx = Math.floor(srcX);
-                    const sy = Math.floor(srcY);
-                    const srcIdx = (sy * img.width + sx) * 4;
                     const idx = (y * outWidth + x) * 4;
-                    
-                    outData.data[idx] = srcData.data[srcIdx];
-                    outData.data[idx + 1] = srcData.data[srcIdx + 1];
-                    outData.data[idx + 2] = srcData.data[srcIdx + 2];
+                    outData.data[idx] = pixel.r;
+                    outData.data[idx + 1] = pixel.g;
+                    outData.data[idx + 2] = pixel.b;
                     outData.data[idx + 3] = 255;
+                    pixelsVisible++;
                 }
                 
-                // Atualizar progresso e log
-                if (y % 100 === 0) {
-                    console.log(`⏳ Processando linha ${y}/${outHeight}`);
-                    setProgress(50 + (y / outHeight) * 40);
-                    await sleep(1); // Dar um respiro pro browser
+                // Atualizar progresso
+                if (y % 50 === 0) {
+                    setProgress(50 + (y / outHeight) * 45);
+                    await sleep(1);
                 }
             }
             
-            console.log('📊 Reprojeção completa:', {pixelsProcessed, pixelsVisible, ratio: (pixelsVisible/pixelsProcessed*100).toFixed(1) + '%'});
+            console.log('📊 Reprojeção completa:', pixelsVisible, 'pixels reprojetados');
             
             ctx.putImageData(outData, 0, 0);
-            console.log('✅ putImageData done');
             
             // Criar overlay
             const dataUrl = canvas.toDataURL('image/png');
-            console.log('✅ toDataURL done, length:', dataUrl.length);
+            console.log('✅ Imagem reprojetada, tamanho:', dataUrl.length);
+            
             const leafletBounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]];
             
             overlay = L.imageOverlay(dataUrl, leafletBounds, {
                 opacity: document.getElementById('opacity').value / 100
             }).addTo(map);
             
+            // Centralizar no Brasil
+            map.fitBounds(leafletBounds);
+            
             console.log('✅ Overlay adicionado ao mapa!');
             
             } catch (err) {
-                console.error('❌ ERRO FATAL em loadWithReprojection:', err);
+                console.error('❌ ERRO em loadWithReprojection:', err);
                 throw err;
             }
         }
