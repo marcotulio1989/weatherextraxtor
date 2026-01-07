@@ -264,7 +264,6 @@
         
         // Bounds de saída para reprojeção
         // GOES-East está em -75.2° de longitude
-        // Visibilidade: aproximadamente ±75° do ponto subsatélite
         const BOUNDS = {
             ssa: {
                 // Bounds da imagem SSA calibrados
@@ -274,12 +273,15 @@
                 east: -15
             },
             fd: {
-                // Full Disk focado na América do Sul
-                // Latitude: 0° a -55°
-                north: 0,
-                south: -55,
-                west: -90,
-                east: -25
+                // Extremidades do Brasil (com margem)
+                // Norte: Monte Caburaí (5.27°N) → 6°
+                // Sul: Arroio Chuí (-33.75°) → -35°
+                // Oeste: Serra Contamana (-73.98°) → -75°
+                // Leste: Ponta do Seixas (-34.79°) → -34°
+                north: 6,
+                south: -35,
+                west: -75,
+                east: -34
             }
         };
         
