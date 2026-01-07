@@ -455,9 +455,17 @@
             const outData = ctx.createImageData(outWidth, outHeight);
             
             // Parâmetros de reprojeção
-            const sat_lon = -75.2; // Longitude do GOES-East
+            // GOES-East (GOES-16 ou GOES-19) está em -75.0° W
+            const sat_lon = (sat === 'goes16' || sat === 'goes19') ? -75.0 : -75.0;
             
             // Processar pixel a pixel
+            // Para imagens Full Disk GEOCOLOR da NOAA STAR:
+            // O disco da Terra fica inscrito na imagem quadrada
+            // Raio angular do disco: ~8.7° = 0.151844 rad do centro
+            // Mas a imagem pode ter um pequeno padding adicional
+            // O fator 0.1518 rad representa o limite do disco visível
+            const scanMax = 0.1518;  // Limite do disco em radianos
+            
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
                     // Lat/lon do pixel de saída
@@ -480,14 +488,28 @@
                             outData.data[idx + 3] = 0; // Transparente
                             continue;
                         }
-                        // Full Disk NOAA:
-                        // - Imagem quadrada com Terra no centro
-                        // - y=0 é o NORTE (topo), y=max é o SUL (fundo)
-                        // - x=0 é o OESTE (esquerda), x=max é o LESTE (direita)
-                        // scan.x: negativo=oeste, positivo=leste
-                        // scan.y: negativo=sul, positivo=norte
-                        srcX = ((scan.x + 0.151844) / (2 * 0.151844)) * img.width;
-                        srcY = ((0.151844 - scan.y) / (2 * 0.151844)) * img.height;
+                        
+                        // Full Disk NOAA GEOCOLOR:
+                        // - Imagem quadrada (tipicamente 5424x5424 px)
+                        // - O disco da Terra está inscrito na imagem
+                        // - Centro da imagem (img.width/2, img.height/2) = nadir do satélite (lat=0, lon=sat_lon)
+                        // - scan.x: ângulo horizontal (positivo = leste)
+                        // - scan.y: ângulo vertical (positivo = norte)
+                        
+                        // Converter coordenadas de scan para pixels
+                        // O raio do disco em pixels é aproximadamente metade da dimensão da imagem
+                        const diskRadius = Math.min(img.width, img.height) / 2;
+                        const centerX = img.width / 2;
+                        const centerY = img.height / 2;
+                        
+                        // Escala: scanMax rad corresponde ao raio do disco em pixels
+                        const scale = diskRadius / scanMax;
+                        
+                        // Mapear scan para pixel
+                        // x positivo = leste = direita na imagem
+                        // y positivo = norte = topo = y menor
+                        srcX = centerX + scan.x * scale;
+                        srcY = centerY - scan.y * scale;
                     }
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
@@ -538,41 +560,60 @@
         // =========================================================
         
         function latLonToScan(lat, lon, sat_lon) {
-            // Converte lat/lon para coordenadas de scan do GOES
-            // Baseado no GOES-R PUG (Product User's Guide)
-            const H = 42164160.0;  // Distância satélite-centro da Terra (m)
-            const r_eq = 6378137.0;
-            const r_pol = 6356752.31414;
+            // Converte lat/lon geodésico para coordenadas de scan (x,y) do GOES-R ABI
+            // Referência: GOES-R PUG Volume 3, Appendix H
+            // 
+            // A projeção geoestacionária funciona assim:
+            // - O satélite está a uma altura fixa sobre o equador
+            // - Cada pixel na imagem corresponde a um ângulo de visada
+            // - x = ângulo horizontal (leste-oeste)
+            // - y = ângulo vertical (norte-sul)
             
-            const lat_rad = lat * Math.PI / 180;
-            const lon_rad = (lon - sat_lon) * Math.PI / 180;
+            // Constantes GOES-R
+            const DEG = Math.PI / 180;
+            const H = 42164160.0;     // Altitude do satélite + raio da Terra (m)
+            const r_eq = 6378137.0;   // Raio equatorial (m)
+            const r_pol = 6356752.31414; // Raio polar (m)
+            const f = (r_eq - r_pol) / r_eq;  // Achatamento
             
-            const cos_lat = Math.cos(lat_rad);
-            const sin_lat = Math.sin(lat_rad);
+            // Converter para radianos
+            const phi = lat * DEG;   // Latitude geodésica
+            const lambda = lon * DEG;
+            const lambda_0 = sat_lon * DEG;  // Longitude do satélite
             
-            // Raio geocêntrico
-            const r_geo = r_eq * r_pol / Math.sqrt(
-                r_pol * r_pol * cos_lat * cos_lat + 
-                r_eq * r_eq * sin_lat * sin_lat
-            );
+            // Latitude geocêntrica (corrigir para elipsóide)
+            const phi_c = Math.atan(Math.tan(phi) * (1 - f) * (1 - f));
             
-            // Vetor do satélite ao ponto na Terra
-            const r_1 = H - r_geo * cos_lat * Math.cos(lon_rad);
-            const r_2 = -r_geo * cos_lat * Math.sin(lon_rad);
-            const r_3 = r_geo * sin_lat;
+            // Raio geocêntrico no ponto
+            const cos_phi_c = Math.cos(phi_c);
+            const sin_phi_c = Math.sin(phi_c);
+            const r_c = r_pol / Math.sqrt(1 - (1 - (r_pol/r_eq)*(r_pol/r_eq)) * cos_phi_c * cos_phi_c);
             
-            // Verificar se ponto está visível
-            if (r_1 > H) return null;
+            // Vetor do centro da Terra ao ponto (em coordenadas do satélite)
+            // x: aponta para o satélite
+            // y: aponta para leste
+            // z: aponta para norte
+            const delta_lambda = lambda - lambda_0;
             
-            const r_n = Math.sqrt(r_1*r_1 + r_2*r_2 + r_3*r_3);
+            const s_x = H - r_c * cos_phi_c * Math.cos(delta_lambda);
+            const s_y = -r_c * cos_phi_c * Math.sin(delta_lambda);
+            const s_z = r_c * sin_phi_c;
             
-            // Coordenadas de scan
-            // x: ângulo leste-oeste (positivo = leste)
-            // y: ângulo norte-sul (positivo = norte na nossa convenção)
-            const x = Math.atan2(-r_2, r_1);
-            const y = Math.asin(r_3 / r_n);  // CORRIGIDO: sem negativo
+            // Verificar se o ponto está visível do satélite
+            // (não está atrás da Terra)
+            const check = s_x * (s_x - H) + s_y * s_y + (s_z * s_z * r_eq * r_eq) / (r_pol * r_pol);
+            if (check > 0) {
+                return null;  // Ponto não visível
+            }
             
-            if (Math.abs(x) > 0.151844 || Math.abs(y) > 0.151844) return null;
+            // Distância do satélite ao ponto
+            const s_n = Math.sqrt(s_x * s_x + s_y * s_y + s_z * s_z);
+            
+            // Coordenadas de scan (ângulos de visada)
+            // x: ângulo horizontal - positivo para leste
+            // y: ângulo vertical - positivo para norte
+            const x = Math.asin(-s_y / s_n);
+            const y = Math.atan2(s_z, s_x);
             
             return { x, y };
         }
