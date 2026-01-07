@@ -460,11 +460,8 @@
             
             // Processar pixel a pixel
             // Para imagens Full Disk GEOCOLOR da NOAA STAR:
-            // O disco da Terra fica inscrito na imagem quadrada
-            // Raio angular do disco: ~8.7° = 0.151844 rad do centro
-            // Mas a imagem pode ter um pequeno padding adicional
-            // O fator 0.1518 rad representa o limite do disco visível
-            const scanMax = 0.1518;  // Limite do disco em radianos
+            // Imagem 5424x5424 usa escala de 56 µrad/pixel
+            // O disco terrestre fica inscrito com algum padding
             
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
@@ -489,27 +486,23 @@
                             continue;
                         }
                         
-                        // Full Disk NOAA GEOCOLOR:
-                        // - Imagem quadrada (tipicamente 5424x5424 px)
-                        // - O disco da Terra está inscrito na imagem
-                        // - Centro da imagem (img.width/2, img.height/2) = nadir do satélite (lat=0, lon=sat_lon)
-                        // - scan.x: ângulo horizontal (positivo = leste)
-                        // - scan.y: ângulo vertical (positivo = norte)
+                        // Imagens GEOCOLOR da NOAA STAR usam grid fixo ABI
+                        // A escala é 56 µrad/pixel para Full Disk 2km
+                        // Total: 5424 pixels x 56 µrad = 0.303744 rad de extensão total
+                        // Centro da imagem = (2712, 2712) = nadir
                         
-                        // Converter coordenadas de scan para pixels
-                        // O raio do disco em pixels é aproximadamente metade da dimensão da imagem
-                        const diskRadius = Math.min(img.width, img.height) / 2;
+                        // Escala em radianos por pixel
+                        const scale_rad_per_px = 0.000056;  // 56 µrad
+                        
+                        // Centro da imagem
                         const centerX = img.width / 2;
                         const centerY = img.height / 2;
                         
-                        // Escala: scanMax rad corresponde ao raio do disco em pixels
-                        const scale = diskRadius / scanMax;
-                        
-                        // Mapear scan para pixel
-                        // x positivo = leste = direita na imagem
-                        // y positivo = norte = topo = y menor
-                        srcX = centerX + scan.x * scale;
-                        srcY = centerY - scan.y * scale;
+                        // Converter ângulos de scan para pixels
+                        // scan.x positivo = leste = direita = srcX maior
+                        // scan.y positivo = norte = cima = srcY menor
+                        srcX = centerX + (scan.x / scale_rad_per_px);
+                        srcY = centerY - (scan.y / scale_rad_per_px);
                     }
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
@@ -556,67 +549,61 @@
         }
         
         // =========================================================
-        // FUNÇÕES DE PROJEÇÃO
+        // FUNÇÕES DE PROJEÇÃO - GOES-R ABI Fixed Grid
+        // Referência: GOES-R PUG Volume 3, L1b Products
         // =========================================================
         
         function latLonToScan(lat, lon, sat_lon) {
-            // Converte lat/lon geodésico para coordenadas de scan (x,y) do GOES-R ABI
-            // Referência: GOES-R PUG Volume 3, Appendix H
-            // 
-            // A projeção geoestacionária funciona assim:
-            // - O satélite está a uma altura fixa sobre o equador
-            // - Cada pixel na imagem corresponde a um ângulo de visada
-            // - x = ângulo horizontal (leste-oeste)
-            // - y = ângulo vertical (norte-sul)
+            // Converte lat/lon para coordenadas de scan do GOES-R ABI
+            // Baseado exatamente no GOES-R PUG Volume 3
             
-            // Constantes GOES-R
-            const DEG = Math.PI / 180;
-            const H = 42164160.0;     // Altitude do satélite + raio da Terra (m)
-            const r_eq = 6378137.0;   // Raio equatorial (m)
-            const r_pol = 6356752.31414; // Raio polar (m)
-            const f = (r_eq - r_pol) / r_eq;  // Achatamento
+            const DEG2RAD = Math.PI / 180;
             
-            // Converter para radianos
-            const phi = lat * DEG;   // Latitude geodésica
-            const lambda = lon * DEG;
-            const lambda_0 = sat_lon * DEG;  // Longitude do satélite
+            // Constantes GRS80/WGS84
+            const req = 6378137.0;           // Raio equatorial (m)
+            const rpol = 6356752.31414;      // Raio polar (m)
+            const H = 42164160.0;            // Distância satélite ao centro da Terra (m)
+            const e2 = 1 - (rpol * rpol) / (req * req);  // Excentricidade ao quadrado
             
-            // Latitude geocêntrica (corrigir para elipsóide)
-            const phi_c = Math.atan(Math.tan(phi) * (1 - f) * (1 - f));
+            const lat_rad = lat * DEG2RAD;
+            const lon_rad = lon * DEG2RAD;
+            const sat_lon_rad = sat_lon * DEG2RAD;
             
-            // Raio geocêntrico no ponto
-            const cos_phi_c = Math.cos(phi_c);
-            const sin_phi_c = Math.sin(phi_c);
-            const r_c = r_pol / Math.sqrt(1 - (1 - (r_pol/r_eq)*(r_pol/r_eq)) * cos_phi_c * cos_phi_c);
+            // Latitude geocêntrica
+            const lat_geo = Math.atan((rpol * rpol / (req * req)) * Math.tan(lat_rad));
             
-            // Vetor do centro da Terra ao ponto (em coordenadas do satélite)
-            // x: aponta para o satélite
-            // y: aponta para leste
-            // z: aponta para norte
-            const delta_lambda = lambda - lambda_0;
+            // Raio geocêntrico
+            const rc = rpol / Math.sqrt(1 - e2 * Math.cos(lat_geo) * Math.cos(lat_geo));
             
-            const s_x = H - r_c * cos_phi_c * Math.cos(delta_lambda);
-            const s_y = -r_c * cos_phi_c * Math.sin(delta_lambda);
-            const s_z = r_c * sin_phi_c;
+            // Diferença de longitude
+            const dlon = lon_rad - sat_lon_rad;
             
-            // Verificar se o ponto está visível do satélite
-            // (não está atrás da Terra)
-            const check = s_x * (s_x - H) + s_y * s_y + (s_z * s_z * r_eq * r_eq) / (r_pol * r_pol);
-            if (check > 0) {
-                return null;  // Ponto não visível
-            }
+            // Coordenadas do ponto vistas do satélite
+            const sx = H - rc * Math.cos(lat_geo) * Math.cos(dlon);
+            const sy = -rc * Math.cos(lat_geo) * Math.sin(dlon);
+            const sz = rc * Math.sin(lat_geo);
             
-            // Distância do satélite ao ponto
-            const s_n = Math.sqrt(s_x * s_x + s_y * s_y + s_z * s_z);
+            // Verificar visibilidade
+            const sn_sq = sx * sx + sy * sy + sz * sz;
+            const vis_check = H * (H - sx) - sn_sq;
+            if (vis_check < 0) return null;
             
-            // Coordenadas de scan (ângulos de visada)
-            // x: ângulo horizontal - positivo para leste
-            // y: ângulo vertical - positivo para norte
-            const x = Math.asin(-s_y / s_n);
-            const y = Math.atan2(s_z, s_x);
+            const sn = Math.sqrt(sn_sq);
+            
+            // Ângulos de scan
+            // x (lambda): ângulo leste-oeste, positivo para leste do satélite
+            // y (theta): ângulo norte-sul, positivo para norte
+            const x = Math.asin(-sy / sn);
+            const y = Math.atan(sz / sx);
             
             return { x, y };
         }
+        
+        // Parâmetros da imagem Full Disk NOAA STAR GEOCOLOR
+        // A imagem 5424x5424 usa uma escala de 56 microradianos por pixel
+        // O centro da imagem corresponde ao nadir (lat=0, lon=sat_lon)
+        const GOES_SCALE = 0.000056;  // 56 µrad por pixel
+        const GOES_FD_SIZE = 5424;    // Pixels na imagem Full Disk
         
         function bilinear(srcData, x, y) {
             const x0 = Math.floor(x);
