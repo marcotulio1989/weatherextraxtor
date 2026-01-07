@@ -882,6 +882,15 @@
         }
 
         function handleTouchStart(e) {
+            // NÃO prevenir default se tocou em um botão ou input
+            const target = e.target;
+            if (target.tagName === 'BUTTON' || target.tagName === 'INPUT' || 
+                target.tagName === 'SELECT' || target.tagName === 'OPTION' ||
+                target.closest('.zoom-controls') || target.closest('.control-panel')) {
+                // Deixar o evento acontecer normalmente
+                return;
+            }
+            
             e.preventDefault();
             
             const touches = e.touches;
@@ -933,6 +942,11 @@
         }
 
         function handleTouchMove(e) {
+            // Só prevenir default se estamos em um modo de interação ativo
+            if (!touchState.isPanning && !touchState.isPinching && !isDragging) {
+                return;
+            }
+            
             e.preventDefault();
             
             const touches = e.touches;
