@@ -339,38 +339,6 @@
                 </div>
             </div>
 
-            <!-- NOVO: Cantos Arrastáveis -->
-            <div class="control-section">
-                <h3>📍 Cantos da Imagem (ARRASTE NO MAPA!)</h3>
-                <div class="instructions highlight">
-                    <b>ARRASTE os 4 marcadores coloridos</b> no mapa para definir os cantos da imagem:
-                    <br>🔴 NW (Noroeste) | 🔵 NE (Nordeste)
-                    <br>🟠 SW (Sudoeste) | 🟢 SE (Sudeste)
-                </div>
-                
-                <div class="corner-coords">
-                    <span class="label nw">🔴 NW:</span>
-                    <span id="nwLat">-</span>
-                    <span id="nwLng">-</span>
-                    
-                    <span class="label ne">🔵 NE:</span>
-                    <span id="neLat">-</span>
-                    <span id="neLng">-</span>
-                    
-                    <span class="label sw">🟠 SW:</span>
-                    <span id="swLat">-</span>
-                    <span id="swLng">-</span>
-                    
-                    <span class="label se">🟢 SE:</span>
-                    <span id="seLat">-</span>
-                    <span id="seLng">-</span>
-                </div>
-                
-                <button class="btn btn-success" onclick="fitToCorners()" style="margin-top:8px;">
-                    🎯 Aplicar Cantos à Imagem
-                </button>
-            </div>
-
             <!-- Presets de Área -->
             <div class="control-section">
                 <h3>⚡ Presets de Área</h3>
@@ -388,171 +356,19 @@
                         🌎 América do Sul
                     </button>
                 </div>
-            </div>
-
-            <!-- Grade -->
-            <div class="control-section">
-                <h3>📐 Grade de Pontos</h3>
-                
-                <!-- Grade Customizada -->
-                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <label style="font-size: 0.7em; color: #aaa;">Linhas:</label>
-                        <input type="number" id="customRows" min="2" max="50" value="4" 
-                               style="width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #0f3460; 
-                                      background: #0a0a15; color: #00d9ff; font-size: 0.8em; text-align: center;">
-                    </div>
-                    <span style="color: #666;">×</span>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <label style="font-size: 0.7em; color: #aaa;">Colunas:</label>
-                        <input type="number" id="customCols" min="2" max="50" value="4" 
-                               style="width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #0f3460; 
-                                      background: #0a0a15; color: #00d9ff; font-size: 0.8em; text-align: center;">
-                    </div>
-                </div>
-                <button class="btn btn-success" onclick="applyCustomGrid()" style="font-size: 0.75em; margin-bottom: 8px;">
-                    ✅ Aplicar Grade Customizada
-                </button>
-                
-                <!-- Presets rápidos -->
-                <div style="font-size: 0.65em; color: #888; margin-bottom: 4px;">Presets rápidos:</div>
-                <div class="btn-grid-3">
-                    <button class="btn btn-secondary" onclick="setGrid(2,2)" style="font-size:0.65em;">2×2</button>
-                    <button class="btn btn-secondary" onclick="setGrid(3,3)" style="font-size:0.65em;">3×3</button>
-                    <button class="btn btn-secondary" onclick="setGrid(5,5)" style="font-size:0.65em;">5×5</button>
-                    <button class="btn btn-secondary" onclick="setGrid(10,10)" style="font-size:0.65em;">10×10</button>
-                    <button class="btn btn-secondary" onclick="setGrid(15,15)" style="font-size:0.65em;">15×15</button>
-                    <button class="btn btn-secondary" onclick="setGrid(20,20)" style="font-size:0.65em;">20×20</button>
-                </div>
-                <div class="status-bar">Pontos: <span id="pointCount">0</span> | Triângulos: <span id="triangleCount">0</span></div>
-            </div>
-
-            <!-- NOVO: Deslocamento Global -->
-            <div class="control-section">
-                <h3>🎯 Mover Imagem Toda</h3>
-                <div class="instructions" style="margin-bottom: 8px;">
-                    Use os botões ou sliders para deslocar toda a imagem de satélite.
-                </div>
-                
-                <!-- Botões direcionais -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 10px;">
-                    <div></div>
-                    <button class="btn btn-secondary" onclick="moveImage(0, -1)" style="font-size: 1.2em; padding: 8px;">⬆️</button>
-                    <div></div>
-                    <button class="btn btn-secondary" onclick="moveImage(-1, 0)" style="font-size: 1.2em; padding: 8px;">⬅️</button>
-                    <button class="btn btn-warning" onclick="resetOffset()" style="font-size: 0.7em; padding: 8px;">🎯</button>
-                    <button class="btn btn-secondary" onclick="moveImage(1, 0)" style="font-size: 1.2em; padding: 8px;">➡️</button>
-                    <div></div>
-                    <button class="btn btn-secondary" onclick="moveImage(0, 1)" style="font-size: 1.2em; padding: 8px;">⬇️</button>
-                    <div></div>
-                </div>
-                
-                <!-- Sliders de offset -->
-                <div class="slider-row">
-                    <label>Offset X:</label>
-                    <input type="range" id="offsetX" min="-500" max="500" step="1" value="0" oninput="redraw()">
-                    <span class="value" id="offsetXVal">0px</span>
-                </div>
-                <div class="slider-row">
-                    <label>Offset Y:</label>
-                    <input type="range" id="offsetY" min="-500" max="500" step="1" value="0" oninput="redraw()">
-                    <span class="value" id="offsetYVal">0px</span>
-                </div>
-                
-                <!-- Passo do movimento -->
-                <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
-                    <label style="font-size: 0.7em; color: #aaa;">Passo (px):</label>
-                    <input type="number" id="moveStep" min="1" max="100" value="10" 
-                           style="width: 60px; padding: 4px; border-radius: 4px; border: 1px solid #0f3460; 
-                                  background: #0a0a15; color: #00d9ff; font-size: 0.8em; text-align: center;">
+                <div class="status-bar" style="margin-top: 6px;">
+                    Área: <span id="currentArea">-</span>
                 </div>
             </div>
 
-            <!-- NOVO: Perspectiva/Trapézio -->
+            <!-- Ajustes da Imagem -->
             <div class="control-section">
-                <h3>📐 Perspectiva (Esticar/Encolher)</h3>
-                <div class="instructions" style="margin-bottom: 8px;">
-                    Ajuste a largura da parte superior ou inferior separadamente.
-                </div>
-                
-                <!-- Parte Superior -->
-                <div style="margin-bottom: 10px;">
-                    <div style="font-size: 0.7em; color: #e74c3c; margin-bottom: 4px;">🔺 Parte Superior</div>
-                    <div class="slider-row">
-                        <label>Largura:</label>
-                        <input type="range" id="topScale" min="0.5" max="1.5" step="0.01" value="1" oninput="redraw()">
-                        <span class="value" id="topScaleVal">1.00</span>
-                    </div>
-                    <div class="slider-row">
-                        <label>Offset Y:</label>
-                        <input type="range" id="topOffsetY" min="-200" max="200" step="1" value="0" oninput="redraw()">
-                        <span class="value" id="topOffsetYVal">0px</span>
-                    </div>
-                </div>
-                
-                <!-- Parte Inferior -->
-                <div style="margin-bottom: 10px;">
-                    <div style="font-size: 0.7em; color: #27ae60; margin-bottom: 4px;">🔻 Parte Inferior</div>
-                    <div class="slider-row">
-                        <label>Largura:</label>
-                        <input type="range" id="bottomScale" min="0.5" max="1.5" step="0.01" value="1" oninput="redraw()">
-                        <span class="value" id="bottomScaleVal">1.00</span>
-                    </div>
-                    <div class="slider-row">
-                        <label>Offset Y:</label>
-                        <input type="range" id="bottomOffsetY" min="-200" max="200" step="1" value="0" oninput="redraw()">
-                        <span class="value" id="bottomOffsetYVal">0px</span>
-                    </div>
-                </div>
-                
-                <button class="btn btn-warning" onclick="resetPerspective()" style="font-size:0.7em;">
-                    ↩️ Resetar Perspectiva
-                </button>
-            </div>
-
-            <!-- Ajustes Finos -->
-            <div class="control-section">
-                <h3>🔧 Ajustes Finos</h3>
-                <div class="slider-row">
-                    <label>Rotação:</label>
-                    <input type="range" id="rotation" min="-15" max="15" step="0.1" value="0" oninput="redraw()">
-                    <span class="value" id="rotationVal">0°</span>
-                </div>
-                <div class="slider-row">
-                    <label>Escala X:</label>
-                    <input type="range" id="scaleX" min="0.8" max="1.2" step="0.005" value="1" oninput="redraw()">
-                    <span class="value" id="scaleXVal">1.00</span>
-                </div>
-                <div class="slider-row">
-                    <label>Escala Y:</label>
-                    <input type="range" id="scaleY" min="0.8" max="1.2" step="0.005" value="1" oninput="redraw()">
-                    <span class="value" id="scaleYVal">1.00</span>
-                </div>
+                <h3>🔧 Ajustes da Imagem</h3>
                 <div class="slider-row">
                     <label>Opacidade:</label>
-                    <input type="range" id="opacity" min="10" max="100" step="1" value="95" oninput="redraw()">
+                    <input type="range" id="opacity" min="10" max="100" step="1" value="95" oninput="updateOpacity()">
                     <span class="value" id="opacityVal">95%</span>
                 </div>
-                <button class="btn btn-warning" onclick="resetFineAdjust()" style="font-size:0.7em;">
-                    ↩️ Resetar Ajustes
-                </button>
-            </div>
-
-            <!-- Deletar Triângulos -->
-            <div class="control-section">
-                <h3>🗑️ Remover Áreas</h3>
-                <button class="btn btn-danger" id="btnDeleteMode" onclick="toggleDeleteMode()">
-                    ✂️ Modo Deletar
-                </button>
-                <div class="instructions" id="deleteInstructions" style="display:none;">
-                    Clique nos triângulos para excluí-los.
-                </div>
-                <div id="deletedList" class="triangle-list" style="display:none;">
-                    <div id="deletedItems"></div>
-                </div>
-                <button class="btn btn-secondary" onclick="restoreAllTriangles()" style="margin-top:5px; font-size:0.7em;">
-                    ↩️ Restaurar Todos
-                </button>
             </div>
 
             <!-- Exportar/Importar -->
@@ -565,83 +381,55 @@
             </div>
         </div>
 
-        <div id="map">
-            <canvas id="imageCanvas"></canvas>
-            <canvas id="selectionCanvas"></canvas>
-        </div>
+        <div id="map"></div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.0/delaunator.min.js"></script>
     <script>
         // ===== ESTADO =====
         let map = null;
         let imageElement = null;
         let imageLoaded = false;
-        let canvas, ctx;
-        let selCanvas, selCtx;
+        let imageOverlay = null; // Leaflet image overlay
         
-        // NOVO: Marcadores de canto
-        let cornerMarkers = {
-            nw: null, ne: null, sw: null, se: null
+        // Bounds da imagem
+        let imageBounds = {
+            north: 15,
+            south: -55,
+            west: -100,
+            east: -30
         };
-        let cornerBounds = {
-            nw: { lat: 15, lng: -100 },
-            ne: { lat: 15, lng: -30 },
-            sw: { lat: -55, lng: -100 },
-            se: { lat: -55, lng: -30 }
-        };
-        let boundsRectangle = null;
         
-        // Pontos de controle
-        let controlPoints = [];
-        let gridRows = 4, gridCols = 4;
-        let pointIdCounter = 0;
-        
-        // Triangulação
-        let triangles = [];
-        let deletedTriangles = new Set();
-        
-        // Modo deletar
-        let deleteMode = false;
+        // Nome do preset atual
+        let currentPresetName = '-';
 
         // Presets conhecidos
         const PRESETS = {
             goes_ssa: {
                 name: 'GOES SSA (South America Sector)',
-                nw: { lat: 14.98, lng: -101.04 },
-                ne: { lat: 14.98, lng: -30.98 },
-                sw: { lat: -54.98, lng: -101.04 },
-                se: { lat: -54.98, lng: -30.98 }
+                north: 14.98, south: -54.98,
+                west: -101.04, east: -30.98
             },
             goes_full: {
                 name: 'GOES Full Disk',
-                nw: { lat: 60, lng: -135 },
-                ne: { lat: 60, lng: 15 },
-                sw: { lat: -60, lng: -135 },
-                se: { lat: -60, lng: 15 }
+                north: 60, south: -60,
+                west: -135, east: 15
             },
             brazil: {
                 name: 'Brasil',
-                nw: { lat: 5.5, lng: -74 },
-                ne: { lat: 5.5, lng: -34 },
-                sw: { lat: -34, lng: -74 },
-                se: { lat: -34, lng: -34 }
+                north: 5.5, south: -34,
+                west: -74, east: -34
             },
             south_america: {
                 name: 'América do Sul',
-                nw: { lat: 15, lng: -82 },
-                ne: { lat: 15, lng: -34 },
-                sw: { lat: -56, lng: -82 },
-                se: { lat: -56, lng: -34 }
+                north: 15, south: -56,
+                west: -82, east: -34
             }
         };
 
         // ===== INIT =====
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
-            initCanvas();
-            initCornerMarkers();
             setupEvents();
         });
 
@@ -683,8 +471,6 @@
 
             // Usar mapa de contornos por padrão (sem cidades/labels)
             setMapLayer('contornos');
-
-            map.on('move zoom moveend zoomend', redraw);
         }
 
         function setMapLayer(layerKey) {
@@ -720,132 +506,28 @@
             }
         }
 
-        function initCanvas() {
-            canvas = document.getElementById('imageCanvas');
-            ctx = canvas.getContext('2d');
-            
-            selCanvas = document.getElementById('selectionCanvas');
-            selCtx = selCanvas.getContext('2d');
-            
-            resizeCanvas();
-            new ResizeObserver(resizeCanvas).observe(document.getElementById('map'));
-        }
-
-        function resizeCanvas() {
-            const mapEl = document.getElementById('map');
-            canvas.width = selCanvas.width = mapEl.offsetWidth;
-            canvas.height = selCanvas.height = mapEl.offsetHeight;
-            redraw();
-        }
-
-        // ===== MARCADORES DE CANTO =====
-        function initCornerMarkers() {
-            const corners = [
-                { key: 'nw', label: 'NW', color: 'corner-nw' },
-                { key: 'ne', label: 'NE', color: 'corner-ne' },
-                { key: 'sw', label: 'SW', color: 'corner-sw' },
-                { key: 'se', label: 'SE', color: 'corner-se' }
-            ];
-
-            corners.forEach(c => {
-                const icon = L.divIcon({
-                    className: `corner-marker ${c.color}`,
-                    html: c.label,
-                    iconSize: [24, 24],
-                    iconAnchor: [12, 12]
-                });
-
-                cornerMarkers[c.key] = L.marker(
-                    [cornerBounds[c.key].lat, cornerBounds[c.key].lng],
-                    { icon: icon, draggable: true }
-                ).addTo(map);
-
-                cornerMarkers[c.key].on('drag dragend', function() {
-                    const ll = cornerMarkers[c.key].getLatLng();
-                    cornerBounds[c.key].lat = ll.lat;
-                    cornerBounds[c.key].lng = ll.lng;
-                    updateCornerDisplay();
-                    updateBoundsRectangle();
-                });
-            });
-
-            // Retângulo mostrando os limites
-            boundsRectangle = L.rectangle([
-                [cornerBounds.nw.lat, cornerBounds.nw.lng],
-                [cornerBounds.se.lat, cornerBounds.se.lng]
-            ], {
-                color: '#ff00ff',
-                weight: 2,
-                fill: false,
-                dashArray: '10, 5'
-            }).addTo(map);
-
-            updateCornerDisplay();
-        }
-
-        function updateCornerDisplay() {
-            document.getElementById('nwLat').textContent = cornerBounds.nw.lat.toFixed(2) + '°';
-            document.getElementById('nwLng').textContent = cornerBounds.nw.lng.toFixed(2) + '°';
-            document.getElementById('neLat').textContent = cornerBounds.ne.lat.toFixed(2) + '°';
-            document.getElementById('neLng').textContent = cornerBounds.ne.lng.toFixed(2) + '°';
-            document.getElementById('swLat').textContent = cornerBounds.sw.lat.toFixed(2) + '°';
-            document.getElementById('swLng').textContent = cornerBounds.sw.lng.toFixed(2) + '°';
-            document.getElementById('seLat').textContent = cornerBounds.se.lat.toFixed(2) + '°';
-            document.getElementById('seLng').textContent = cornerBounds.se.lng.toFixed(2) + '°';
-        }
-
-        function updateBoundsRectangle() {
-            if (boundsRectangle) {
-                // Usar os 4 cantos para fazer um polígono
-                boundsRectangle.setLatLngs([
-                    [cornerBounds.nw.lat, cornerBounds.nw.lng],
-                    [cornerBounds.ne.lat, cornerBounds.ne.lng],
-                    [cornerBounds.se.lat, cornerBounds.se.lng],
-                    [cornerBounds.sw.lat, cornerBounds.sw.lng]
-                ]);
-            }
-        }
-
-        function fitToCorners() {
-            if (!imageLoaded) {
-                alert('Carregue uma imagem primeiro!');
-                return;
-            }
-            createGridFromCorners();
-            triangulate();
-            redraw();
-        }
-
         function setPreset(presetKey) {
             const preset = PRESETS[presetKey];
             if (!preset) return;
 
             // Atualizar bounds
-            cornerBounds.nw = { ...preset.nw };
-            cornerBounds.ne = { ...preset.ne };
-            cornerBounds.sw = { ...preset.sw };
-            cornerBounds.se = { ...preset.se };
-
-            // Mover marcadores
-            cornerMarkers.nw.setLatLng([preset.nw.lat, preset.nw.lng]);
-            cornerMarkers.ne.setLatLng([preset.ne.lat, preset.ne.lng]);
-            cornerMarkers.sw.setLatLng([preset.sw.lat, preset.sw.lng]);
-            cornerMarkers.se.setLatLng([preset.se.lat, preset.se.lng]);
-
-            updateCornerDisplay();
-            updateBoundsRectangle();
+            imageBounds.north = preset.north;
+            imageBounds.south = preset.south;
+            imageBounds.west = preset.west;
+            imageBounds.east = preset.east;
+            currentPresetName = preset.name;
+            
+            document.getElementById('currentArea').textContent = preset.name;
 
             // Ajustar visão do mapa
             map.fitBounds([
-                [preset.nw.lat, preset.nw.lng],
-                [preset.se.lat, preset.se.lng]
+                [preset.north, preset.west],
+                [preset.south, preset.east]
             ], { padding: [20, 20] });
 
-            // Se tiver imagem, recriar grade
+            // Se tiver imagem, atualizar overlay
             if (imageLoaded) {
-                createGridFromCorners();
-                triangulate();
-                redraw();
+                updateImageOverlay();
             }
         }
 
@@ -858,19 +540,6 @@
                     reader.onload = (ev) => loadImage(ev.target.result, file.name);
                     reader.readAsDataURL(file);
                 }
-            });
-
-            selCanvas.addEventListener('click', function(e) {
-                if (!deleteMode || !imageLoaded) return;
-                const rect = selCanvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-                clickOnTriangle(x, y);
-            });
-
-            selCanvas.addEventListener('mousemove', function(e) {
-                if (!deleteMode) return;
-                selCanvas.style.cursor = 'crosshair';
             });
             
             // Eventos para sliders de reprojeção
@@ -982,30 +651,22 @@
                         const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
                         const visibleRange = 81; // graus de visibilidade do satélite
                         
-                        // Definir cantos para área visível do satélite
-                        cornerBounds.nw = { lat: visibleRange, lng: satLonDeg - visibleRange };
-                        cornerBounds.ne = { lat: visibleRange, lng: satLonDeg + visibleRange };
-                        cornerBounds.sw = { lat: -visibleRange, lng: satLonDeg - visibleRange };
-                        cornerBounds.se = { lat: -visibleRange, lng: satLonDeg + visibleRange };
+                        // Definir bounds para área visível do satélite
+                        imageBounds.north = visibleRange;
+                        imageBounds.south = -visibleRange;
+                        imageBounds.west = satLonDeg - visibleRange;
+                        imageBounds.east = satLonDeg + visibleRange;
                         
-                        // Atualizar marcadores
-                        cornerMarkers.nw.setLatLng([cornerBounds.nw.lat, cornerBounds.nw.lng]);
-                        cornerMarkers.ne.setLatLng([cornerBounds.ne.lat, cornerBounds.ne.lng]);
-                        cornerMarkers.sw.setLatLng([cornerBounds.sw.lat, cornerBounds.sw.lng]);
-                        cornerMarkers.se.setLatLng([cornerBounds.se.lat, cornerBounds.se.lng]);
-                        
-                        updateCornerDisplay();
-                        updateBoundsRectangle();
+                        currentPresetName = 'Full Disk Reprojetado';
+                        document.getElementById('currentArea').textContent = currentPresetName;
                         
                         // Ajustar visão do mapa
                         map.fitBounds([
-                            [cornerBounds.nw.lat, cornerBounds.nw.lng],
-                            [cornerBounds.se.lat, cornerBounds.se.lng]
+                            [imageBounds.north, imageBounds.west],
+                            [imageBounds.south, imageBounds.east]
                         ], { padding: [20, 20] });
                         
-                        createGridFromCorners();
-                        triangulate();
-                        redraw();
+                        updateImageOverlay();
                     };
                     imageElement.src = reprojectedCanvas.toDataURL('image/png');
                     
@@ -1126,9 +787,7 @@
                 document.getElementById('imageStatus').innerHTML = `✅ ${name} (${this.width}×${this.height})`;
                 document.getElementById('imageStatus').style.color = '#00ff00';
                 
-                createGridFromCorners();
-                triangulate();
-                redraw();
+                updateImageOverlay();
             };
             
             imageElement.onerror = function() {
@@ -1138,474 +797,50 @@
             
             imageElement.src = src;
         }
-
-        // ===== GRID DE PONTOS =====
-        function setGrid(rows, cols) {
-            gridRows = rows;
-            gridCols = cols;
-            // Atualizar os inputs customizados
-            document.getElementById('customRows').value = rows;
-            document.getElementById('customCols').value = cols;
-            if (imageLoaded) {
-                createGridFromCorners();
-                triangulate();
-                redraw();
-            }
-        }
-
-        function applyCustomGrid() {
-            const rows = parseInt(document.getElementById('customRows').value) || 4;
-            const cols = parseInt(document.getElementById('customCols').value) || 4;
+        
+        // ===== IMAGE OVERLAY (usando Leaflet) =====
+        function updateImageOverlay() {
+            if (!imageLoaded || !imageElement) return;
             
-            // Validar limites
-            const validRows = Math.max(2, Math.min(50, rows));
-            const validCols = Math.max(2, Math.min(50, cols));
-            
-            // Atualizar inputs se foram corrigidos
-            document.getElementById('customRows').value = validRows;
-            document.getElementById('customCols').value = validCols;
-            
-            gridRows = validRows;
-            gridCols = validCols;
-            
-            if (imageLoaded) {
-                createGridFromCorners();
-                triangulate();
-                redraw();
-            } else {
-                alert('Carregue uma imagem primeiro!');
-            }
-        }
-
-        function createGridFromCorners() {
-            // Limpar pontos antigos
-            controlPoints.forEach(p => { if (p.marker) map.removeLayer(p.marker); });
-            controlPoints = [];
-            pointIdCounter = 0;
-            deletedTriangles.clear();
-
-            // Interpolar posições baseado nos 4 cantos
-            for (let r = 0; r < gridRows; r++) {
-                for (let c = 0; c < gridCols; c++) {
-                    // Fatores de interpolação
-                    const u = c / (gridCols - 1); // 0 a 1 (esquerda a direita)
-                    const v = r / (gridRows - 1); // 0 a 1 (cima a baixo)
-                    
-                    // Interpolação bilinear dos 4 cantos
-                    const lat = (1-v) * ((1-u) * cornerBounds.nw.lat + u * cornerBounds.ne.lat) +
-                                v * ((1-u) * cornerBounds.sw.lat + u * cornerBounds.se.lat);
-                    
-                    const lng = (1-v) * ((1-u) * cornerBounds.nw.lng + u * cornerBounds.ne.lng) +
-                                v * ((1-u) * cornerBounds.sw.lng + u * cornerBounds.se.lng);
-                    
-                    // Posição na imagem (0-1)
-                    const srcX = c / (gridCols - 1);
-                    const srcY = r / (gridRows - 1);
-                    
-                    addControlPoint(srcX, srcY, lat, lng);
-                }
+            // Remover overlay anterior
+            if (imageOverlay) {
+                map.removeLayer(imageOverlay);
             }
             
-            document.getElementById('pointCount').textContent = controlPoints.length;
-        }
-
-        function addControlPoint(srcX, srcY, lat, lng) {
-            pointIdCounter++;
-            const id = pointIdCounter;
+            // Criar bounds do Leaflet
+            const bounds = L.latLngBounds(
+                [imageBounds.south, imageBounds.west],
+                [imageBounds.north, imageBounds.east]
+            );
             
-            const icon = L.divIcon({
-                className: 'control-point',
-                html: id,
-                iconSize: [14, 14],
-                iconAnchor: [7, 7]
-            });
+            // Obter opacidade
+            const opacity = parseFloat(document.getElementById('opacity').value) / 100;
             
-            const marker = L.marker([lat, lng], {
-                icon: icon,
-                draggable: true
+            // Criar image overlay
+            imageOverlay = L.imageOverlay(imageElement.src, bounds, {
+                opacity: opacity,
+                interactive: false
             }).addTo(map);
             
-            marker.on('drag dragend', function() {
-                const ll = marker.getLatLng();
-                const pt = controlPoints.find(p => p.id === id);
-                if (pt) {
-                    pt.lat = ll.lat;
-                    pt.lng = ll.lng;
-                }
-                redraw();
-            });
-            
-            controlPoints.push({ id, marker, srcX, srcY, lat, lng });
-        }
-
-        // ===== TRIANGULAÇÃO =====
-        function triangulate() {
-            if (controlPoints.length < 3) {
-                triangles = [];
-                return;
-            }
-            
-            const coords = [];
-            controlPoints.forEach(p => {
-                const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-                coords.push(pt.x, pt.y);
-            });
-            
-            try {
-                const delaunay = new Delaunator(coords);
-                triangles = Array.from(delaunay.triangles);
-            } catch (e) {
-                triangles = [];
-            }
-            
-            document.getElementById('triangleCount').textContent = triangles.length / 3;
-        }
-
-        // ===== DESENHAR =====
-        function redraw() {
-            if (!ctx) return;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
-            
-            updateSliderDisplays();
-            
-            if (!imageLoaded || !imageElement || controlPoints.length < 3) return;
-            
-            triangulate();
-            
-            const opacity = parseFloat(document.getElementById('opacity').value) / 100;
-            ctx.globalAlpha = opacity;
-            
-            const imgW = imageElement.naturalWidth;
-            const imgH = imageElement.naturalHeight;
-            
-            // Ajustes finos
-            const scaleX = parseFloat(document.getElementById('scaleX').value);
-            const scaleY = parseFloat(document.getElementById('scaleY').value);
-            const rotation = parseFloat(document.getElementById('rotation').value) * Math.PI / 180;
-            
-            // Desenhar cada triângulo
-            for (let i = 0; i < triangles.length; i += 3) {
-                const triIndex = i / 3;
-                
-                if (deletedTriangles.has(triIndex)) continue;
-                
-                const i0 = triangles[i];
-                const i1 = triangles[i + 1];
-                const i2 = triangles[i + 2];
-                
-                const p0 = controlPoints[i0];
-                const p1 = controlPoints[i1];
-                const p2 = controlPoints[i2];
-                
-                if (!p0 || !p1 || !p2) continue;
-                
-                // Posições na imagem
-                const src0 = [p0.srcX * imgW, p0.srcY * imgH];
-                const src1 = [p1.srcX * imgW, p1.srcY * imgH];
-                const src2 = [p2.srcX * imgW, p2.srcY * imgH];
-                
-                // Posições na tela
-                const dst0 = getTransformedPoint(p0.lat, p0.lng, scaleX, scaleY, rotation);
-                const dst1 = getTransformedPoint(p1.lat, p1.lng, scaleX, scaleY, rotation);
-                const dst2 = getTransformedPoint(p2.lat, p2.lng, scaleX, scaleY, rotation);
-                
-                drawTriangle(ctx, imageElement, src0, src1, src2, dst0, dst1, dst2);
-            }
-            
-            if (deleteMode) {
-                drawTriangleOutlines();
-            }
-        }
-
-        function getTransformedPoint(lat, lng, scaleX, scaleY, rotation) {
-            const pt = map.latLngToContainerPoint([lat, lng]);
-            
-            // Offset global (deslocamento da imagem toda)
-            const offsetX = parseFloat(document.getElementById('offsetX').value) || 0;
-            const offsetY = parseFloat(document.getElementById('offsetY').value) || 0;
-            
-            // Perspectiva (esticar/encolher topo e base separadamente)
-            const topScale = parseFloat(document.getElementById('topScale').value) || 1;
-            const bottomScale = parseFloat(document.getElementById('bottomScale').value) || 1;
-            const topOffsetY = parseFloat(document.getElementById('topOffsetY').value) || 0;
-            const bottomOffsetY = parseFloat(document.getElementById('bottomOffsetY').value) || 0;
-            
-            // Centro = centro dos 4 cantos
-            const centerLat = (cornerBounds.nw.lat + cornerBounds.se.lat) / 2;
-            const centerLng = (cornerBounds.nw.lng + cornerBounds.se.lng) / 2;
-            const center = map.latLngToContainerPoint([centerLat, centerLng]);
-            
-            // Calcular a posição vertical relativa (0 = topo, 1 = base)
-            const topPt = map.latLngToContainerPoint([cornerBounds.nw.lat, centerLng]);
-            const bottomPt = map.latLngToContainerPoint([cornerBounds.sw.lat, centerLng]);
-            const totalHeight = bottomPt.y - topPt.y;
-            
-            let verticalRatio = 0.5; // padrão no centro
-            if (totalHeight > 0) {
-                verticalRatio = (pt.y - topPt.y) / totalHeight;
-                verticalRatio = Math.max(0, Math.min(1, verticalRatio));
-            }
-            
-            // Calcular escala horizontal baseada na posição vertical (interpolação linear)
-            const perspectiveScaleX = topScale * (1 - verticalRatio) + bottomScale * verticalRatio;
-            
-            // Calcular offset Y baseado na posição vertical
-            const perspectiveOffsetY = topOffsetY * (1 - verticalRatio) + bottomOffsetY * verticalRatio;
-            
-            let x = pt.x - center.x;
-            let y = pt.y - center.y;
-            
-            // Aplicar escala de perspectiva (apenas horizontal, baseado na posição vertical)
-            x *= perspectiveScaleX;
-            
-            // Escala global
-            x *= scaleX;
-            y *= scaleY;
-            
-            // Rotação
-            const cos = Math.cos(rotation);
-            const sin = Math.sin(rotation);
-            const rx = x * cos - y * sin;
-            const ry = x * sin + y * cos;
-            
-            // Aplicar offset global + offset de perspectiva APÓS escala e rotação
-            return [rx + center.x + offsetX, ry + center.y + offsetY + perspectiveOffsetY];
-        }
-
-        function drawTriangle(ctx, img, src0, src1, src2, dst0, dst1, dst2) {
-            ctx.save();
-            
-            ctx.beginPath();
-            ctx.moveTo(dst0[0], dst0[1]);
-            ctx.lineTo(dst1[0], dst1[1]);
-            ctx.lineTo(dst2[0], dst2[1]);
-            ctx.closePath();
-            ctx.clip();
-            
-            const denom = (src0[0] - src2[0]) * (src1[1] - src2[1]) - (src1[0] - src2[0]) * (src0[1] - src2[1]);
-            if (Math.abs(denom) < 0.001) { ctx.restore(); return; }
-            
-            const a = ((dst0[0] - dst2[0]) * (src1[1] - src2[1]) - (dst1[0] - dst2[0]) * (src0[1] - src2[1])) / denom;
-            const b = ((src0[0] - src2[0]) * (dst1[0] - dst2[0]) - (src1[0] - src2[0]) * (dst0[0] - dst2[0])) / denom;
-            const c = dst0[0] - a * src0[0] - b * src0[1];
-            const d = ((dst0[1] - dst2[1]) * (src1[1] - src2[1]) - (dst1[1] - dst2[1]) * (src0[1] - src2[1])) / denom;
-            const e = ((src0[0] - src2[0]) * (dst1[1] - dst2[1]) - (src1[0] - src2[0]) * (dst0[1] - dst2[1])) / denom;
-            const f = dst0[1] - d * src0[0] - e * src0[1];
-            
-            ctx.setTransform(a, d, b, e, c, f);
-            ctx.drawImage(img, 0, 0);
-            
-            ctx.restore();
-        }
-
-        function drawTriangleOutlines() {
-            const scaleX = parseFloat(document.getElementById('scaleX').value);
-            const scaleY = parseFloat(document.getElementById('scaleY').value);
-            const rotation = parseFloat(document.getElementById('rotation').value) * Math.PI / 180;
-            
-            for (let i = 0; i < triangles.length; i += 3) {
-                const triIndex = i / 3;
-                
-                if (deletedTriangles.has(triIndex)) {
-                    selCtx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-                    selCtx.setLineDash([5, 5]);
-                } else {
-                    selCtx.strokeStyle = 'rgba(255, 0, 100, 0.6)';
-                    selCtx.setLineDash([]);
-                }
-                selCtx.lineWidth = 2;
-                
-                const p0 = controlPoints[triangles[i]];
-                const p1 = controlPoints[triangles[i + 1]];
-                const p2 = controlPoints[triangles[i + 2]];
-                
-                if (!p0 || !p1 || !p2) continue;
-                
-                const dst0 = getTransformedPoint(p0.lat, p0.lng, scaleX, scaleY, rotation);
-                const dst1 = getTransformedPoint(p1.lat, p1.lng, scaleX, scaleY, rotation);
-                const dst2 = getTransformedPoint(p2.lat, p2.lng, scaleX, scaleY, rotation);
-                
-                selCtx.beginPath();
-                selCtx.moveTo(dst0[0], dst0[1]);
-                selCtx.lineTo(dst1[0], dst1[1]);
-                selCtx.lineTo(dst2[0], dst2[1]);
-                selCtx.closePath();
-                selCtx.stroke();
-            }
-        }
-
-        // ===== MODO DELETAR =====
-        function toggleDeleteMode() {
-            deleteMode = !deleteMode;
-            const btn = document.getElementById('btnDeleteMode');
-            const instr = document.getElementById('deleteInstructions');
-            
-            if (deleteMode) {
-                btn.classList.add('active');
-                btn.innerHTML = '✂️ CLICANDO...';
-                instr.style.display = 'block';
-                selCanvas.style.pointerEvents = 'auto';
-                document.getElementById('map').classList.add('delete-mode-active');
-            } else {
-                btn.classList.remove('active');
-                btn.innerHTML = '✂️ Modo Deletar';
-                instr.style.display = 'none';
-                selCanvas.style.pointerEvents = 'none';
-                selCanvas.style.cursor = 'default';
-                document.getElementById('map').classList.remove('delete-mode-active');
-            }
-            
-            redraw();
-        }
-
-        function clickOnTriangle(x, y) {
-            const scaleX = parseFloat(document.getElementById('scaleX').value);
-            const scaleY = parseFloat(document.getElementById('scaleY').value);
-            const rotation = parseFloat(document.getElementById('rotation').value) * Math.PI / 180;
-            
-            for (let i = 0; i < triangles.length; i += 3) {
-                const triIndex = i / 3;
-                
-                const p0 = controlPoints[triangles[i]];
-                const p1 = controlPoints[triangles[i + 1]];
-                const p2 = controlPoints[triangles[i + 2]];
-                
-                if (!p0 || !p1 || !p2) continue;
-                
-                const dst0 = getTransformedPoint(p0.lat, p0.lng, scaleX, scaleY, rotation);
-                const dst1 = getTransformedPoint(p1.lat, p1.lng, scaleX, scaleY, rotation);
-                const dst2 = getTransformedPoint(p2.lat, p2.lng, scaleX, scaleY, rotation);
-                
-                if (pointInTriangle(x, y, dst0, dst1, dst2)) {
-                    if (deletedTriangles.has(triIndex)) {
-                        deletedTriangles.delete(triIndex);
-                    } else {
-                        deletedTriangles.add(triIndex);
-                    }
-                    updateDeletedList();
-                    redraw();
-                    return;
-                }
-            }
-        }
-
-        function pointInTriangle(px, py, v0, v1, v2) {
-            const area = 0.5 * (-v1[1] * v2[0] + v0[1] * (-v1[0] + v2[0]) + v0[0] * (v1[1] - v2[1]) + v1[0] * v2[1]);
-            const s = 1 / (2 * area) * (v0[1] * v2[0] - v0[0] * v2[1] + (v2[1] - v0[1]) * px + (v0[0] - v2[0]) * py);
-            const t = 1 / (2 * area) * (v0[0] * v1[1] - v0[1] * v1[0] + (v0[1] - v1[1]) * px + (v1[0] - v0[0]) * py);
-            return s >= 0 && t >= 0 && (1 - s - t) >= 0;
-        }
-
-        function updateDeletedList() {
-            const list = document.getElementById('deletedList');
-            const items = document.getElementById('deletedItems');
-            
-            if (deletedTriangles.size === 0) {
-                list.style.display = 'none';
-                return;
-            }
-            
-            list.style.display = 'block';
-            let html = '';
-            deletedTriangles.forEach(idx => {
-                html += `<div class="triangle-item">
-                    Triângulo #${idx + 1}
-                    <button onclick="restoreTriangle(${idx})">↩️</button>
-                </div>`;
-            });
-            items.innerHTML = html;
-        }
-
-        function restoreTriangle(idx) {
-            deletedTriangles.delete(idx);
-            updateDeletedList();
-            redraw();
-        }
-
-        function restoreAllTriangles() {
-            deletedTriangles.clear();
-            updateDeletedList();
-            redraw();
-        }
-
-        // ===== AJUSTES =====
-        function moveImage(dx, dy) {
-            const step = parseInt(document.getElementById('moveStep').value) || 10;
-            const offsetXEl = document.getElementById('offsetX');
-            const offsetYEl = document.getElementById('offsetY');
-            
-            let newX = parseInt(offsetXEl.value) + (dx * step);
-            let newY = parseInt(offsetYEl.value) + (dy * step);
-            
-            // Limitar aos valores do slider
-            newX = Math.max(-500, Math.min(500, newX));
-            newY = Math.max(-500, Math.min(500, newY));
-            
-            offsetXEl.value = newX;
-            offsetYEl.value = newY;
-            
-            redraw();
+            // Garantir que fica abaixo dos controles do mapa
+            imageOverlay.bringToBack();
         }
         
-        function resetOffset() {
-            document.getElementById('offsetX').value = 0;
-            document.getElementById('offsetY').value = 0;
-            redraw();
-        }
-        
-        function resetPerspective() {
-            document.getElementById('topScale').value = 1;
-            document.getElementById('bottomScale').value = 1;
-            document.getElementById('topOffsetY').value = 0;
-            document.getElementById('bottomOffsetY').value = 0;
-            redraw();
-        }
-        
-        function resetFineAdjust() {
-            document.getElementById('rotation').value = 0;
-            document.getElementById('scaleX').value = 1;
-            document.getElementById('scaleY').value = 1;
-            document.getElementById('offsetX').value = 0;
-            document.getElementById('offsetY').value = 0;
-            resetPerspective();
-        }
-
-        function updateSliderDisplays() {
-            document.getElementById('scaleXVal').textContent = parseFloat(document.getElementById('scaleX').value).toFixed(2);
-            document.getElementById('scaleYVal').textContent = parseFloat(document.getElementById('scaleY').value).toFixed(2);
-            document.getElementById('rotationVal').textContent = parseFloat(document.getElementById('rotation').value).toFixed(1) + '°';
+        function updateOpacity() {
+            if (imageOverlay) {
+                const opacity = parseFloat(document.getElementById('opacity').value) / 100;
+                imageOverlay.setOpacity(opacity);
+            }
             document.getElementById('opacityVal').textContent = document.getElementById('opacity').value + '%';
-            document.getElementById('offsetXVal').textContent = document.getElementById('offsetX').value + 'px';
-            document.getElementById('offsetYVal').textContent = document.getElementById('offsetY').value + 'px';
-            document.getElementById('topScaleVal').textContent = parseFloat(document.getElementById('topScale').value).toFixed(2);
-            document.getElementById('bottomScaleVal').textContent = parseFloat(document.getElementById('bottomScale').value).toFixed(2);
-            document.getElementById('topOffsetYVal').textContent = document.getElementById('topOffsetY').value + 'px';
-            document.getElementById('bottomOffsetYVal').textContent = document.getElementById('bottomOffsetY').value + 'px';
         }
 
         // ===== EXPORT/IMPORT =====
         function exportConfig() {
             const data = {
                 timestamp: new Date().toISOString(),
-                version: 'v7',
-                corners: cornerBounds,
-                grid: { rows: gridRows, cols: gridCols },
-                points: controlPoints.map(p => ({ srcX: p.srcX, srcY: p.srcY, lat: p.lat, lng: p.lng })),
-                deletedTriangles: Array.from(deletedTriangles),
-                adjustments: {
-                    scaleX: document.getElementById('scaleX').value,
-                    scaleY: document.getElementById('scaleY').value,
-                    rotation: document.getElementById('rotation').value,
-                    opacity: document.getElementById('opacity').value,
-                    offsetX: document.getElementById('offsetX').value,
-                    offsetY: document.getElementById('offsetY').value,
-                    topScale: document.getElementById('topScale').value,
-                    bottomScale: document.getElementById('bottomScale').value,
-                    topOffsetY: document.getElementById('topOffsetY').value,
-                    bottomOffsetY: document.getElementById('bottomOffsetY').value
-                }
+                version: 'v7-simple',
+                bounds: imageBounds,
+                opacity: document.getElementById('opacity').value
             };
             
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1635,47 +870,17 @@
         }
 
         function applyConfig(data) {
-            // Aplicar cantos
-            if (data.corners) {
-                cornerBounds = data.corners;
-                cornerMarkers.nw.setLatLng([data.corners.nw.lat, data.corners.nw.lng]);
-                cornerMarkers.ne.setLatLng([data.corners.ne.lat, data.corners.ne.lng]);
-                cornerMarkers.sw.setLatLng([data.corners.sw.lat, data.corners.sw.lng]);
-                cornerMarkers.se.setLatLng([data.corners.se.lat, data.corners.se.lng]);
-                updateCornerDisplay();
-                updateBoundsRectangle();
+            // Aplicar bounds
+            if (data.bounds) {
+                imageBounds = data.bounds;
+                updateImageOverlay();
             }
             
-            // Aplicar ajustes
-            if (data.adjustments) {
-                Object.keys(data.adjustments).forEach(key => {
-                    const el = document.getElementById(key);
-                    if (el) el.value = data.adjustments[key];
-                });
+            // Aplicar opacidade
+            if (data.opacity) {
+                document.getElementById('opacity').value = data.opacity;
+                updateOpacity();
             }
-            
-            // Aplicar grade
-            if (data.grid) {
-                gridRows = data.grid.rows;
-                gridCols = data.grid.cols;
-            }
-            
-            // Aplicar pontos individuais
-            if (data.points && imageLoaded) {
-                controlPoints.forEach(p => { if (p.marker) map.removeLayer(p.marker); });
-                controlPoints = [];
-                pointIdCounter = 0;
-                data.points.forEach(p => addControlPoint(p.srcX, p.srcY, p.lat, p.lng));
-            }
-            
-            // Aplicar triângulos deletados
-            if (data.deletedTriangles) {
-                deletedTriangles = new Set(data.deletedTriangles);
-            }
-            
-            triangulate();
-            updateDeletedList();
-            redraw();
         }
     </script>
 </body>
