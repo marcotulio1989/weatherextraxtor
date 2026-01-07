@@ -567,12 +567,22 @@
                 console.log('✅ Imagem carregada:', img.width, 'x', img.height);
                 setProgress(50);
                 
-                showLoading('Reprojetando para Plate Carrée...');
+                showLoading('Reprojetando para Web Mercator...');
                 
-                // Canvas de saída - maior resolução para qualidade
+                // Converter bounds para Web Mercator
+                const mercBounds = {
+                    minX: lonToMercatorX(bounds.west),
+                    maxX: lonToMercatorX(bounds.east),
+                    // Mercator inverte: norte tem Y maior
+                    minY: latToMercatorY(bounds.south),
+                    maxY: latToMercatorY(bounds.north)
+                };
+                
+                // Canvas de saída - proporção baseada em Mercator
                 const outWidth = 1200;
-                const outHeight = Math.round(outWidth * (bounds.north - bounds.south) / (bounds.east - bounds.west));
+                const outHeight = Math.round(outWidth * (mercBounds.maxY - mercBounds.minY) / (mercBounds.maxX - mercBounds.minX));
                 console.log('📏 Canvas saída:', outWidth, 'x', outHeight);
+                console.log('📐 Mercator bounds:', mercBounds);
                 
                 const canvas = document.createElement('canvas');
                 canvas.width = outWidth;
@@ -608,13 +618,17 @@
             
             let pixelsVisible = 0;
             
-            console.log('🔄 Iniciando reprojeção pixel a pixel...');
+            console.log('🔄 Iniciando reprojeção para Web Mercator...');
             
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
-                    // Coordenadas geográficas do pixel de saída (Plate Carrée)
-                    const lon = bounds.west + (x / outWidth) * (bounds.east - bounds.west);
-                    const lat = bounds.north - (y / outHeight) * (bounds.north - bounds.south);
+                    // Coordenadas em Web Mercator do pixel de saída
+                    const mercX = mercBounds.minX + (x / outWidth) * (mercBounds.maxX - mercBounds.minX);
+                    const mercY = mercBounds.maxY - (y / outHeight) * (mercBounds.maxY - mercBounds.minY);
+                    
+                    // Converter Mercator para lat/lon
+                    const lon = mercatorXToLon(mercX);
+                    const lat = mercatorYToLat(mercY);
                     
                     // Converter lat/lon para coordenadas de scan do satélite
                     const scan = latLonToScan(lat, lon, sat_lon);
@@ -668,6 +682,31 @@
                 console.error('❌ ERRO em loadWithReprojection:', err);
                 throw err;
             }
+        }
+        
+        // =========================================================
+        // FUNÇÕES DE PROJEÇÃO WEB MERCATOR (EPSG:3857)
+        // =========================================================
+        
+        const EARTH_RADIUS = 6378137; // metros
+        
+        function lonToMercatorX(lon) {
+            return lon * Math.PI / 180 * EARTH_RADIUS;
+        }
+        
+        function latToMercatorY(lat) {
+            // Limitar para evitar infinito
+            const latClamped = Math.max(-85, Math.min(85, lat));
+            const latRad = latClamped * Math.PI / 180;
+            return Math.log(Math.tan(Math.PI / 4 + latRad / 2)) * EARTH_RADIUS;
+        }
+        
+        function mercatorXToLon(x) {
+            return x / EARTH_RADIUS * 180 / Math.PI;
+        }
+        
+        function mercatorYToLat(y) {
+            return (2 * Math.atan(Math.exp(y / EARTH_RADIUS)) - Math.PI / 2) * 180 / Math.PI;
         }
         
         // =========================================================
