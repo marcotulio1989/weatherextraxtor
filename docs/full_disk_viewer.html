@@ -209,6 +209,16 @@
         </div>
         
         <div class="control-group">
+            <label>⚡ Qualidade</label>
+            <select id="quality">
+                <option value="low">Rápida (600px)</option>
+                <option value="medium" selected>Média (1200px)</option>
+                <option value="high">Alta (2400px)</option>
+                <option value="max">Máxima (4800px)</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
             <label>🔍 Opacidade</label>
             <div class="slider-group">
                 <input type="range" id="opacity" min="0" max="100" value="75">
@@ -566,7 +576,17 @@
                 console.log('✅ Imagem carregada:', img.width, 'x', img.height);
                 setProgress(50);
                 
-                showLoading('Reprojetando para Web Mercator...');
+                // Obter qualidade selecionada
+                const quality = document.getElementById('quality').value;
+                const qualitySettings = {
+                    low: { width: 600, interpolate: false },
+                    medium: { width: 1200, interpolate: true },
+                    high: { width: 2400, interpolate: true },
+                    max: { width: 4800, interpolate: true }
+                };
+                const settings = qualitySettings[quality] || qualitySettings.medium;
+                
+                showLoading(`Reprojetando (${quality})...`);
                 
                 // Converter bounds para Web Mercator
                 const mercBounds = {
@@ -578,9 +598,9 @@
                 };
                 
                 // Canvas de saída - proporção baseada em Mercator
-                const outWidth = 1200;
+                const outWidth = settings.width;
                 const outHeight = Math.round(outWidth * (mercBounds.maxY - mercBounds.minY) / (mercBounds.maxX - mercBounds.minX));
-                console.log('📏 Canvas saída:', outWidth, 'x', outHeight);
+                console.log('📏 Canvas saída:', outWidth, 'x', outHeight, '| Qualidade:', quality);
                 console.log('📐 Mercator bounds:', mercBounds);
                 
                 const canvas = document.createElement('canvas');
@@ -640,13 +660,25 @@
                     // Verificar limites
                     if (srcX < 0 || srcX >= img.width - 1 || srcY < 0 || srcY >= img.height - 1) continue;
                     
-                    // Interpolação bilinear para qualidade
-                    const pixel = bilinear(srcData, srcX, srcY);
+                    // Interpolação: bilinear para qualidade, nearest neighbor para velocidade
+                    let r, g, b;
+                    if (settings.interpolate) {
+                        const pixel = bilinear(srcData, srcX, srcY);
+                        r = pixel.r; g = pixel.g; b = pixel.b;
+                    } else {
+                        // Nearest neighbor - mais rápido
+                        const sx = Math.floor(srcX);
+                        const sy = Math.floor(srcY);
+                        const srcIdx = (sy * srcData.width + sx) * 4;
+                        r = srcData.data[srcIdx];
+                        g = srcData.data[srcIdx + 1];
+                        b = srcData.data[srcIdx + 2];
+                    }
                     
                     const idx = (y * outWidth + x) * 4;
-                    outData.data[idx] = pixel.r;
-                    outData.data[idx + 1] = pixel.g;
-                    outData.data[idx + 2] = pixel.b;
+                    outData.data[idx] = r;
+                    outData.data[idx + 1] = g;
+                    outData.data[idx + 2] = b;
                     outData.data[idx + 3] = 255;
                     pixelsVisible++;
                 }
