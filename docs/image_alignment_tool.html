@@ -646,8 +646,9 @@
                 pointEl.innerHTML = id;
                 pointEl.dataset.id = id;
                 document.getElementById('imageContainer').appendChild(pointEl);
-                pointEl.style.left = (p.pixelX * currentZoom) + 'px';
-                pointEl.style.top = (p.pixelY * currentZoom) + 'px';
+                // Posicionar em coordenadas de pixel original
+                pointEl.style.left = p.pixelX + 'px';
+                pointEl.style.top = p.pixelY + 'px';
                 setupPointDrag(pointEl);
 
                 gcpPoints.push({
@@ -1034,6 +1035,8 @@
             const pixel = clientToImagePixel(touch.clientX, touch.clientY);
             if (!pixel) return;
             
+            console.log('Adicionando ponto GCP via touch em pixel:', pixel);
+            
             gcpCounter++;
             const id = gcpCounter;
             
@@ -1043,8 +1046,9 @@
             pointEl.dataset.id = id;
             document.getElementById('imageContainer').appendChild(pointEl);
             
-            pointEl.style.left = (pixel.x * currentZoom) + 'px';
-            pointEl.style.top = (pixel.y * currentZoom) + 'px';
+            // Posicionar em coordenadas de pixel original
+            pointEl.style.left = pixel.x + 'px';
+            pointEl.style.top = pixel.y + 'px';
             
             setupPointDrag(pointEl);
 
@@ -1067,8 +1071,9 @@
             
             point.pixelX = pixel.x;
             point.pixelY = pixel.y;
-            point.element.style.left = (pixel.x * currentZoom) + 'px';
-            point.element.style.top = (pixel.y * currentZoom) + 'px';
+            // Posicionar em coordenadas de pixel original
+            point.element.style.left = pixel.x + 'px';
+            point.element.style.top = pixel.y + 'px';
             
             updateGcpList();
         }
@@ -1107,21 +1112,36 @@
         }
 
         function clientToImagePixel(clientX, clientY) {
-            const container = document.getElementById('imageContainer');
-            const rect = container.getBoundingClientRect();
+            // Pegar o retângulo da imagem que já está transformada na tela
             const imgRect = imageElement.getBoundingClientRect();
             
-            // Posição relativa à imagem escalada
+            // Posição do clique relativa ao canto superior esquerdo da imagem renderizada
             const relX = clientX - imgRect.left;
             const relY = clientY - imgRect.top;
             
-            // Converter para coordenadas de pixel original
+            // A imagem está escalada por currentZoom, então dividimos para obter pixel original
             const pixelX = relX / currentZoom;
             const pixelY = relY / currentZoom;
             
-            if (pixelX >= 0 && pixelX <= imageNaturalSize.width &&
-                pixelY >= 0 && pixelY <= imageNaturalSize.height) {
-                return { x: pixelX, y: pixelY };
+            // Debug: log para verificar cálculo
+            console.log('clientToImagePixel:', {
+                clientX, clientY,
+                imgRect: {left: imgRect.left, top: imgRect.top, width: imgRect.width, height: imgRect.height},
+                relX, relY,
+                currentZoom,
+                pixelX, pixelY,
+                imageNaturalSize
+            });
+            
+            // Permitir margem de erro para cliques próximos à borda
+            const margin = 20;
+            if (pixelX >= -margin && pixelX <= imageNaturalSize.width + margin &&
+                pixelY >= -margin && pixelY <= imageNaturalSize.height + margin) {
+                // Clampar para valores válidos
+                return { 
+                    x: Math.max(0, Math.min(imageNaturalSize.width, pixelX)), 
+                    y: Math.max(0, Math.min(imageNaturalSize.height, pixelY)) 
+                };
             }
             return null;
         }
@@ -1200,7 +1220,7 @@
 
             const pointNum = measurePoints.length + 1;
 
-            // Criar marcador visual
+            // Criar marcador visual - posicionado em coordenadas de pixel original
             const marker = document.createElement('div');
             marker.className = 'measure-marker';
             marker.innerHTML = pointNum;
@@ -1220,8 +1240,8 @@
                 transform: translate(-50%, -50%);
                 z-index: 200;
                 pointer-events: none;
-                left: ${pixel.x * currentZoom}px;
-                top: ${pixel.y * currentZoom}px;
+                left: ${pixel.x}px;
+                top: ${pixel.y}px;
             `;
             document.getElementById('imageContainer').appendChild(marker);
             measureMarkers.push(marker);
@@ -1268,10 +1288,11 @@
             const p1 = measurePoints[0];
             const p2 = measurePoints[1];
 
-            const x1 = p1.pixelX * currentZoom;
-            const y1 = p1.pixelY * currentZoom;
-            const x2 = p2.pixelX * currentZoom;
-            const y2 = p2.pixelY * currentZoom;
+            // Usar coordenadas de pixel original - o container escala tudo junto
+            const x1 = p1.pixelX;
+            const y1 = p1.pixelY;
+            const x2 = p2.pixelX;
+            const y2 = p2.pixelY;
 
             const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
             svg.id = 'measureLine';
@@ -1279,10 +1300,11 @@
                 position: absolute;
                 top: 0;
                 left: 0;
-                width: 100%;
-                height: 100%;
+                width: ${imageNaturalSize.width}px;
+                height: ${imageNaturalSize.height}px;
                 pointer-events: none;
                 z-index: 150;
+                overflow: visible;
             `;
             svg.innerHTML = `
                 <defs>
@@ -1390,7 +1412,12 @@
             }
 
             const pixel = clientToImagePixel(e.clientX, e.clientY);
-            if (!pixel) return;
+            if (!pixel) {
+                console.log('Clique fora da imagem');
+                return;
+            }
+            
+            console.log('Adicionando ponto GCP em pixel:', pixel);
 
             gcpCounter++;
             const id = gcpCounter;
@@ -1402,9 +1429,10 @@
             pointEl.dataset.id = id;
             document.getElementById('imageContainer').appendChild(pointEl);
 
-            // Posicionar
-            pointEl.style.left = (pixel.x * currentZoom) + 'px';
-            pointEl.style.top = (pixel.y * currentZoom) + 'px';
+            // Posicionar em coordenadas de pixel original
+            // O container tem transform: scale() que escala automaticamente
+            pointEl.style.left = pixel.x + 'px';
+            pointEl.style.top = pixel.y + 'px';
 
             // Permitir arrastar
             setupPointDrag(pointEl);
@@ -1442,23 +1470,28 @@
             if (pixel) {
                 point.pixelX = pixel.x;
                 point.pixelY = pixel.y;
-                point.element.style.left = (pixel.x * currentZoom) + 'px';
-                point.element.style.top = (pixel.y * currentZoom) + 'px';
+                // Posicionar em coordenadas de pixel original
+                point.element.style.left = pixel.x + 'px';
+                point.element.style.top = pixel.y + 'px';
                 updateGcpList();
             }
         }
 
         function updatePointPositions() {
+            // Os pontos são posicionados em relação à imagem original
+            // O container aplica o scale via transform, então os pontos precisam
+            // ser posicionados em coordenadas de pixel original (serão escalados junto)
             gcpPoints.forEach(point => {
-                point.element.style.left = (point.pixelX * currentZoom) + 'px';
-                point.element.style.top = (point.pixelY * currentZoom) + 'px';
+                // Posição em pixels originais - o transform: scale() do container escala automaticamente
+                point.element.style.left = point.pixelX + 'px';
+                point.element.style.top = point.pixelY + 'px';
             });
             
             // Atualizar posição dos marcadores de medição
             measureMarkers.forEach((marker, i) => {
                 if (measurePoints[i]) {
-                    marker.style.left = (measurePoints[i].pixelX * currentZoom) + 'px';
-                    marker.style.top = (measurePoints[i].pixelY * currentZoom) + 'px';
+                    marker.style.left = measurePoints[i].pixelX + 'px';
+                    marker.style.top = measurePoints[i].pixelY + 'px';
                 }
             });
             
@@ -1571,7 +1604,11 @@
             if (n < 2) return null;
             
             if (n === 2) {
-                // Com apenas 2 pontos, assumir sem rotação
+                // Com 2 pontos, calculamos escala e offset para X e Y separadamente
+                // Assume-se que: 
+                //   - X da imagem corresponde a Longitude
+                //   - Y da imagem corresponde a Latitude (invertido - Y cresce pra baixo, lat decresce)
+                
                 const p1 = points[0];
                 const p2 = points[1];
                 
@@ -1580,31 +1617,51 @@
                 const dLng = p2.lng - p1.lng;
                 const dLat = p2.lat - p1.lat;
                 
-                // Calcular escala média
-                const pixelDist = Math.sqrt(dPixelX * dPixelX + dPixelY * dPixelY);
-                const geoDist = Math.sqrt(dLng * dLng + dLat * dLat);
+                console.log('Calculando transformação com 2 pontos:', {p1, p2, dPixelX, dPixelY, dLng, dLat});
                 
-                if (pixelDist === 0) return null;
+                // Verificar se os pontos não são iguais
+                if (Math.abs(dPixelX) < 1 && Math.abs(dPixelY) < 1) {
+                    console.error('Pontos muito próximos!');
+                    return null;
+                }
                 
-                // Estimar escala separada para X e Y
+                // Calcular escala baseada nos deltas
+                // Para imagens de satélite típicas:
+                // - dPixelX positivo + dLng negativo = indo para oeste (típico América do Sul)
+                // - dPixelY positivo + dLat negativo = indo para sul (típico imagens sat)
+                
                 let scaleX, scaleY;
                 
-                if (Math.abs(dPixelX) > 1) {
+                // Se temos movimento horizontal suficiente
+                if (Math.abs(dPixelX) > 10) {
                     scaleX = dLng / dPixelX;
                 } else {
-                    scaleX = geoDist / pixelDist;
+                    // Estimar baseado na razão vertical
+                    if (Math.abs(dPixelY) > 10) {
+                        // Assumir proporção típica de mapas
+                        scaleX = (dLat / dPixelY) * -1; // Negativo para manter orientação
+                    } else {
+                        return null; // Pontos muito próximos para calcular
+                    }
                 }
                 
-                if (Math.abs(dPixelY) > 1) {
+                // Se temos movimento vertical suficiente
+                if (Math.abs(dPixelY) > 10) {
                     scaleY = dLat / dPixelY;
                 } else {
-                    scaleY = -geoDist / pixelDist; // Negativo porque Y aumenta para baixo
+                    // Estimar baseado na razão horizontal
+                    if (Math.abs(dPixelX) > 10) {
+                        scaleY = (dLng / dPixelX) * -1;
+                    } else {
+                        return null;
+                    }
                 }
                 
-                // Ajuste: latitude decresce quando Y aumenta (imagem)
                 // Offset calculado a partir do primeiro ponto
                 const offsetLng = p1.lng - (p1.pixelX * scaleX);
                 const offsetLat = p1.lat - (p1.pixelY * scaleY);
+                
+                console.log('Transformação calculada:', {scaleX, scaleY, offsetLng, offsetLat});
                 
                 return {
                     a: scaleX, b: 0, c: offsetLng,
@@ -1986,8 +2043,9 @@
                     pointEl.innerHTML = id;
                     pointEl.dataset.id = id;
                     document.getElementById('imageContainer').appendChild(pointEl);
-                    pointEl.style.left = (p.pixelX * currentZoom) + 'px';
-                    pointEl.style.top = (p.pixelY * currentZoom) + 'px';
+                    // Posicionar em coordenadas de pixel original
+                    pointEl.style.left = p.pixelX + 'px';
+                    pointEl.style.top = p.pixelY + 'px';
                     setupPointDrag(pointEl);
 
                     gcpPoints.push({
