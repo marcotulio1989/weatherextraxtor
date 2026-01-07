@@ -978,8 +978,30 @@
                         document.getElementById('reprojStatus').style.color = '#00ff00';
                         document.getElementById('btnReproject').disabled = false;
                         
-                        // Aplicar preset para área visível
-                        setPreset('goes_full');
+                        // Aplicar bounds da área visível do satélite
+                        const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
+                        const visibleRange = 81; // graus de visibilidade do satélite
+                        
+                        // Definir cantos para área visível do satélite
+                        cornerBounds.nw = { lat: visibleRange, lng: satLonDeg - visibleRange };
+                        cornerBounds.ne = { lat: visibleRange, lng: satLonDeg + visibleRange };
+                        cornerBounds.sw = { lat: -visibleRange, lng: satLonDeg - visibleRange };
+                        cornerBounds.se = { lat: -visibleRange, lng: satLonDeg + visibleRange };
+                        
+                        // Atualizar marcadores
+                        cornerMarkers.nw.setLatLng([cornerBounds.nw.lat, cornerBounds.nw.lng]);
+                        cornerMarkers.ne.setLatLng([cornerBounds.ne.lat, cornerBounds.ne.lng]);
+                        cornerMarkers.sw.setLatLng([cornerBounds.sw.lat, cornerBounds.sw.lng]);
+                        cornerMarkers.se.setLatLng([cornerBounds.se.lat, cornerBounds.se.lng]);
+                        
+                        updateCornerDisplay();
+                        updateBoundsRectangle();
+                        
+                        // Ajustar visão do mapa
+                        map.fitBounds([
+                            [cornerBounds.nw.lat, cornerBounds.nw.lng],
+                            [cornerBounds.se.lat, cornerBounds.se.lng]
+                        ], { padding: [20, 20] });
                         
                         createGridFromCorners();
                         triangulate();
@@ -997,11 +1019,21 @@
         
         function geostatToPlateCarree(srcImg) {
             const quality = parseInt(document.getElementById('reprojQuality').value) || 600;
-            const satLon = parseFloat(document.getElementById('satLongitude').value) * Math.PI / 180;
+            const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
+            const satLon = satLonDeg * Math.PI / 180;
             
-            // Dimensões da imagem de saída (Plate Carrée)
-            const outWidth = quality * 2; // aspecto 2:1 para mapa mundi
-            const outHeight = quality;
+            // Área visível do satélite (aproximadamente 81° em cada direção)
+            const visibleRange = 81 * Math.PI / 180; // em radianos
+            
+            // Limites da área visível
+            const minLon = satLon - visibleRange;
+            const maxLon = satLon + visibleRange;
+            const minLat = -visibleRange;
+            const maxLat = visibleRange;
+            
+            // Dimensões da imagem de saída (apenas área visível)
+            const outWidth = quality;
+            const outHeight = quality; // Quadrado para área visível
             
             // Criar canvas de saída
             const outCanvas = document.createElement('canvas');
@@ -1022,33 +1054,17 @@
             // Centro e raio do disco na imagem fonte
             const cx = srcCanvas.width / 2;
             const cy = srcCanvas.height / 2;
-            const radius = Math.min(cx, cy) * 0.99; // Um pouco menor para evitar bordas
+            const radius = Math.min(cx, cy) * 0.98; // Um pouco menor para evitar bordas
             
-            // Constantes para GOES (satélite geoestacionário)
-            const EARTH_RADIUS = 6371.0; // km
-            const SAT_HEIGHT = 35786.0; // km acima da superfície
-            const SAT_DIST = EARTH_RADIUS + SAT_HEIGHT; // Distância do centro da Terra
-            
-            // Para cada pixel na imagem de saída (Plate Carrée)
+            // Para cada pixel na imagem de saída (Plate Carrée - apenas área visível)
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
-                    // Converter posição para lat/lon
-                    const lon = (x / outWidth) * 2 * Math.PI - Math.PI; // -180 a 180
-                    const lat = (0.5 - y / outHeight) * Math.PI; // 90 a -90
+                    // Converter posição para lat/lon (dentro da área visível)
+                    const lon = minLon + (x / outWidth) * (maxLon - minLon);
+                    const lat = maxLat - (y / outHeight) * (maxLat - minLat);
                     
-                    // Verificar se o ponto é visível do satélite
+                    // Diferença de longitude em relação ao satélite
                     const lonDiff = lon - satLon;
-                    
-                    // Limite de visibilidade (~81° do ponto sub-satelital)
-                    if (Math.abs(lonDiff) > Math.PI / 2.2 || Math.abs(lat) > Math.PI / 2.2) {
-                        // Fora da visão do satélite - pixel transparente
-                        const idx = (y * outWidth + x) * 4;
-                        outData.data[idx] = 0;
-                        outData.data[idx + 1] = 0;
-                        outData.data[idx + 2] = 0;
-                        outData.data[idx + 3] = 0;
-                        continue;
-                    }
                     
                     // Projeção inversa: lat/lon → posição no disco
                     // Fórmula simplificada para projeção geoestacionária
