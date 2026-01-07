@@ -616,7 +616,6 @@
             console.log('🎯 Reprojeção params:', {scanMax, imgRadius, scale, centerX, centerY});
             
             let pixelsVisible = 0;
-            let debugCount = 0;
             
             console.log('🔄 Iniciando reprojeção para Web Mercator...');
             
@@ -630,20 +629,8 @@
                     const lon = mercatorXToLon(mercX);
                     const lat = mercatorYToLat(mercY);
                     
-                    // Debug primeiro pixel
-                    if (debugCount < 5) {
-                        console.log('🔍 Debug pixel:', {x, y, mercX, mercY, lon, lat});
-                        debugCount++;
-                    }
-                    
                     // Converter lat/lon para coordenadas de scan do satélite
                     const scan = latLonToScan(lat, lon, sat_lon);
-                    
-                    // Debug scan
-                    if (debugCount <= 5 && scan) {
-                        console.log('✅ Scan encontrado:', scan);
-                    }
-                    
                     if (!scan) continue; // Ponto fora da visão do satélite
                     
                     // Mapear coordenadas de scan para pixels da imagem fonte
