@@ -460,8 +460,16 @@
             
             // Processar pixel a pixel
             // Para imagens Full Disk GEOCOLOR da NOAA STAR:
-            // Imagem 5424x5424 usa escala de 56 µrad/pixel
-            // O disco terrestre fica inscrito com algum padding
+            // O disco da Terra ocupa toda a imagem (inscrito no quadrado)
+            // Raio angular do limbo terrestre visto do GOES: ~8.7° = 0.1518 rad
+            
+            // O disco da Terra ocupa praticamente toda a imagem
+            // Então scanMax corresponde a metade da dimensão da imagem
+            const scanMax = 0.1518;  // Raio angular do disco em radianos
+            const imgRadius = Math.min(img.width, img.height) / 2;
+            const scale = imgRadius / scanMax;  // pixels por radiano
+            const centerX = img.width / 2;
+            const centerY = img.height / 2;
             
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
@@ -486,23 +494,11 @@
                             continue;
                         }
                         
-                        // Imagens GEOCOLOR da NOAA STAR usam grid fixo ABI
-                        // A escala é 56 µrad/pixel para Full Disk 2km
-                        // Total: 5424 pixels x 56 µrad = 0.303744 rad de extensão total
-                        // Centro da imagem = (2712, 2712) = nadir
-                        
-                        // Escala em radianos por pixel
-                        const scale_rad_per_px = 0.000056;  // 56 µrad
-                        
-                        // Centro da imagem
-                        const centerX = img.width / 2;
-                        const centerY = img.height / 2;
-                        
                         // Converter ângulos de scan para pixels
                         // scan.x positivo = leste = direita = srcX maior
                         // scan.y positivo = norte = cima = srcY menor
-                        srcX = centerX + (scan.x / scale_rad_per_px);
-                        srcY = centerY - (scan.y / scale_rad_per_px);
+                        srcX = centerX + scan.x * scale;
+                        srcY = centerY - scan.y * scale;
                     }
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
@@ -598,12 +594,6 @@
             
             return { x, y };
         }
-        
-        // Parâmetros da imagem Full Disk NOAA STAR GEOCOLOR
-        // A imagem 5424x5424 usa uma escala de 56 microradianos por pixel
-        // O centro da imagem corresponde ao nadir (lat=0, lon=sat_lon)
-        const GOES_SCALE = 0.000056;  // 56 µrad por pixel
-        const GOES_FD_SIZE = 5424;    // Pixels na imagem Full Disk
         
         function bilinear(srcData, x, y) {
             const x0 = Math.floor(x);
