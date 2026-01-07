@@ -44,33 +44,31 @@ print(f"📏 Raio: {RADIUS_NM} NM ({RADIUS_DEG:.2f}°)")
 print(f"📦 BBOX: {BBOX}")
 
 # =========================================================================
-# PARÂMETROS DA PROJEÇÃO GOES-16/19
+# BOUNDS DO SETOR SSA (South America) - GOES-19
 # =========================================================================
-# GOES-East está em 75.2°W (GOES-16) ou 75.0°W (GOES-19)
-# Setor SSA (South America) tem parâmetros específicos
+# Bounds calculados empiricamente a partir da imagem JPG do CDN STAR/NOAA
+# A imagem SSA é reprojetada para coordenadas geográficas (lat/lon)
+# Dimensões: 7200 x 4320 pixels
+# Aspect ratio: 1.6667 (125°/75° = 7200/4320)
 
-# Parâmetros da projeção geoestacionária GOES
-# A imagem SSA está em projeção geoestacionária do satélite GOES
-GOES_PROJECTION = {
-    "sat_lon": -75.2,          # Longitude do satélite (graus)
-    "sat_height": 35786023.0,  # Altura do satélite (m)
-    "earth_radius": 6378137.0, # Raio equatorial (m)
-    "earth_radius_polar": 6356752.31414, # Raio polar (m)
-    
-    # Scan angles calibrados para a imagem SSA (radianos)
-    "scan_x_min": -0.08365403,
-    "scan_x_max": 0.13199896,
-    "scan_y_min": -0.14002762,
-    "scan_y_max": 0.04996900,
-    
-    # Dimensões da imagem original
-    "img_width": 7200,
-    "img_height": 4320,
+SSA_BOUNDS = {
+    "lat_north": -12.0,     # Norte: 12°S (inclui Salvador, Lima)
+    "lat_south": -55.0,     # Sul: 55°S (inclui Ushuaia/Terra do Fogo)
+    "lon_west": -82.0,      # Oeste: 82°W (Oceano Pacífico, inclui Lima)
+    "lon_east": -10.33,     # Leste: ~10°W (Oceano Atlântico)
 }
 
-# Tamanho típico da imagem SSA
-SSA_WIDTH = 2500  # pixels aproximados
-SSA_HEIGHT = 2500
+# Dimensões da imagem SSA original
+SSA_WIDTH = 7200
+SSA_HEIGHT = 4320
+
+# Resolução em graus por pixel
+SSA_RES_LAT = (SSA_BOUNDS["lat_north"] - SSA_BOUNDS["lat_south"]) / SSA_HEIGHT  # ~0.0169°/px
+SSA_RES_LON = (SSA_BOUNDS["lon_east"] - SSA_BOUNDS["lon_west"]) / SSA_WIDTH     # ~0.0169°/px
+
+print(f"📐 SSA Bounds: Lat [{SSA_BOUNDS['lat_south']}° a {SSA_BOUNDS['lat_north']}°]")
+print(f"              Lon [{SSA_BOUNDS['lon_west']}° a {SSA_BOUNDS['lon_east']}°]")
+print(f"📏 Resolução: {SSA_RES_LAT:.4f}°/px x {SSA_RES_LON:.4f}°/px (~1.9 km/px)")
 
 
 def download_goes_image():
@@ -96,12 +94,28 @@ def download_goes_image():
 
 def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
     """
-    Converte lat/lon para coordenadas de pixel na imagem.
-    Assume projeção linear simples (aproximação para região pequena).
+    Converte lat/lon para coordenadas de pixel na imagem SSA.
+    A imagem SSA usa projeção equirectangular (lat/lon linear).
+    
+    Args:
+        lat: Latitude em graus (-58 a 15 para SSA)
+        lon: Longitude em graus (-116.83 a 4.83 para SSA)
+        img_width: Largura da imagem em pixels
+        img_height: Altura da imagem em pixels
+        bounds: Dicionário com lat_north, lat_south, lon_west, lon_east
+    
+    Returns:
+        (x, y): Coordenadas do pixel
     """
-    # Normalizar lon/lat para 0-1
-    x_norm = (lon - bounds["lon_min"]) / (bounds["lon_max"] - bounds["lon_min"])
-    y_norm = (bounds["lat_max"] - lat) / (bounds["lat_max"] - bounds["lat_min"])
+    # Usar nomes corretos das chaves
+    lon_west = bounds.get("lon_west", bounds.get("lon_min"))
+    lon_east = bounds.get("lon_east", bounds.get("lon_max"))
+    lat_north = bounds.get("lat_north", bounds.get("lat_max"))
+    lat_south = bounds.get("lat_south", bounds.get("lat_min"))
+    
+    # Normalizar para 0-1
+    x_norm = (lon - lon_west) / (lon_east - lon_west)
+    y_norm = (lat_north - lat) / (lat_north - lat_south)
     
     # Converter para pixels
     x = int(x_norm * img_width)
@@ -113,12 +127,28 @@ def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
 def pixel_to_latlon(x, y, img_width, img_height, bounds):
     """
     Converte coordenadas de pixel para lat/lon.
+    A imagem SSA usa projeção equirectangular (lat/lon linear).
+    
+    Args:
+        x, y: Coordenadas do pixel
+        img_width: Largura da imagem em pixels
+        img_height: Altura da imagem em pixels
+        bounds: Dicionário com lat_north, lat_south, lon_west, lon_east
+    
+    Returns:
+        (lat, lon): Coordenadas geográficas em graus
     """
+    # Usar nomes corretos das chaves
+    lon_west = bounds.get("lon_west", bounds.get("lon_min"))
+    lon_east = bounds.get("lon_east", bounds.get("lon_max"))
+    lat_north = bounds.get("lat_north", bounds.get("lat_max"))
+    lat_south = bounds.get("lat_south", bounds.get("lat_min"))
+    
     x_norm = x / img_width
     y_norm = y / img_height
     
-    lon = bounds["lon_min"] + x_norm * (bounds["lon_max"] - bounds["lon_min"])
-    lat = bounds["lat_max"] - y_norm * (bounds["lat_max"] - bounds["lat_min"])
+    lon = lon_west + x_norm * (lon_east - lon_west)
+    lat = lat_north - y_norm * (lat_north - lat_south)
     
     return lat, lon
 

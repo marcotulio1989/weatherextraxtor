@@ -73,6 +73,23 @@ GOES_PROJECTION = {
     "img_height": 4320,
 }
 
+# =========================================================================
+# BOUNDS DO SETOR SSA (South America) - GOES-19
+# =========================================================================
+# Bounds calculados empiricamente a partir da imagem JPG do CDN STAR/NOAA
+# A imagem SSA é reprojetada para coordenadas geográficas (lat/lon)
+SSA_BOUNDS = {
+    "lat_north": -12.0,     # Norte: 12°S (inclui Salvador, Lima)
+    "lat_south": -55.0,     # Sul: 55°S (inclui Ushuaia/Terra do Fogo)
+    "lon_west": -82.0,      # Oeste: 82°W (Oceano Pacífico, inclui Lima)
+    "lon_east": -10.33,     # Leste: ~10°W (Oceano Atlântico)
+    # Chaves alternativas para compatibilidade
+    "lat_max": -12.0,
+    "lat_min": -55.0,
+    "lon_max": -10.33,
+    "lon_min": -82.0,
+}
+
 
 def download_satellite_image(sat_id):
     """Baixa a imagem de um satélite específico."""
@@ -120,9 +137,14 @@ def download_satellite_image(sat_id):
 
 
 def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
-    """Converte lat/lon para coordenadas de pixel."""
-    x_norm = (lon - bounds["lon_min"]) / (bounds["lon_max"] - bounds["lon_min"])
-    y_norm = (bounds["lat_max"] - lat) / (bounds["lat_max"] - bounds["lat_min"])
+    """Converte lat/lon para coordenadas de pixel na imagem SSA."""
+    lon_west = bounds.get("lon_west", bounds.get("lon_min"))
+    lon_east = bounds.get("lon_east", bounds.get("lon_max"))
+    lat_north = bounds.get("lat_north", bounds.get("lat_max"))
+    lat_south = bounds.get("lat_south", bounds.get("lat_min"))
+    
+    x_norm = (lon - lon_west) / (lon_east - lon_west)
+    y_norm = (lat_north - lat) / (lat_north - lat_south)
     
     x = int(x_norm * img_width)
     y = int(y_norm * img_height)
@@ -132,11 +154,16 @@ def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
 
 def pixel_to_latlon(x, y, img_width, img_height, bounds):
     """Converte pixel para lat/lon."""
+    lon_west = bounds.get("lon_west", bounds.get("lon_min"))
+    lon_east = bounds.get("lon_east", bounds.get("lon_max"))
+    lat_north = bounds.get("lat_north", bounds.get("lat_max"))
+    lat_south = bounds.get("lat_south", bounds.get("lat_min"))
+    
     x_norm = x / img_width
     y_norm = y / img_height
     
-    lon = bounds["lon_min"] + x_norm * (bounds["lon_max"] - bounds["lon_min"])
-    lat = bounds["lat_max"] - y_norm * (bounds["lat_max"] - bounds["lat_min"])
+    lon = lon_west + x_norm * (lon_east - lon_west)
+    lat = lat_north - y_norm * (lat_north - lat_south)
     
     return lat, lon
 

@@ -5,17 +5,17 @@
       "name": "GOES-19",
       "image_url": "satellite_goes19.png",
       "data_url": "satellite_goes19.json",
-      "image_time_utc": "2026-01-06 08:41:32 UTC"
+      "image_time_utc": "2026-01-07 06:02:56 UTC"
     },
     {
       "id": "goes16",
       "name": "GOES-16",
       "image_url": "satellite_goes16.png",
       "data_url": "satellite_goes16.json",
-      "image_time_utc": "2026-01-06 08:41:32 UTC"
+      "image_time_utc": "2026-01-07 06:02:56 UTC"
     }
   ],
-  "updated_at": "2026-01-06T08:48:10.887173+00:00",
+  "updated_at": "2026-01-07T06:03:47.692667+00:00",
   "ship": {
     "lat": -22.5,
     "lon": -40.5,
