@@ -481,11 +481,14 @@
                             outData.data[idx + 3] = 0; // Transparente
                             continue;
                         }
-                        // Full Disk: centro da imagem é o subsatellite point
-                        // x positivo = leste, y positivo = norte
-                        // Imagem: x=0 é oeste, y=0 é norte
+                        // Full Disk NOAA:
+                        // - Imagem quadrada com Terra no centro
+                        // - y=0 é o NORTE (topo), y=max é o SUL (fundo)
+                        // - x=0 é o OESTE (esquerda), x=max é o LESTE (direita)
+                        // scan.x: negativo=oeste, positivo=leste
+                        // scan.y: negativo=sul, positivo=norte
                         srcX = ((scan.x + 0.151844) / (2 * 0.151844)) * img.width;
-                        srcY = ((-scan.y + 0.151844) / (2 * 0.151844)) * img.height;
+                        srcY = ((0.151844 - scan.y) / (2 * 0.151844)) * img.height;
                     }
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
@@ -536,7 +539,9 @@
         // =========================================================
         
         function latLonToScan(lat, lon, sat_lon) {
-            const H = 42164160.0;
+            // Converte lat/lon para coordenadas de scan do GOES
+            // Baseado no GOES-R PUG (Product User's Guide)
+            const H = 42164160.0;  // Distância satélite-centro da Terra (m)
             const r_eq = 6378137.0;
             const r_pol = 6356752.31414;
             
@@ -546,20 +551,27 @@
             const cos_lat = Math.cos(lat_rad);
             const sin_lat = Math.sin(lat_rad);
             
+            // Raio geocêntrico
             const r_geo = r_eq * r_pol / Math.sqrt(
                 r_pol * r_pol * cos_lat * cos_lat + 
                 r_eq * r_eq * sin_lat * sin_lat
             );
             
+            // Vetor do satélite ao ponto na Terra
             const r_1 = H - r_geo * cos_lat * Math.cos(lon_rad);
             const r_2 = -r_geo * cos_lat * Math.sin(lon_rad);
             const r_3 = r_geo * sin_lat;
             
+            // Verificar se ponto está visível
             if (r_1 > H) return null;
             
             const r_n = Math.sqrt(r_1*r_1 + r_2*r_2 + r_3*r_3);
+            
+            // Coordenadas de scan
+            // x: ângulo leste-oeste (positivo = leste)
+            // y: ângulo norte-sul (positivo = norte na nossa convenção)
             const x = Math.atan2(-r_2, r_1);
-            const y = Math.asin(-r_3 / r_n);
+            const y = Math.asin(r_3 / r_n);  // CORRIGIDO: sem negativo
             
             if (Math.abs(x) > 0.151844 || Math.abs(y) > 0.151844) return null;
             
