@@ -337,6 +337,11 @@
             width: 100%;
         }
 
+        /* Touch-friendly - prevenir zoom do browser */
+        .image-area {
+            touch-action: none;
+        }
+
         /* Status */
         .status-bar {
             font-size: 0.8em;
@@ -536,6 +541,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             imageElement = document.getElementById('satelliteImage');
             setupImageDrag();
+            setupTouchEvents();
             setupMouseTracking();
         });
 
@@ -559,42 +565,55 @@
         }
 
         // ===== PRESETS DE ALINHAMENTO GOES =====
-        // Coordenadas conhecidas para imagens GOES setoriais
-        // Nota: Imagens GOES usam projeção geoestacionária, então o alinhamento
-        // linear é uma aproximação. Use múltiplos pontos de referência para melhor precisão.
+        // IMPORTANTE: Estes presets NÃO definem posições de pixel corretas!
+        // Os pontos são apenas MARCADORES para você arrastar para os locais corretos na imagem.
+        // Use características geográficas identificáveis como:
+        // - Fernando de Noronha (ilha isolada)
+        // - Foz do Rio Amazonas
+        // - Ponta de praias/cabos
+        // - Lagos grandes (Lagoa dos Patos, Titicaca)
         const ALIGNMENT_PRESETS = {
             goes_ssa: {
                 name: 'GOES SSA (América do Sul)',
-                // Bounds do setor SSA (South America) - 1808x1015 ou similar
-                // Estas são aproximações - ajuste os pontos para locais conhecidos!
+                description: 'Arraste cada ponto para o local indicado na imagem',
+                // Pontos começam no CENTRO - você deve arrastar para a posição correta!
                 gcpPoints: [
-                    // Pontos em locais mais identificáveis
-                    // Buenos Aires (aproximado)
-                    { pixelX: 350, pixelY: 500, lat: -34.6, lng: -58.4 },
-                    // Rio de Janeiro (aproximado)
-                    { pixelX: 650, pixelY: 450, lat: -22.9, lng: -43.2 },
-                    // Lima (aproximado)
-                    { pixelX: 150, pixelY: 380, lat: -12.0, lng: -77.0 },
-                    // Manaus (aproximado)
-                    { pixelX: 450, pixelY: 280, lat: -3.1, lng: -60.0 }
+                    // Fernando de Noronha - ilha bem visível no Atlântico
+                    { pixelX: 100, pixelY: 100, lat: -3.8544, lng: -32.4297, label: 'Fernando de Noronha' },
+                    // Foz do Amazonas - delta bem característico
+                    { pixelX: 200, pixelY: 100, lat: -0.0389, lng: -49.5167, label: 'Foz do Amazonas' },
+                    // Cabo Frio - ponta característica no RJ
+                    { pixelX: 300, pixelY: 100, lat: -22.8833, lng: -42.0167, label: 'Cabo Frio' },
+                    // Lagoa dos Patos - lago bem visível no RS
+                    { pixelX: 400, pixelY: 100, lat: -31.0000, lng: -51.0000, label: 'Lagoa dos Patos' }
                 ]
             },
             goes_car: {
                 name: 'GOES CAR (Caribe)',
+                description: 'Arraste cada ponto para o local indicado na imagem',
                 gcpPoints: [
-                    { pixelX: 900, pixelY: 540, lat: 18.5, lng: -69.9 },  // Santo Domingo
-                    { pixelX: 600, pixelY: 300, lat: 25.8, lng: -80.2 },  // Miami
-                    { pixelX: 400, pixelY: 700, lat: 10.5, lng: -66.9 },  // Caracas
-                    { pixelX: 700, pixelY: 450, lat: 18.0, lng: -76.8 }   // Kingston
+                    // Cuba - ponta oeste
+                    { pixelX: 100, pixelY: 100, lat: 21.9000, lng: -84.9500, label: 'Ponta W Cuba' },
+                    // Jamaica - centro da ilha
+                    { pixelX: 200, pixelY: 100, lat: 18.1096, lng: -77.2975, label: 'Jamaica' },
+                    // Porto Rico - bem definido
+                    { pixelX: 300, pixelY: 100, lat: 18.2208, lng: -66.5901, label: 'Porto Rico' },
+                    // Trinidad - sul do Caribe
+                    { pixelX: 400, pixelY: 100, lat: 10.4500, lng: -61.2500, label: 'Trinidad' }
                 ]
             },
             goes_gm: {
                 name: 'GOES GM (Golfo México)',
+                description: 'Arraste cada ponto para o local indicado na imagem',
                 gcpPoints: [
-                    { pixelX: 900, pixelY: 300, lat: 29.8, lng: -95.4 },  // Houston
-                    { pixelX: 600, pixelY: 600, lat: 19.4, lng: -99.1 },  // Cidade México
-                    { pixelX: 1200, pixelY: 450, lat: 25.7, lng: -80.2 }, // Miami
-                    { pixelX: 400, pixelY: 400, lat: 23.2, lng: -106.4 }  // Mazatlán
+                    // Delta do Mississippi
+                    { pixelX: 100, pixelY: 100, lat: 29.1500, lng: -89.2500, label: 'Delta Mississippi' },
+                    // Ponta Yucatán
+                    { pixelX: 200, pixelY: 100, lat: 21.5000, lng: -86.9500, label: 'Cancún/Yucatán' },
+                    // Cabo Catoche - extremo NE Yucatán
+                    { pixelX: 300, pixelY: 100, lat: 21.6000, lng: -87.1000, label: 'Cabo Catoche' },
+                    // Florida Keys
+                    { pixelX: 400, pixelY: 100, lat: 24.5500, lng: -81.8000, label: 'Florida Keys' }
                 ]
             }
         };
@@ -629,6 +648,7 @@
                     pixelY: p.pixelY,
                     lat: p.lat,
                     lng: p.lng,
+                    label: p.label || null,
                     element: pointEl
                 });
             });
@@ -636,7 +656,7 @@
             updateGcpList();
             updateSummary();
             
-            alert(`Preset "${preset.name}" carregado!\n\n⚠️ IMPORTANTE: Os pontos estão em posições aproximadas.\nArraste-os para localizações conhecidas (cidades, ilhas, etc.) e ajuste as coordenadas para melhor precisão.`);
+            alert(`Preset "${preset.name}" carregado!\n\n⚠️ IMPORTANTE:\n\nOs pontos NÃO estão nas posições corretas!\nVocê DEVE arrastar cada ponto para o local indicado:\n\n${preset.gcpPoints.map((p,i) => `${i+1}. ${p.label || 'Ponto '+(i+1)}`).join('\n')}\n\nUse o zoom para identificar as feições geográficas.`);
         }
 
         // ===== CIDADES CONHECIDAS =====
@@ -818,6 +838,203 @@
             } else {
                 area.style.cursor = 'grab';
             }
+        }
+
+        // ===== SUPORTE A TOUCH (TABLET/CELULAR) =====
+        let touchState = {
+            lastTouches: null,
+            initialDistance: 0,
+            initialZoom: 1,
+            isPanning: false,
+            isPinching: false
+        };
+
+        function setupTouchEvents() {
+            const area = document.getElementById('imageArea');
+            
+            // Prevenir comportamentos padrão do browser
+            area.addEventListener('touchstart', handleTouchStart, { passive: false });
+            area.addEventListener('touchmove', handleTouchMove, { passive: false });
+            area.addEventListener('touchend', handleTouchEnd, { passive: false });
+            area.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+        }
+
+        function handleTouchStart(e) {
+            e.preventDefault();
+            
+            const touches = e.touches;
+            
+            if (touches.length === 1) {
+                // Um dedo = pan ou clique
+                const touch = touches[0];
+                
+                // Verificar se tocou em ponto GCP
+                if (e.target.classList.contains('image-point')) {
+                    // Iniciar arrasto de ponto
+                    const pointId = parseInt(e.target.dataset.id);
+                    const point = gcpPoints.find(p => p.id === pointId);
+                    if (point) {
+                        isDragging = true;
+                        dragTarget = { type: 'point', point: point };
+                    }
+                    return;
+                }
+                
+                // Se em modo GCP ou medição, tratar como clique
+                if (gcpMode || measureMode) {
+                    // Simular click
+                    if (gcpMode) {
+                        addGcpPointFromTouch(touch);
+                    }
+                    return;
+                }
+                
+                // Senão, iniciar pan
+                touchState.isPanning = true;
+                touchState.lastTouches = [{ x: touch.clientX, y: touch.clientY }];
+                
+            } else if (touches.length === 2) {
+                // Dois dedos = pinch to zoom
+                touchState.isPanning = false;
+                touchState.isPinching = true;
+                
+                const dist = getTouchDistance(touches[0], touches[1]);
+                touchState.initialDistance = dist;
+                touchState.initialZoom = currentZoom;
+                
+                // Centro entre os dois toques para pan durante pinch
+                touchState.lastTouches = [
+                    { x: touches[0].clientX, y: touches[0].clientY },
+                    { x: touches[1].clientX, y: touches[1].clientY }
+                ];
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            
+            const touches = e.touches;
+            
+            if (touchState.isPanning && touches.length === 1) {
+                // Pan com um dedo
+                const touch = touches[0];
+                const dx = touch.clientX - touchState.lastTouches[0].x;
+                const dy = touch.clientY - touchState.lastTouches[0].y;
+                
+                imageOffset.x += dx;
+                imageOffset.y += dy;
+                applyZoom();
+                
+                touchState.lastTouches = [{ x: touch.clientX, y: touch.clientY }];
+                
+            } else if (isDragging && dragTarget && dragTarget.type === 'point' && touches.length === 1) {
+                // Arrastando ponto GCP
+                const touch = touches[0];
+                updatePointDragFromTouch(touch, dragTarget.point);
+                
+            } else if (touchState.isPinching && touches.length === 2) {
+                // Pinch to zoom
+                const dist = getTouchDistance(touches[0], touches[1]);
+                const scale = dist / touchState.initialDistance;
+                
+                let newZoom = touchState.initialZoom * scale;
+                newZoom = Math.max(0.1, Math.min(10, newZoom));
+                
+                // Calcular centro do pinch
+                const centerX = (touches[0].clientX + touches[1].clientX) / 2;
+                const centerY = (touches[0].clientY + touches[1].clientY) / 2;
+                
+                // Zoom em direção ao centro do pinch
+                const zoomRatio = newZoom / currentZoom;
+                
+                // Ajustar offset para manter centro
+                const area = document.getElementById('imageArea');
+                const rect = area.getBoundingClientRect();
+                const areaCenterX = rect.left + rect.width / 2;
+                const areaCenterY = rect.top + rect.height / 2;
+                
+                const dx = centerX - areaCenterX;
+                const dy = centerY - areaCenterY;
+                
+                imageOffset.x = imageOffset.x - dx * (zoomRatio - 1);
+                imageOffset.y = imageOffset.y - dy * (zoomRatio - 1);
+                
+                currentZoom = newZoom;
+                applyZoom();
+                
+                // Também fazer pan durante o pinch
+                const oldCenterX = (touchState.lastTouches[0].x + touchState.lastTouches[1].x) / 2;
+                const oldCenterY = (touchState.lastTouches[0].y + touchState.lastTouches[1].y) / 2;
+                
+                imageOffset.x += centerX - oldCenterX;
+                imageOffset.y += centerY - oldCenterY;
+                applyZoom();
+                
+                touchState.lastTouches = [
+                    { x: touches[0].clientX, y: touches[0].clientY },
+                    { x: touches[1].clientX, y: touches[1].clientY }
+                ];
+            }
+        }
+
+        function handleTouchEnd(e) {
+            touchState.isPanning = false;
+            touchState.isPinching = false;
+            touchState.lastTouches = null;
+            
+            if (isDragging) {
+                isDragging = false;
+                dragTarget = null;
+            }
+        }
+
+        function getTouchDistance(touch1, touch2) {
+            const dx = touch1.clientX - touch2.clientX;
+            const dy = touch1.clientY - touch2.clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function addGcpPointFromTouch(touch) {
+            const pixel = clientToImagePixel(touch.clientX, touch.clientY);
+            if (!pixel) return;
+            
+            gcpCounter++;
+            const id = gcpCounter;
+            
+            const pointEl = document.createElement('div');
+            pointEl.className = 'image-point';
+            pointEl.innerHTML = id;
+            pointEl.dataset.id = id;
+            document.getElementById('imageContainer').appendChild(pointEl);
+            
+            pointEl.style.left = (pixel.x * currentZoom) + 'px';
+            pointEl.style.top = (pixel.y * currentZoom) + 'px';
+            
+            setupPointDrag(pointEl);
+
+            gcpPoints.push({
+                id: id,
+                pixelX: pixel.x,
+                pixelY: pixel.y,
+                lat: 0,
+                lng: 0,
+                element: pointEl
+            });
+
+            updateGcpList();
+            updateSummary();
+        }
+
+        function updatePointDragFromTouch(touch, point) {
+            const pixel = clientToImagePixel(touch.clientX, touch.clientY);
+            if (!pixel) return;
+            
+            point.pixelX = pixel.x;
+            point.pixelY = pixel.y;
+            point.element.style.left = (pixel.x * currentZoom) + 'px';
+            point.element.style.top = (pixel.y * currentZoom) + 'px';
+            
+            updateGcpList();
         }
 
         // ===== RASTREAR MOUSE =====
@@ -1225,6 +1442,9 @@
             
             let html = '';
             gcpPoints.forEach(point => {
+                const labelHtml = point.label 
+                    ? `<div style="color:#ff00ff; font-size:0.8em; font-weight:bold; margin-bottom:4px;">📍 ${point.label}</div>` 
+                    : '';
                 html += `
                     <div class="gcp-item" data-id="${point.id}">
                         <div class="gcp-header">
@@ -1232,6 +1452,7 @@
                             <span style="color:#888; font-size:0.8em;">Pixel: ${Math.round(point.pixelX)}, ${Math.round(point.pixelY)}</span>
                             <button class="remove-btn" onclick="removePoint(${point.id})">×</button>
                         </div>
+                        ${labelHtml}
                         <div class="gcp-coords">
                             <div>
                                 <label>Latitude</label>
