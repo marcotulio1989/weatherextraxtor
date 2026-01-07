@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ Alinhamento Multi-Ponto - Distorção por Malha</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a15;
+            color: #eee;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .control-panel {
+            width: 340px;
+            background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+            padding: 15px;
+            overflow-y: auto;
+            border-right: 2px solid #0f3460;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .control-panel h1 {
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            color: #e94560;
+            text-align: center;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 10px;
+        }
+
+        .control-section {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: rgba(15, 52, 96, 0.5);
+            border-radius: 8px;
+        }
+
+        .control-section h3 {
+            color: #00d9ff;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 6px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 0.85em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560, #c23a51);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #0f3460, #16213e);
+            color: #00d9ff;
+            border: 1px solid #00d9ff;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00b894, #00a381);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #fdcb6e, #e17055);
+            color: #1a1a2e;
+        }
+
+        .btn-active {
+            background: linear-gradient(135deg, #ff00ff, #cc00cc) !important;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(255,0,255,0.5); }
+            50% { box-shadow: 0 0 20px rgba(255,0,255,0.8); }
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        #map {
+            flex: 1;
+            background: #1a1a2e;
+        }
+
+        .status-bar {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 6px;
+            padding: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+
+        .instructions {
+            font-size: 0.75em;
+            color: #aaa;
+            line-height: 1.5;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            border-left: 3px solid #00d9ff;
+        }
+
+        .slider-container {
+            margin: 8px 0;
+        }
+
+        .slider-container label {
+            display: block;
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .slider-container input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #0f3460;
+            outline: none;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .point-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0a0a15;
+            border-radius: 4px;
+            padding: 6px;
+            margin-top: 8px;
+        }
+
+        .point-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 8px;
+            margin-bottom: 4px;
+            background: rgba(15, 52, 96, 0.7);
+            border-radius: 4px;
+            font-size: 0.75em;
+            border-left: 3px solid #ff00ff;
+        }
+
+        .point-item .point-num {
+            background: #ff00ff;
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        .point-item .point-coords {
+            flex: 1;
+            margin: 0 8px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+
+        .point-item .remove-btn {
+            background: #e94560;
+            border: none;
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .grid-controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            margin-top: 8px;
+        }
+
+        .grid-btn {
+            padding: 8px 4px;
+            font-size: 0.7em;
+            background: #0f3460;
+            border: 1px solid #00d9ff;
+            color: #00d9ff;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .grid-btn:hover {
+            background: #16213e;
+        }
+
+        .grid-btn.active {
+            background: #00d9ff;
+            color: #0a0a15;
+        }
+
+        /* Estilos do marcador de controle */
+        .control-point-marker {
+            width: 20px;
+            height: 20px;
+            background: #ff00ff;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: move;
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .control-point-marker:hover {
+            transform: scale(1.2);
+            background: #00ffff;
+        }
+
+        .control-point-marker.corner {
+            background: #00ff00;
+            box-shadow: 0 0 10px rgba(0,255,0,0.8);
+        }
+
+        .error-display {
+            background: #0a0a15;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-family: monospace;
+            font-size: 0.8em;
+        }
+
+        .error-good { color: #00ff00; }
+        .error-ok { color: #ffff00; }
+        .error-bad { color: #ff6600; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Painel de Controle -->
+        <div class="control-panel">
+            <h1>🛰️ Alinhamento Multi-Ponto</h1>
+
+            <!-- Carregar Imagem -->
+            <div class="control-section">
+                <h3>📁 Carregar Imagem</h3>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:8px;">
+                    <button class="btn" onclick="loadNoaaImage('goes19')" style="background:#e74c3c; font-size:0.75em; padding:8px;">
+                        🛰️ GOES-19
+                    </button>
+                    <button class="btn" onclick="loadNoaaImage('goes16')" style="background:#3498db; font-size:0.75em; padding:8px;">
+                        🛰️ GOES-16
+                    </button>
+                </div>
+                
+                <div class="file-input-wrapper">
+                    <button class="btn btn-primary">📂 Selecionar Arquivo</button>
+                    <input type="file" id="imageInput" accept="image/*">
+                </div>
+                
+                <div class="status-bar" id="imageStatus">Nenhuma imagem carregada</div>
+            </div>
+
+            <!-- Opacidade -->
+            <div class="control-section">
+                <h3>🎨 Opacidade</h3>
+                <div class="slider-container">
+                    <label>Imagem: <span id="opacityValue">60</span>%</label>
+                    <input type="range" id="opacitySlider" min="10" max="100" value="60" 
+                           onchange="setImageOpacity(this.value)">
+                </div>
+            </div>
+
+            <!-- Grade de Pontos -->
+            <div class="control-section">
+                <h3>📐 Grade de Controle</h3>
+                <p style="font-size:0.75em; color:#888; margin-bottom:8px;">
+                    Escolha quantos pontos de controle:
+                </p>
+                <div class="grid-controls">
+                    <button class="grid-btn" onclick="createGrid(2,2)" id="grid2x2">2×2 (4)</button>
+                    <button class="grid-btn active" onclick="createGrid(3,3)" id="grid3x3">3×3 (9)</button>
+                    <button class="grid-btn" onclick="createGrid(4,4)" id="grid4x4">4×4 (16)</button>
+                    <button class="grid-btn" onclick="createGrid(5,5)" id="grid5x5">5×5 (25)</button>
+                    <button class="grid-btn" onclick="createGrid(3,5)" id="grid3x5">3×5 (15)</button>
+                    <button class="grid-btn" onclick="createGrid(5,3)" id="grid5x3">5×3 (15)</button>
+                </div>
+            </div>
+
+            <!-- Adicionar Ponto Manual -->
+            <div class="control-section">
+                <h3>➕ Adicionar Ponto Extra</h3>
+                <button class="btn btn-primary" id="btnAddPoint" onclick="toggleAddPointMode()">
+                    🎯 Clique no Mapa para Adicionar
+                </button>
+                <div class="instructions" id="addPointInstructions" style="display:none;">
+                    Clique no mapa onde você quer adicionar um novo ponto de controle.<br>
+                    Depois arraste-o para a posição correta.
+                </div>
+            </div>
+
+            <!-- Lista de Pontos -->
+            <div class="control-section">
+                <h3>📌 Pontos de Controle (<span id="pointCount">0</span>)</h3>
+                <div class="point-list" id="pointList">
+                    <p style="color:#666; font-size:0.8em; text-align:center;">
+                        Carregue uma imagem para criar pontos
+                    </p>
+                </div>
+                
+                <div class="error-display" id="errorDisplay">
+                    Erro médio: --
+                </div>
+            </div>
+
+            <!-- Ações -->
+            <div class="control-section">
+                <h3>⚡ Ações</h3>
+                <button class="btn btn-success" onclick="applyDistortion()">
+                    ✨ Aplicar Distorção
+                </button>
+                <button class="btn btn-warning" onclick="resetAllPoints()">
+                    🔄 Resetar Pontos
+                </button>
+                <button class="btn btn-secondary" onclick="exportAlignment()">
+                    📤 Exportar
+                </button>
+                <button class="btn btn-secondary" onclick="importAlignment()">
+                    📥 Importar
+                </button>
+            </div>
+
+            <!-- Instruções -->
+            <div class="control-section">
+                <h3>📖 Como Usar</h3>
+                <div class="instructions">
+                    <b>1.</b> Carregue a imagem de satélite<br><br>
+                    <b>2.</b> Uma grade de pontos aparecerá sobre a imagem<br><br>
+                    <b>3.</b> <span style="color:#ff00ff;">Arraste cada ponto</span> para alinhar com o mapa:<br>
+                    • Pontos verdes = cantos<br>
+                    • Pontos rosa = intermediários<br><br>
+                    <b>4.</b> Adicione mais pontos onde precisar<br><br>
+                    <b>5. Clique "Aplicar Distorção"</b> para ver o resultado
+                </div>
+            </div>
+        </div>
+
+        <!-- Mapa -->
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Biblioteca para triangulação -->
+    <script src="https://cdn.jsdelivr.net/npm/delaunator@5.0.0/delaunator.min.js"></script>
+    <script>
+        // ===== ESTADO GLOBAL =====
+        let map = null;
+        let imageOverlay = null;
+        let canvasOverlay = null;
+        let controlPoints = []; // {id, marker, originalLat, originalLng, currentLat, currentLng, gridX, gridY}
+        let imageElement = null;
+        let imageBounds = null;
+        let gridSize = { rows: 3, cols: 3 };
+        let addPointMode = false;
+        let pointIdCounter = 0;
+
+        // Bounds iniciais para América do Sul
+        const DEFAULT_BOUNDS = {
+            north: 15,
+            south: -60,
+            west: -90,
+            east: -25
+        };
+
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            setupFileInput();
+        });
+
+        function initMap() {
+            map = L.map('map', {
+                center: [-25, -55],
+                zoom: 4,
+                zoomControl: true
+            });
+
+            // Camada base
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                opacity: 0.8
+            }).addTo(map);
+
+            // Evento de clique para adicionar pontos
+            map.on('click', function(e) {
+                if (addPointMode) {
+                    addExtraPoint(e.latlng);
+                }
+            });
+        }
+
+        function setupFileInput() {
+            document.getElementById('imageInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        loadImage(event.target.result, file.name);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // ===== CARREGAR IMAGENS NOAA =====
+        const NOAA_URLS = {
+            goes19: {
+                name: 'GOES-19 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg'
+            },
+            goes16: {
+                name: 'GOES-16 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg'
+            }
+        };
+
+        function loadNoaaImage(satellite) {
+            const sat = NOAA_URLS[satellite];
+            if (!sat) return;
+
+            document.getElementById('imageStatus').innerHTML = `⏳ Baixando ${sat.name}...`;
+            document.getElementById('imageStatus').style.color = '#ffff00';
+
+            const urlWithCache = sat.url + '?t=' + Date.now();
+            loadImage(urlWithCache, sat.name);
+        }
+
+        // ===== CARREGAR IMAGEM =====
+        function loadImage(src, name) {
+            const status = document.getElementById('imageStatus');
+
+            // Criar elemento de imagem para obter dimensões
+            imageElement = new Image();
+            imageElement.crossOrigin = 'anonymous';
+            
+            imageElement.onload = function() {
+                // Definir bounds iniciais
+                imageBounds = L.latLngBounds(
+                    [DEFAULT_BOUNDS.south, DEFAULT_BOUNDS.west],
+                    [DEFAULT_BOUNDS.north, DEFAULT_BOUNDS.east]
+                );
+
+                // Remover overlay anterior
+                if (imageOverlay) {
+                    map.removeLayer(imageOverlay);
+                }
+                if (canvasOverlay) {
+                    map.removeLayer(canvasOverlay);
+                }
+
+                // Criar overlay da imagem
+                imageOverlay = L.imageOverlay(src, imageBounds, {
+                    opacity: 0.6,
+                    interactive: false
+                }).addTo(map);
+
+                // Ajustar view
+                map.fitBounds(imageBounds);
+
+                // Criar grade de pontos de controle
+                createGrid(gridSize.rows, gridSize.cols);
+
+                status.innerHTML = `✅ ${name}<br>📐 ${this.width}×${this.height}px`;
+                status.style.color = '#00ff00';
+            };
+
+            imageElement.onerror = function() {
+                status.innerHTML = '❌ Erro ao carregar';
+                status.style.color = '#ff4444';
+            };
+
+            imageElement.src = src;
+        }
+
+        // ===== CRIAR GRADE DE PONTOS =====
+        function createGrid(rows, cols) {
+            gridSize = { rows, cols };
+
+            // Limpar pontos anteriores
+            clearAllPoints();
+
+            // Atualizar botões
+            document.querySelectorAll('.grid-btn').forEach(btn => btn.classList.remove('active'));
+            const btnId = `grid${rows}x${cols}`;
+            const btn = document.getElementById(btnId);
+            if (btn) btn.classList.add('active');
+
+            if (!imageBounds) return;
+
+            const north = imageBounds.getNorth();
+            const south = imageBounds.getSouth();
+            const west = imageBounds.getWest();
+            const east = imageBounds.getEast();
+
+            const latStep = (north - south) / (rows - 1);
+            const lngStep = (east - west) / (cols - 1);
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const lat = north - (r * latStep);
+                    const lng = west + (c * lngStep);
+                    
+                    const isCorner = (r === 0 || r === rows - 1) && (c === 0 || c === cols - 1);
+                    
+                    addControlPoint(lat, lng, r, c, isCorner);
+                }
+            }
+
+            updatePointList();
+            updatePointCount();
+        }
+
+        // ===== ADICIONAR PONTO DE CONTROLE =====
+        function addControlPoint(lat, lng, gridX, gridY, isCorner = false) {
+            pointIdCounter++;
+            const id = pointIdCounter;
+
+            // Criar ícone do marcador
+            const icon = L.divIcon({
+                className: 'control-point-marker' + (isCorner ? ' corner' : ''),
+                html: `<span>${id}</span>`,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+
+            // Criar marcador arrastável
+            const marker = L.marker([lat, lng], {
+                icon: icon,
+                draggable: true
+            }).addTo(map);
+
+            // Evento de arrastar
+            marker.on('drag', function(e) {
+                const point = controlPoints.find(p => p.id === id);
+                if (point) {
+                    point.currentLat = e.latlng.lat;
+                    point.currentLng = e.latlng.lng;
+                    updatePointList();
+                }
+            });
+
+            marker.on('dragend', function() {
+                calculateError();
+            });
+
+            // Adicionar ao array
+            controlPoints.push({
+                id: id,
+                marker: marker,
+                originalLat: lat,
+                originalLng: lng,
+                currentLat: lat,
+                currentLng: lng,
+                gridX: gridX,
+                gridY: gridY,
+                isCorner: isCorner
+            });
+
+            return id;
+        }
+
+        // ===== MODO ADICIONAR PONTO =====
+        function toggleAddPointMode() {
+            addPointMode = !addPointMode;
+            const btn = document.getElementById('btnAddPoint');
+            const instructions = document.getElementById('addPointInstructions');
+
+            if (addPointMode) {
+                btn.classList.add('btn-active');
+                btn.innerHTML = '🎯 CLIQUE NO MAPA!';
+                instructions.style.display = 'block';
+                map.getContainer().style.cursor = 'crosshair';
+            } else {
+                btn.classList.remove('btn-active');
+                btn.innerHTML = '🎯 Clique no Mapa para Adicionar';
+                instructions.style.display = 'none';
+                map.getContainer().style.cursor = '';
+            }
+        }
+
+        function addExtraPoint(latlng) {
+            addControlPoint(latlng.lat, latlng.lng, -1, -1, false);
+            updatePointList();
+            updatePointCount();
+            toggleAddPointMode();
+        }
+
+        // ===== REMOVER PONTO =====
+        function removePoint(id) {
+            const index = controlPoints.findIndex(p => p.id === id);
+            if (index !== -1) {
+                map.removeLayer(controlPoints[index].marker);
+                controlPoints.splice(index, 1);
+                updatePointList();
+                updatePointCount();
+            }
+        }
+
+        // ===== LIMPAR PONTOS =====
+        function clearAllPoints() {
+            controlPoints.forEach(p => map.removeLayer(p.marker));
+            controlPoints = [];
+            pointIdCounter = 0;
+            updatePointList();
+            updatePointCount();
+        }
+
+        function resetAllPoints() {
+            // Resetar posições para originais
+            controlPoints.forEach(p => {
+                p.currentLat = p.originalLat;
+                p.currentLng = p.originalLng;
+                p.marker.setLatLng([p.originalLat, p.originalLng]);
+            });
+            updatePointList();
+            calculateError();
+            
+            // Resetar imagem
+            if (imageOverlay && imageBounds) {
+                map.removeLayer(imageOverlay);
+                imageOverlay = L.imageOverlay(imageElement.src, imageBounds, {
+                    opacity: parseFloat(document.getElementById('opacitySlider').value) / 100
+                }).addTo(map);
+            }
+            
+            if (canvasOverlay) {
+                map.removeLayer(canvasOverlay);
+                canvasOverlay = null;
+            }
+        }
+
+        // ===== ATUALIZAR LISTA DE PONTOS =====
+        function updatePointList() {
+            const list = document.getElementById('pointList');
+            
+            if (controlPoints.length === 0) {
+                list.innerHTML = '<p style="color:#666; font-size:0.8em; text-align:center;">Nenhum ponto</p>';
+                return;
+            }
+
+            let html = '';
+            controlPoints.forEach(p => {
+                const moved = (p.currentLat !== p.originalLat || p.currentLng !== p.originalLng);
+                const movedClass = moved ? 'style="border-left-color:#00ff00;"' : '';
+                
+                html += `
+                    <div class="point-item" ${movedClass}>
+                        <span class="point-num">${p.id}</span>
+                        <span class="point-coords">
+                            ${p.currentLat.toFixed(3)}, ${p.currentLng.toFixed(3)}
+                        </span>
+                        <button class="remove-btn" onclick="removePoint(${p.id})">×</button>
+                    </div>
+                `;
+            });
+
+            list.innerHTML = html;
+        }
+
+        function updatePointCount() {
+            document.getElementById('pointCount').textContent = controlPoints.length;
+        }
+
+        // ===== CALCULAR ERRO =====
+        function calculateError() {
+            const display = document.getElementById('errorDisplay');
+            
+            if (controlPoints.length < 2) {
+                display.innerHTML = 'Erro médio: --';
+                return;
+            }
+
+            let totalDist = 0;
+            let movedCount = 0;
+
+            controlPoints.forEach(p => {
+                const dLat = p.currentLat - p.originalLat;
+                const dLng = p.currentLng - p.originalLng;
+                const dist = Math.sqrt(dLat * dLat + dLng * dLng) * 111; // ~111 km por grau
+                
+                if (dist > 0.1) {
+                    totalDist += dist;
+                    movedCount++;
+                }
+            });
+
+            const avgDist = movedCount > 0 ? totalDist / movedCount : 0;
+            
+            let colorClass = 'error-good';
+            if (avgDist > 50) colorClass = 'error-bad';
+            else if (avgDist > 20) colorClass = 'error-ok';
+
+            display.innerHTML = `
+                Deslocamento médio: <span class="${colorClass}">${avgDist.toFixed(1)} km</span><br>
+                Pontos movidos: ${movedCount}/${controlPoints.length}
+            `;
+        }
+
+        // ===== APLICAR DISTORÇÃO =====
+        function applyDistortion() {
+            if (controlPoints.length < 4) {
+                alert('Você precisa de pelo menos 4 pontos para aplicar distorção!');
+                return;
+            }
+
+            if (!imageElement || !imageBounds) {
+                alert('Carregue uma imagem primeiro!');
+                return;
+            }
+
+            // Esconder overlay original
+            if (imageOverlay) {
+                imageOverlay.setOpacity(0);
+            }
+
+            // Remover canvas anterior
+            if (canvasOverlay) {
+                map.removeLayer(canvasOverlay);
+            }
+
+            // Criar canvas overlay com a imagem distorcida
+            const CanvasOverlay = L.Layer.extend({
+                onAdd: function(map) {
+                    this._map = map;
+                    this._canvas = L.DomUtil.create('canvas', 'leaflet-layer');
+                    this._canvas.style.position = 'absolute';
+                    this._canvas.style.pointerEvents = 'none';
+                    
+                    const pane = map.getPane('overlayPane');
+                    pane.appendChild(this._canvas);
+
+                    map.on('moveend', this._reset, this);
+                    map.on('zoomend', this._reset, this);
+                    this._reset();
+                },
+
+                onRemove: function(map) {
+                    L.DomUtil.remove(this._canvas);
+                    map.off('moveend', this._reset, this);
+                    map.off('zoomend', this._reset, this);
+                },
+
+                _reset: function() {
+                    const size = this._map.getSize();
+                    this._canvas.width = size.x;
+                    this._canvas.height = size.y;
+
+                    const topLeft = this._map.containerPointToLayerPoint([0, 0]);
+                    L.DomUtil.setPosition(this._canvas, topLeft);
+
+                    this._draw();
+                },
+
+                _draw: function() {
+                    const ctx = this._canvas.getContext('2d');
+                    ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+
+                    // Desenhar a imagem com distorção baseada em triangulação
+                    this._drawDistortedImage(ctx);
+                },
+
+                _drawDistortedImage: function(ctx) {
+                    const map = this._map;
+                    const opacity = parseFloat(document.getElementById('opacitySlider').value) / 100;
+                    ctx.globalAlpha = opacity;
+
+                    // Obter pontos de controle em coordenadas de tela
+                    const srcPoints = []; // Pontos na imagem original
+                    const dstPoints = []; // Pontos no mapa (destino)
+
+                    const imgWidth = imageElement.naturalWidth;
+                    const imgHeight = imageElement.naturalHeight;
+
+                    controlPoints.forEach(p => {
+                        // Posição original na imagem (normalizada 0-1)
+                        const origNormLat = (DEFAULT_BOUNDS.north - p.originalLat) / (DEFAULT_BOUNDS.north - DEFAULT_BOUNDS.south);
+                        const origNormLng = (p.originalLng - DEFAULT_BOUNDS.west) / (DEFAULT_BOUNDS.east - DEFAULT_BOUNDS.west);
+
+                        // Posição no pixel da imagem
+                        const srcX = origNormLng * imgWidth;
+                        const srcY = origNormLat * imgHeight;
+
+                        // Posição atual no mapa (pixel da tela)
+                        const dstPoint = map.latLngToContainerPoint([p.currentLat, p.currentLng]);
+
+                        srcPoints.push([srcX, srcY]);
+                        dstPoints.push([dstPoint.x, dstPoint.y]);
+                    });
+
+                    // Triangulação de Delaunay
+                    if (typeof Delaunator !== 'undefined' && dstPoints.length >= 3) {
+                        const flatDst = dstPoints.flat();
+                        const delaunay = new Delaunator(flatDst);
+                        const triangles = delaunay.triangles;
+
+                        // Desenhar cada triângulo
+                        for (let i = 0; i < triangles.length; i += 3) {
+                            const i0 = triangles[i];
+                            const i1 = triangles[i + 1];
+                            const i2 = triangles[i + 2];
+
+                            this._drawTriangle(ctx, imageElement,
+                                srcPoints[i0], srcPoints[i1], srcPoints[i2],
+                                dstPoints[i0], dstPoints[i1], dstPoints[i2]
+                            );
+                        }
+                    }
+                },
+
+                _drawTriangle: function(ctx, img, src0, src1, src2, dst0, dst1, dst2) {
+                    // Desenhar triângulo texturizado usando transformação afim
+                    ctx.save();
+
+                    // Criar path do triângulo destino
+                    ctx.beginPath();
+                    ctx.moveTo(dst0[0], dst0[1]);
+                    ctx.lineTo(dst1[0], dst1[1]);
+                    ctx.lineTo(dst2[0], dst2[1]);
+                    ctx.closePath();
+                    ctx.clip();
+
+                    // Calcular transformação afim
+                    // Resolver sistema linear para encontrar matriz de transformação
+                    const denom = (src0[0] - src2[0]) * (src1[1] - src2[1]) - (src1[0] - src2[0]) * (src0[1] - src2[1]);
+                    
+                    if (Math.abs(denom) < 0.001) {
+                        ctx.restore();
+                        return;
+                    }
+
+                    const a = ((dst0[0] - dst2[0]) * (src1[1] - src2[1]) - (dst1[0] - dst2[0]) * (src0[1] - src2[1])) / denom;
+                    const b = ((src0[0] - src2[0]) * (dst1[0] - dst2[0]) - (src1[0] - src2[0]) * (dst0[0] - dst2[0])) / denom;
+                    const c = dst0[0] - a * src0[0] - b * src0[1];
+
+                    const d = ((dst0[1] - dst2[1]) * (src1[1] - src2[1]) - (dst1[1] - dst2[1]) * (src0[1] - src2[1])) / denom;
+                    const e = ((src0[0] - src2[0]) * (dst1[1] - dst2[1]) - (src1[0] - src2[0]) * (dst0[1] - dst2[1])) / denom;
+                    const f = dst0[1] - d * src0[0] - e * src0[1];
+
+                    ctx.setTransform(a, d, b, e, c, f);
+                    ctx.drawImage(img, 0, 0);
+
+                    ctx.restore();
+                }
+            });
+
+            canvasOverlay = new CanvasOverlay();
+            canvasOverlay.addTo(map);
+
+            document.getElementById('imageStatus').innerHTML = '✅ Distorção aplicada!';
+            document.getElementById('imageStatus').style.color = '#00ff00';
+        }
+
+        // ===== OPACIDADE =====
+        function setImageOpacity(value) {
+            document.getElementById('opacityValue').textContent = value;
+            
+            if (imageOverlay) {
+                imageOverlay.setOpacity(value / 100);
+            }
+            
+            if (canvasOverlay && canvasOverlay._canvas) {
+                canvasOverlay._reset();
+            }
+        }
+
+        // ===== EXPORTAR/IMPORTAR =====
+        function exportAlignment() {
+            if (controlPoints.length === 0) {
+                alert('Adicione pontos primeiro!');
+                return;
+            }
+
+            const data = {
+                timestamp: new Date().toISOString(),
+                gridSize: gridSize,
+                bounds: DEFAULT_BOUNDS,
+                points: controlPoints.map(p => ({
+                    id: p.id,
+                    originalLat: p.originalLat,
+                    originalLng: p.originalLng,
+                    currentLat: p.currentLat,
+                    currentLng: p.currentLng,
+                    gridX: p.gridX,
+                    gridY: p.gridY,
+                    isCorner: p.isCorner
+                }))
+            };
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `multipoint_alignment_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importAlignment() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            applyImportedAlignment(data);
+                        } catch (err) {
+                            alert('Erro: ' + err.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        function applyImportedAlignment(data) {
+            clearAllPoints();
+
+            if (data.points) {
+                data.points.forEach(p => {
+                    const id = addControlPoint(p.originalLat, p.originalLng, p.gridX, p.gridY, p.isCorner);
+                    const point = controlPoints.find(cp => cp.id === id);
+                    if (point) {
+                        point.currentLat = p.currentLat;
+                        point.currentLng = p.currentLng;
+                        point.marker.setLatLng([p.currentLat, p.currentLng]);
+                    }
+                });
+            }
+
+            updatePointList();
+            updatePointCount();
+            calculateError();
+
+            document.getElementById('imageStatus').innerHTML = '✅ Alinhamento importado!';
+        }
+    </script>
+</body>
+</html>
