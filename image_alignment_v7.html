@@ -654,13 +654,13 @@
                 return;
             }
             
-            document.getElementById('reprojStatus').innerHTML = '🔄 Reprojetando...';
+            document.getElementById('reprojStatus').innerHTML = '🔄 Reprojetando para Mercator...';
             document.getElementById('btnReproject').disabled = true;
             
             // Usar setTimeout para permitir UI update
             setTimeout(() => {
                 try {
-                    const reprojectedCanvas = geostatToPlateCarree(originalFullDiskImage);
+                    const reprojectedCanvas = geostatToMercator(originalFullDiskImage);
                     
                     // Converter canvas para imagem
                     imageElement = new Image();
@@ -668,13 +668,13 @@
                         imageLoaded = true;
                         isFullDisk = false; // Agora é uma imagem plana
                         
-                        document.getElementById('reprojStatus').innerHTML = '✅ Reprojeção concluída!';
+                        document.getElementById('reprojStatus').innerHTML = '✅ Reprojeção Mercator concluída!';
                         document.getElementById('reprojStatus').style.color = '#00ff00';
                         document.getElementById('btnReproject').disabled = false;
                         
-                        // Aplicar bounds da área visível do satélite
+                        // Aplicar bounds da área visível do satélite (81° = área completa)
                         const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
-                        const visibleRange = 70; // graus de visibilidade (reduzido para menos distorção)
+                        const visibleRange = 81; // graus de visibilidade completa
                         
                         // Definir bounds para área visível do satélite
                         imageBounds.north = visibleRange;
@@ -682,7 +682,7 @@
                         imageBounds.west = satLonDeg - visibleRange;
                         imageBounds.east = satLonDeg + visibleRange;
                         
-                        currentPresetName = 'Full Disk Reprojetado';
+                        currentPresetName = 'Full Disk Mercator';
                         document.getElementById('currentArea').textContent = currentPresetName;
                         
                         // Atualizar overlay primeiro
@@ -708,24 +708,43 @@
             }, 50);
         }
         
-        function geostatToPlateCarree(srcImg) {
+        // Reprojetar de Geoestacionário para Web Mercator (EPSG:3857)
+        function geostatToMercator(srcImg) {
             const quality = parseInt(document.getElementById('reprojQuality').value) || 600;
             const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
             const satLon = satLonDeg * Math.PI / 180;
             
-            // Área visível do satélite - usar 70° para menos distorção nas bordas
-            const lonRange = 70 * Math.PI / 180; // longitude
-            const latRange = 70 * Math.PI / 180; // latitude
+            // Área visível do satélite (aproximadamente 81° em cada direção)
+            const visibleRange = 81 * Math.PI / 180;
             
-            // Limites da área visível
-            const minLon = satLon - lonRange;
-            const maxLon = satLon + lonRange;
-            const minLat = -latRange;
-            const maxLat = latRange;
+            // Limites em longitude
+            const minLon = satLon - visibleRange;
+            const maxLon = satLon + visibleRange;
             
-            // Dimensões da imagem de saída - proporção 2:1 para Plate Carrée
+            // Limites em latitude (Mercator não vai além de ~85°)
+            const maxLat = 81 * Math.PI / 180;
+            const minLat = -81 * Math.PI / 180;
+            
+            // Converter lat para Y em Mercator
+            function latToMercatorY(lat) {
+                return Math.log(Math.tan(Math.PI / 4 + lat / 2));
+            }
+            
+            // Converter Y Mercator para lat
+            function mercatorYToLat(y) {
+                return 2 * Math.atan(Math.exp(y)) - Math.PI / 2;
+            }
+            
+            // Limites Y em Mercator
+            const minMercY = latToMercatorY(minLat);
+            const maxMercY = latToMercatorY(maxLat);
+            
+            // Dimensões da imagem de saída
             const outWidth = quality;
-            const outHeight = quality; // Mesma altura porque área lat/lon é igual
+            // Altura proporcional ao Mercator
+            const mercHeight = maxMercY - minMercY;
+            const mercWidth = maxLon - minLon;
+            const outHeight = Math.round(outWidth * (mercHeight / mercWidth));
             
             // Criar canvas de saída
             const outCanvas = document.createElement('canvas');
@@ -746,27 +765,30 @@
             // Centro e raio do disco na imagem fonte
             const cx = srcCanvas.width / 2;
             const cy = srcCanvas.height / 2;
-            const radius = Math.min(cx, cy) * 0.98; // Um pouco menor para evitar bordas
+            const radius = Math.min(cx, cy) * 0.98;
             
-            // Para cada pixel na imagem de saída (Plate Carrée - apenas área visível)
+            // Para cada pixel na imagem de saída (Web Mercator)
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
-                    // Converter posição para lat/lon (dentro da área visível)
-                    const lon = minLon + (x / outWidth) * (maxLon - minLon);
-                    const lat = maxLat - (y / outHeight) * (maxLat - minLat);
+                    // Converter posição do pixel para coordenadas Mercator
+                    const mercX = minLon + (x / outWidth) * (maxLon - minLon);
+                    const mercY = maxMercY - (y / outHeight) * (maxMercY - minMercY);
+                    
+                    // Converter Mercator Y para latitude
+                    const lat = mercatorYToLat(mercY);
+                    const lon = mercX;
                     
                     // Diferença de longitude em relação ao satélite
                     const lonDiff = lon - satLon;
                     
-                    // Projeção inversa: lat/lon → posição no disco
-                    // Fórmula simplificada para projeção geoestacionária
+                    // Projeção inversa: lat/lon → posição no disco geoestacionário
                     const cosLat = Math.cos(lat);
                     const sinLat = Math.sin(lat);
                     const cosLonDiff = Math.cos(lonDiff);
                     const sinLonDiff = Math.sin(lonDiff);
                     
                     // Verificar se o ponto está no lado visível da Terra
-                    const cosc = sinLat * 0 + cosLat * cosLonDiff;
+                    const cosc = cosLat * cosLonDiff;
                     if (cosc < 0.1) {
                         const idx = (y * outWidth + x) * 4;
                         outData.data[idx] = 0;
@@ -778,7 +800,7 @@
                     
                     // Coordenadas normalizadas no disco (-1 a 1)
                     const diskX = cosLat * sinLonDiff;
-                    const diskY = -sinLat; // Y invertido
+                    const diskY = -sinLat;
                     
                     // Converter para coordenadas de pixel na imagem fonte
                     const srcX = Math.round(cx + diskX * radius);
