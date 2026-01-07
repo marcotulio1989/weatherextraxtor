@@ -264,22 +264,25 @@
         
         // Bounds aproximados (CORRIGIDOS para SSA)
         // SSA = South America Sector
-        // Estes são bounds empíricos calibrados para alinhar com o mapa
+        // A imagem SSA da NOAA tem:
+        // - Norte no topo da imagem (y=0)
+        // - Sul no fundo da imagem (y=max)
+        // - Oeste na esquerda (x=0)
+        // - Leste na direita (x=max)
         const BOUNDS = {
             ssa: {
-                // Bounds da imagem SSA (Sul América)
-                // Calibrados empiricamente
-                north: 15,      // Latitude norte
-                south: -60,     // Latitude sul  
-                west: -110,     // Longitude oeste
-                east: -20       // Longitude leste
+                // Bounds da imagem SSA calibrados
+                north: 17,
+                south: -82,
+                west: -115,
+                east: -15
             },
             fd: {
-                // Full Disk - cobertura completa do hemisfério
-                north: 70,
-                south: -70,
-                west: -150,
-                east: 0
+                // Full Disk - cobertura do hemisfério visível
+                north: 81,
+                south: -81,
+                west: -156,
+                east: 6
             }
         };
         
@@ -466,9 +469,10 @@
                     let srcX, srcY;
                     
                     if (type === 'ssa') {
-                        // Para SSA, usar mapeamento linear ajustado
-                        srcX = (lon - bounds.west) / (bounds.east - bounds.west) * img.width;
-                        srcY = (bounds.north - lat) / (bounds.north - bounds.south) * img.height;
+                        // Para SSA, mapeamento direto
+                        // Imagem SSA: x=0 é oeste, y=0 é norte
+                        srcX = ((lon - bounds.west) / (bounds.east - bounds.west)) * img.width;
+                        srcY = ((bounds.north - lat) / (bounds.north - bounds.south)) * img.height;
                     } else {
                         // Para Full Disk, usar projeção geoestacionária
                         const scan = latLonToScan(lat, lon, sat_lon);
@@ -477,8 +481,11 @@
                             outData.data[idx + 3] = 0; // Transparente
                             continue;
                         }
-                        srcX = (scan.x + 0.151844) / (2 * 0.151844) * img.width;
-                        srcY = (-scan.y + 0.151844) / (2 * 0.151844) * img.height;
+                        // Full Disk: centro da imagem é o subsatellite point
+                        // x positivo = leste, y positivo = norte
+                        // Imagem: x=0 é oeste, y=0 é norte
+                        srcX = ((scan.x + 0.151844) / (2 * 0.151844)) * img.width;
+                        srcY = ((-scan.y + 0.151844) / (2 * 0.151844)) * img.height;
                     }
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
