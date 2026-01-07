@@ -262,13 +262,9 @@
             }
         };
         
-        // Bounds aproximados (CORRIGIDOS para SSA)
-        // SSA = South America Sector
-        // A imagem SSA da NOAA tem:
-        // - Norte no topo da imagem (y=0)
-        // - Sul no fundo da imagem (y=max)
-        // - Oeste na esquerda (x=0)
-        // - Leste na direita (x=max)
+        // Bounds de saída para reprojeção
+        // GOES-East está em -75.2° de longitude
+        // Visibilidade: aproximadamente ±75° do ponto subsatélite
         const BOUNDS = {
             ssa: {
                 // Bounds da imagem SSA calibrados
@@ -278,11 +274,12 @@
                 east: -15
             },
             fd: {
-                // Full Disk - cobertura do hemisfério visível
-                north: 81,
-                south: -81,
-                west: -156,
-                east: 6
+                // Full Disk limitado a ±60° de latitude
+                // para evitar distorção extrema nos polos
+                north: 60,
+                south: -60,
+                west: -150,  // -75.2 - 75 ≈ -150
+                east: 0      // -75.2 + 75 ≈ 0
             }
         };
         
