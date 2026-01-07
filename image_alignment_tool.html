@@ -1490,19 +1490,27 @@
                         </div>
                         ${labelHtml}
                         <div class="gcp-coords">
-                            <div>
-                                <label>Latitude</label>
-                                <input type="text" inputmode="decimal" value="${point.lat}" 
-                                       placeholder="-22.123456"
-                                       onchange="updatePointCoord(${point.id}, 'lat', this.value)"
-                                       pattern="-?[0-9]*\\.?[0-9]*">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <button type="button" onclick="toggleSign(${point.id}, 'lat')" 
+                                        style="width:30px; height:30px; background:#e94560; border:none; color:white; border-radius:4px; font-size:16px; font-weight:bold; cursor:pointer;">±</button>
+                                <div style="flex:1;">
+                                    <label>Lat</label>
+                                    <input type="text" value="${point.lat}" 
+                                           placeholder="-22.12"
+                                           onchange="updatePointCoord(${point.id}, 'lat', this.value)"
+                                           style="width:100%;">
+                                </div>
                             </div>
-                            <div>
-                                <label>Longitude</label>
-                                <input type="text" inputmode="decimal" value="${point.lng}" 
-                                       placeholder="-41.567890"
-                                       onchange="updatePointCoord(${point.id}, 'lng', this.value)"
-                                       pattern="-?[0-9]*\\.?[0-9]*">
+                            <div style="display:flex; align-items:center; gap:4px;">
+                                <button type="button" onclick="toggleSign(${point.id}, 'lng')" 
+                                        style="width:30px; height:30px; background:#e94560; border:none; color:white; border-radius:4px; font-size:16px; font-weight:bold; cursor:pointer;">±</button>
+                                <div style="flex:1;">
+                                    <label>Lng</label>
+                                    <input type="text" value="${point.lng}" 
+                                           placeholder="-41.56"
+                                           onchange="updatePointCoord(${point.id}, 'lng', this.value)"
+                                           style="width:100%;">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1516,6 +1524,15 @@
             const point = gcpPoints.find(p => p.id === id);
             if (point) {
                 point[field] = parseFloat(value) || 0;
+                updateSummary();
+            }
+        }
+
+        function toggleSign(id, field) {
+            const point = gcpPoints.find(p => p.id === id);
+            if (point) {
+                point[field] = -point[field];
+                updateGcpList();
                 updateSummary();
             }
         }
