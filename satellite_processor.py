@@ -53,9 +53,9 @@ print(f"📦 BBOX: {BBOX}")
 
 SSA_BOUNDS = {
     "lat_north": -12.0,     # Norte: 12°S (inclui Salvador, Lima)
-    "lat_south": -55.0,     # Sul: 55°S (inclui Ushuaia/Terra do Fogo)
-    "lon_west": -82.0,      # Oeste: 82°W (Oceano Pacífico, inclui Lima)
-    "lon_east": -10.33,     # Leste: ~10°W (Oceano Atlântico)
+    "lat_south": -72.0,     # Sul: 72°S (inclui Antártica)
+    "lon_west": -96.0,      # Oeste: 96°W (Oceano Pacífico)
+    "lon_east": 4.0,        # Leste: 4°E (Oceano Atlântico)
 }
 
 # Dimensões da imagem SSA original
