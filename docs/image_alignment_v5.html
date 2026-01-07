@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ Alinhamento Completo - V5</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a0a15;
+            color: #eee;
+            overflow: hidden;
+        }
+        .container { display: flex; height: 100vh; }
+        
+        .control-panel {
+            width: 360px;
+            background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+            padding: 12px;
+            overflow-y: auto;
+            border-right: 2px solid #0f3460;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+        .control-panel h1 {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #e94560;
+            text-align: center;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 8px;
+        }
+        .control-section {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(15, 52, 96, 0.5);
+            border-radius: 8px;
+        }
+        .control-section h3 {
+            color: #00d9ff;
+            margin-bottom: 8px;
+            font-size: 0.8em;
+        }
+        .btn {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8em;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: linear-gradient(135deg, #e94560, #c23a51); color: white; }
+        .btn-secondary { background: #0f3460; color: #00d9ff; border: 1px solid #00d9ff; }
+        .btn-success { background: linear-gradient(135deg, #00b894, #00a381); color: white; }
+        .btn-warning { background: linear-gradient(135deg, #fdcb6e, #e17055); color: #1a1a2e; }
+        .btn:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.3); }
+        
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+        
+        #map { flex: 1; background: #1a1a2e; }
+        
+        .slider-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 8px;
+        }
+        .slider-row label {
+            width: 70px;
+            font-size: 0.75em;
+            color: #aaa;
+        }
+        .slider-row input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #0f3460;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        .slider-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #00d9ff;
+            cursor: pointer;
+        }
+        .slider-row .value {
+            width: 50px;
+            font-size: 0.75em;
+            color: #00ff00;
+            text-align: right;
+            font-family: monospace;
+        }
+        
+        .status-bar {
+            font-size: 0.75em;
+            color: #888;
+            padding: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+            margin-top: 6px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+        }
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0; top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%; height: 100%;
+        }
+        
+        .corner-marker {
+            width: 20px;
+            height: 20px;
+            background: #ff00ff;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: move;
+            box-shadow: 0 0 10px rgba(255,0,255,0.8);
+        }
+        .corner-marker.nw { background: #ff0000; }
+        .corner-marker.ne { background: #00ff00; }
+        .corner-marker.sw { background: #0000ff; }
+        .corner-marker.se { background: #ffff00; }
+        
+        .instructions {
+            font-size: 0.7em;
+            color: #888;
+            line-height: 1.4;
+            padding: 6px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            border-left: 2px solid #00d9ff;
+        }
+        
+        /* Canvas que sobrepõe o mapa para a imagem */
+        #imageCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 400;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel">
+            <h1>🛰️ Alinhamento V5</h1>
+
+            <!-- Carregar Imagem -->
+            <div class="control-section">
+                <h3>📁 Imagem Satélite</h3>
+                <div class="btn-grid">
+                    <button class="btn btn-primary" onclick="loadNoaaImage('goes19')" style="font-size:0.7em;">🛰️ GOES-19</button>
+                    <button class="btn btn-primary" onclick="loadNoaaImage('goes16')" style="font-size:0.7em; background:#3498db;">🛰️ GOES-16</button>
+                </div>
+                <div class="file-input-wrapper">
+                    <button class="btn btn-secondary">📂 Selecionar Arquivo</button>
+                    <input type="file" id="imageInput" accept="image/*">
+                </div>
+                <div class="status-bar" id="imageStatus">Nenhuma imagem</div>
+            </div>
+
+            <!-- Transformações Globais -->
+            <div class="control-section">
+                <h3>🔧 Transformações</h3>
+                
+                <div class="slider-row">
+                    <label>Escala X:</label>
+                    <input type="range" id="scaleX" min="0.1" max="3" step="0.01" value="1" onchange="updateTransform()">
+                    <span class="value" id="scaleXVal">1.00</span>
+                </div>
+                
+                <div class="slider-row">
+                    <label>Escala Y:</label>
+                    <input type="range" id="scaleY" min="0.1" max="3" step="0.01" value="1" onchange="updateTransform()">
+                    <span class="value" id="scaleYVal">1.00</span>
+                </div>
+                
+                <div class="slider-row">
+                    <label>Rotação:</label>
+                    <input type="range" id="rotation" min="-180" max="180" step="0.5" value="0" onchange="updateTransform()">
+                    <span class="value" id="rotationVal">0°</span>
+                </div>
+                
+                <div class="slider-row">
+                    <label>Cisalha X:</label>
+                    <input type="range" id="skewX" min="-45" max="45" step="0.5" value="0" onchange="updateTransform()">
+                    <span class="value" id="skewXVal">0°</span>
+                </div>
+                
+                <div class="slider-row">
+                    <label>Cisalha Y:</label>
+                    <input type="range" id="skewY" min="-45" max="45" step="0.5" value="0" onchange="updateTransform()">
+                    <span class="value" id="skewYVal">0°</span>
+                </div>
+                
+                <div class="slider-row">
+                    <label>Opacidade:</label>
+                    <input type="range" id="opacity" min="10" max="100" step="1" value="70" onchange="updateTransform()">
+                    <span class="value" id="opacityVal">70%</span>
+                </div>
+                
+                <button class="btn btn-warning" onclick="resetTransforms()">🔄 Resetar Transformações</button>
+            </div>
+
+            <!-- Posição -->
+            <div class="control-section">
+                <h3>📍 Posição Central</h3>
+                <div class="slider-row">
+                    <label>Latitude:</label>
+                    <input type="range" id="centerLat" min="-60" max="15" step="0.1" value="-25" onchange="updateTransform()">
+                    <span class="value" id="centerLatVal">-25.0°</span>
+                </div>
+                <div class="slider-row">
+                    <label>Longitude:</label>
+                    <input type="range" id="centerLng" min="-90" max="-25" step="0.1" value="-55" onchange="updateTransform()">
+                    <span class="value" id="centerLngVal">-55.0°</span>
+                </div>
+            </div>
+
+            <!-- Tamanho dos Bounds -->
+            <div class="control-section">
+                <h3>📐 Tamanho (Graus)</h3>
+                <div class="slider-row">
+                    <label>Largura:</label>
+                    <input type="range" id="boundsWidth" min="10" max="120" step="1" value="65" onchange="updateTransform()">
+                    <span class="value" id="boundsWidthVal">65°</span>
+                </div>
+                <div class="slider-row">
+                    <label>Altura:</label>
+                    <input type="range" id="boundsHeight" min="10" max="90" step="1" value="75" onchange="updateTransform()">
+                    <span class="value" id="boundsHeightVal">75°</span>
+                </div>
+            </div>
+
+            <!-- Cantos Arrastáveis -->
+            <div class="control-section">
+                <h3>🎯 Cantos (Arrastar no Mapa)</h3>
+                <div class="instructions">
+                    Arraste os marcadores coloridos nos cantos:<br>
+                    🔴 NW &nbsp; 🟢 NE &nbsp; 🔵 SW &nbsp; 🟡 SE
+                </div>
+                <button class="btn btn-success" onclick="toggleCornerMode()">🎯 Modo Cantos</button>
+            </div>
+
+            <!-- Ações -->
+            <div class="control-section">
+                <h3>⚡ Ações</h3>
+                <button class="btn btn-secondary" onclick="exportAlignment()">📤 Exportar JSON</button>
+                <button class="btn btn-secondary" onclick="importAlignment()">📥 Importar JSON</button>
+            </div>
+        </div>
+
+        <div id="map">
+            <canvas id="imageCanvas"></canvas>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ===== ESTADO GLOBAL =====
+        let map = null;
+        let imageElement = null;
+        let imageLoaded = false;
+        let canvas = null;
+        let ctx = null;
+        
+        // Marcadores dos cantos
+        let cornerMarkers = { nw: null, ne: null, sw: null, se: null };
+        let cornerMode = false;
+        
+        // Transformações
+        let transform = {
+            scaleX: 1,
+            scaleY: 1,
+            rotation: 0,
+            skewX: 0,
+            skewY: 0,
+            opacity: 0.7,
+            centerLat: -25,
+            centerLng: -55,
+            width: 65,
+            height: 75
+        };
+
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            initCanvas();
+            setupFileInput();
+        });
+
+        function initMap() {
+            map = L.map('map', {
+                center: [-25, -55],
+                zoom: 4,
+                zoomControl: true
+            });
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                opacity: 0.8
+            }).addTo(map);
+
+            // Eventos para redesenhar
+            map.on('move', drawImage);
+            map.on('zoom', drawImage);
+            map.on('moveend', drawImage);
+            map.on('zoomend', drawImage);
+            map.on('resize', resizeCanvas);
+        }
+
+        function initCanvas() {
+            canvas = document.getElementById('imageCanvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+        }
+
+        function resizeCanvas() {
+            const mapContainer = document.getElementById('map');
+            canvas.width = mapContainer.offsetWidth;
+            canvas.height = mapContainer.offsetHeight;
+            drawImage();
+        }
+
+        function setupFileInput() {
+            document.getElementById('imageInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        loadImage(event.target.result, file.name);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+            
+            // Resize observer
+            new ResizeObserver(resizeCanvas).observe(document.getElementById('map'));
+        }
+
+        // ===== CARREGAR IMAGEM =====
+        const NOAA_URLS = {
+            goes19: {
+                name: 'GOES-19 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg'
+            },
+            goes16: {
+                name: 'GOES-16 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg'
+            }
+        };
+
+        function loadNoaaImage(satellite) {
+            const sat = NOAA_URLS[satellite];
+            if (!sat) return;
+            document.getElementById('imageStatus').innerHTML = `⏳ Baixando ${sat.name}...`;
+            loadImage(sat.url + '?t=' + Date.now(), sat.name);
+        }
+
+        function loadImage(src, name) {
+            const status = document.getElementById('imageStatus');
+            
+            imageElement = new Image();
+            imageElement.crossOrigin = 'anonymous';
+            
+            imageElement.onload = function() {
+                imageLoaded = true;
+                status.innerHTML = `✅ ${name}<br>📐 ${this.width}×${this.height}px`;
+                status.style.color = '#00ff00';
+                
+                createCornerMarkers();
+                drawImage();
+            };
+            
+            imageElement.onerror = function() {
+                status.innerHTML = '❌ Erro ao carregar';
+                status.style.color = '#ff4444';
+            };
+            
+            imageElement.src = src;
+        }
+
+        // ===== DESENHAR IMAGEM =====
+        function drawImage() {
+            if (!ctx || !canvas) return;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (!imageLoaded || !imageElement) return;
+            
+            ctx.save();
+            ctx.globalAlpha = transform.opacity;
+            
+            // Calcular posição dos 4 cantos em pixels da tela
+            const bounds = getBounds();
+            
+            const nw = map.latLngToContainerPoint([bounds.north, bounds.west]);
+            const ne = map.latLngToContainerPoint([bounds.north, bounds.east]);
+            const sw = map.latLngToContainerPoint([bounds.south, bounds.west]);
+            const se = map.latLngToContainerPoint([bounds.south, bounds.east]);
+            
+            // Centro da imagem
+            const cx = (nw.x + ne.x + sw.x + se.x) / 4;
+            const cy = (nw.y + ne.y + sw.y + se.y) / 4;
+            
+            // Dimensões base
+            const width = Math.abs(ne.x - nw.x);
+            const height = Math.abs(sw.y - nw.y);
+            
+            // Aplicar transformações
+            ctx.translate(cx, cy);
+            ctx.rotate(transform.rotation * Math.PI / 180);
+            ctx.transform(1, Math.tan(transform.skewY * Math.PI / 180), 
+                         Math.tan(transform.skewX * Math.PI / 180), 1, 0, 0);
+            ctx.scale(transform.scaleX, transform.scaleY);
+            
+            // Desenhar imagem centrada
+            ctx.drawImage(imageElement, 
+                -width / 2, -height / 2, 
+                width, height
+            );
+            
+            ctx.restore();
+        }
+
+        function getBounds() {
+            const halfW = transform.width / 2;
+            const halfH = transform.height / 2;
+            
+            return {
+                north: transform.centerLat + halfH,
+                south: transform.centerLat - halfH,
+                west: transform.centerLng - halfW,
+                east: transform.centerLng + halfW
+            };
+        }
+
+        // ===== ATUALIZAR TRANSFORMAÇÕES =====
+        function updateTransform() {
+            transform.scaleX = parseFloat(document.getElementById('scaleX').value);
+            transform.scaleY = parseFloat(document.getElementById('scaleY').value);
+            transform.rotation = parseFloat(document.getElementById('rotation').value);
+            transform.skewX = parseFloat(document.getElementById('skewX').value);
+            transform.skewY = parseFloat(document.getElementById('skewY').value);
+            transform.opacity = parseFloat(document.getElementById('opacity').value) / 100;
+            transform.centerLat = parseFloat(document.getElementById('centerLat').value);
+            transform.centerLng = parseFloat(document.getElementById('centerLng').value);
+            transform.width = parseFloat(document.getElementById('boundsWidth').value);
+            transform.height = parseFloat(document.getElementById('boundsHeight').value);
+            
+            // Atualizar displays
+            document.getElementById('scaleXVal').textContent = transform.scaleX.toFixed(2);
+            document.getElementById('scaleYVal').textContent = transform.scaleY.toFixed(2);
+            document.getElementById('rotationVal').textContent = transform.rotation.toFixed(1) + '°';
+            document.getElementById('skewXVal').textContent = transform.skewX.toFixed(1) + '°';
+            document.getElementById('skewYVal').textContent = transform.skewY.toFixed(1) + '°';
+            document.getElementById('opacityVal').textContent = Math.round(transform.opacity * 100) + '%';
+            document.getElementById('centerLatVal').textContent = transform.centerLat.toFixed(1) + '°';
+            document.getElementById('centerLngVal').textContent = transform.centerLng.toFixed(1) + '°';
+            document.getElementById('boundsWidthVal').textContent = transform.width + '°';
+            document.getElementById('boundsHeightVal').textContent = transform.height + '°';
+            
+            // Atualizar marcadores de canto
+            updateCornerMarkers();
+            
+            drawImage();
+        }
+
+        function resetTransforms() {
+            document.getElementById('scaleX').value = 1;
+            document.getElementById('scaleY').value = 1;
+            document.getElementById('rotation').value = 0;
+            document.getElementById('skewX').value = 0;
+            document.getElementById('skewY').value = 0;
+            document.getElementById('opacity').value = 70;
+            document.getElementById('centerLat').value = -25;
+            document.getElementById('centerLng').value = -55;
+            document.getElementById('boundsWidth').value = 65;
+            document.getElementById('boundsHeight').value = 75;
+            updateTransform();
+        }
+
+        // ===== MARCADORES DE CANTO =====
+        function createCornerMarkers() {
+            // Remover anteriores
+            Object.values(cornerMarkers).forEach(m => { if (m) map.removeLayer(m); });
+            
+            const bounds = getBounds();
+            
+            const corners = {
+                nw: [bounds.north, bounds.west],
+                ne: [bounds.north, bounds.east],
+                sw: [bounds.south, bounds.west],
+                se: [bounds.south, bounds.east]
+            };
+            
+            const colors = { nw: '#ff0000', ne: '#00ff00', sw: '#0000ff', se: '#ffff00' };
+            const labels = { nw: 'NW', ne: 'NE', sw: 'SW', se: 'SE' };
+            
+            Object.keys(corners).forEach(key => {
+                const icon = L.divIcon({
+                    className: 'corner-marker ' + key,
+                    html: `<div style="width:20px;height:20px;background:${colors[key]};border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:bold;color:#000;">${labels[key]}</div>`,
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+                
+                cornerMarkers[key] = L.marker(corners[key], {
+                    icon: icon,
+                    draggable: true
+                }).addTo(map);
+                
+                cornerMarkers[key].on('drag', function(e) {
+                    onCornerDrag(key, e.latlng);
+                });
+            });
+        }
+
+        function updateCornerMarkers() {
+            if (!cornerMarkers.nw) return;
+            
+            const bounds = getBounds();
+            
+            cornerMarkers.nw.setLatLng([bounds.north, bounds.west]);
+            cornerMarkers.ne.setLatLng([bounds.north, bounds.east]);
+            cornerMarkers.sw.setLatLng([bounds.south, bounds.west]);
+            cornerMarkers.se.setLatLng([bounds.south, bounds.east]);
+        }
+
+        function onCornerDrag(corner, latlng) {
+            const bounds = getBounds();
+            
+            // Atualizar bounds baseado no canto arrastado
+            switch (corner) {
+                case 'nw':
+                    bounds.north = latlng.lat;
+                    bounds.west = latlng.lng;
+                    break;
+                case 'ne':
+                    bounds.north = latlng.lat;
+                    bounds.east = latlng.lng;
+                    break;
+                case 'sw':
+                    bounds.south = latlng.lat;
+                    bounds.west = latlng.lng;
+                    break;
+                case 'se':
+                    bounds.south = latlng.lat;
+                    bounds.east = latlng.lng;
+                    break;
+            }
+            
+            // Recalcular centro e tamanho
+            transform.centerLat = (bounds.north + bounds.south) / 2;
+            transform.centerLng = (bounds.east + bounds.west) / 2;
+            transform.width = Math.abs(bounds.east - bounds.west);
+            transform.height = Math.abs(bounds.north - bounds.south);
+            
+            // Atualizar sliders
+            document.getElementById('centerLat').value = transform.centerLat;
+            document.getElementById('centerLng').value = transform.centerLng;
+            document.getElementById('boundsWidth').value = transform.width;
+            document.getElementById('boundsHeight').value = transform.height;
+            
+            updateTransform();
+        }
+
+        function toggleCornerMode() {
+            cornerMode = !cornerMode;
+            const opacity = cornerMode ? 1 : 0.7;
+            Object.values(cornerMarkers).forEach(m => {
+                if (m) m.setOpacity(opacity);
+            });
+        }
+
+        // ===== EXPORTAR/IMPORTAR =====
+        function exportAlignment() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                transform: transform
+            };
+            
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `alignment_v5_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importAlignment() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            if (data.transform) {
+                                // Aplicar transformações importadas
+                                document.getElementById('scaleX').value = data.transform.scaleX || 1;
+                                document.getElementById('scaleY').value = data.transform.scaleY || 1;
+                                document.getElementById('rotation').value = data.transform.rotation || 0;
+                                document.getElementById('skewX').value = data.transform.skewX || 0;
+                                document.getElementById('skewY').value = data.transform.skewY || 0;
+                                document.getElementById('opacity').value = (data.transform.opacity || 0.7) * 100;
+                                document.getElementById('centerLat').value = data.transform.centerLat || -25;
+                                document.getElementById('centerLng').value = data.transform.centerLng || -55;
+                                document.getElementById('boundsWidth').value = data.transform.width || 65;
+                                document.getElementById('boundsHeight').value = data.transform.height || 75;
+                                updateTransform();
+                            }
+                        } catch (err) {
+                            alert('Erro: ' + err.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        // Atalhos de teclado
+        document.addEventListener('keydown', function(e) {
+            const step = e.shiftKey ? 0.1 : 0.5;
+            
+            switch(e.key) {
+                case 'ArrowLeft':
+                    document.getElementById('centerLng').value = parseFloat(document.getElementById('centerLng').value) - step;
+                    updateTransform();
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    document.getElementById('centerLng').value = parseFloat(document.getElementById('centerLng').value) + step;
+                    updateTransform();
+                    e.preventDefault();
+                    break;
+                case 'ArrowUp':
+                    document.getElementById('centerLat').value = parseFloat(document.getElementById('centerLat').value) + step;
+                    updateTransform();
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    document.getElementById('centerLat').value = parseFloat(document.getElementById('centerLat').value) - step;
+                    updateTransform();
+                    e.preventDefault();
+                    break;
+                case 'r':
+                case 'R':
+                    document.getElementById('rotation').value = parseFloat(document.getElementById('rotation').value) + (e.shiftKey ? -1 : 1);
+                    updateTransform();
+                    break;
+                case '+':
+                case '=':
+                    document.getElementById('scaleX').value = parseFloat(document.getElementById('scaleX').value) + 0.05;
+                    document.getElementById('scaleY').value = parseFloat(document.getElementById('scaleY').value) + 0.05;
+                    updateTransform();
+                    break;
+                case '-':
+                    document.getElementById('scaleX').value = parseFloat(document.getElementById('scaleX').value) - 0.05;
+                    document.getElementById('scaleY').value = parseFloat(document.getElementById('scaleY').value) - 0.05;
+                    updateTransform();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
