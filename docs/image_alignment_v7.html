@@ -340,13 +340,36 @@
             <!-- Grade -->
             <div class="control-section">
                 <h3>📐 Grade de Pontos</h3>
+                
+                <!-- Grade Customizada -->
+                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <label style="font-size: 0.7em; color: #aaa;">Linhas:</label>
+                        <input type="number" id="customRows" min="2" max="50" value="4" 
+                               style="width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #0f3460; 
+                                      background: #0a0a15; color: #00d9ff; font-size: 0.8em; text-align: center;">
+                    </div>
+                    <span style="color: #666;">×</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <label style="font-size: 0.7em; color: #aaa;">Colunas:</label>
+                        <input type="number" id="customCols" min="2" max="50" value="4" 
+                               style="width: 50px; padding: 4px; border-radius: 4px; border: 1px solid #0f3460; 
+                                      background: #0a0a15; color: #00d9ff; font-size: 0.8em; text-align: center;">
+                    </div>
+                </div>
+                <button class="btn btn-success" onclick="applyCustomGrid()" style="font-size: 0.75em; margin-bottom: 8px;">
+                    ✅ Aplicar Grade Customizada
+                </button>
+                
+                <!-- Presets rápidos -->
+                <div style="font-size: 0.65em; color: #888; margin-bottom: 4px;">Presets rápidos:</div>
                 <div class="btn-grid-3">
-                    <button class="btn btn-secondary" onclick="setGrid(2,2)" style="font-size:0.7em;">2×2</button>
-                    <button class="btn btn-secondary" onclick="setGrid(3,3)" style="font-size:0.7em;">3×3</button>
-                    <button class="btn btn-secondary" onclick="setGrid(4,4)" style="font-size:0.7em;">4×4</button>
-                    <button class="btn btn-secondary" onclick="setGrid(5,5)" style="font-size:0.7em;">5×5</button>
-                    <button class="btn btn-secondary" onclick="setGrid(6,6)" style="font-size:0.7em;">6×6</button>
-                    <button class="btn btn-secondary" onclick="setGrid(8,8)" style="font-size:0.7em;">8×8</button>
+                    <button class="btn btn-secondary" onclick="setGrid(2,2)" style="font-size:0.65em;">2×2</button>
+                    <button class="btn btn-secondary" onclick="setGrid(3,3)" style="font-size:0.65em;">3×3</button>
+                    <button class="btn btn-secondary" onclick="setGrid(5,5)" style="font-size:0.65em;">5×5</button>
+                    <button class="btn btn-secondary" onclick="setGrid(10,10)" style="font-size:0.65em;">10×10</button>
+                    <button class="btn btn-secondary" onclick="setGrid(15,15)" style="font-size:0.65em;">15×15</button>
+                    <button class="btn btn-secondary" onclick="setGrid(20,20)" style="font-size:0.65em;">20×20</button>
                 </div>
                 <div class="status-bar">Pontos: <span id="pointCount">0</span> | Triângulos: <span id="triangleCount">0</span></div>
             </div>
@@ -696,10 +719,37 @@
         function setGrid(rows, cols) {
             gridRows = rows;
             gridCols = cols;
+            // Atualizar os inputs customizados
+            document.getElementById('customRows').value = rows;
+            document.getElementById('customCols').value = cols;
             if (imageLoaded) {
                 createGridFromCorners();
                 triangulate();
                 redraw();
+            }
+        }
+
+        function applyCustomGrid() {
+            const rows = parseInt(document.getElementById('customRows').value) || 4;
+            const cols = parseInt(document.getElementById('customCols').value) || 4;
+            
+            // Validar limites
+            const validRows = Math.max(2, Math.min(50, rows));
+            const validCols = Math.max(2, Math.min(50, cols));
+            
+            // Atualizar inputs se foram corrigidos
+            document.getElementById('customRows').value = validRows;
+            document.getElementById('customCols').value = validCols;
+            
+            gridRows = validRows;
+            gridCols = validCols;
+            
+            if (imageLoaded) {
+                createGridFromCorners();
+                triangulate();
+                redraw();
+            } else {
+                alert('Carregue uma imagem primeiro!');
             }
         }
 
