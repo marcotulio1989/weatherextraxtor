@@ -307,11 +307,8 @@
                     </select>
                 </div>
                 
-                <div class="btn-grid">
-                    <button class="btn btn-primary" onclick="loadSectorImage()" style="font-size:0.7em;">📍 Setor SSA</button>
-                    <button class="btn btn-success" onclick="loadFullDiskImage()" style="font-size:0.7em;">🌎 Full Disk</button>
-                </div>
-                <div class="file-input-wrapper">
+                <button class="btn btn-success" onclick="loadFullDiskImage()" style="font-size:0.8em; width: 100%;">🌎 Carregar Full Disk</button>
+                <div class="file-input-wrapper" style="margin-top: 6px;">
                     <button class="btn btn-secondary">📂 Arquivo Local</button>
                     <input type="file" id="imageInput" accept="image/*">
                 </div>
@@ -608,27 +605,6 @@
         
         let isFullDisk = false;
         let originalFullDiskImage = null;
-
-        function loadSectorImage() {
-            const satKey = document.getElementById('satelliteSelect').value;
-            const productKey = document.getElementById('productSelect').value;
-            const sat = SATELLITES[satKey];
-            const product = PRODUCTS[productKey];
-            
-            const url = `${sat.base}/SECTOR/ssa/${product.folder}/latest.jpg`;
-            const name = `${sat.name} SSA ${product.name}`;
-            
-            document.getElementById('imageStatus').innerHTML = '⏳ Baixando ' + name + '...';
-            
-            // Esconder seção de reprojeção
-            document.getElementById('reprojectionSection').style.display = 'none';
-            isFullDisk = false;
-            
-            // Aplicar preset GOES SSA automaticamente
-            setPreset('goes_ssa');
-            
-            loadImage(url + '?t=' + Date.now(), name);
-        }
         
         function loadFullDiskImage() {
             const satKey = document.getElementById('satelliteSelect').value;
@@ -671,17 +647,6 @@
             originalFullDiskImage.src = url + '?t=' + Date.now();
         }
         
-        // Funções legadas para compatibilidade
-        function loadNoaaImage(sat) {
-            document.getElementById('satelliteSelect').value = sat === 'goes19' ? 'GOES19' : 'GOES16';
-            loadSectorImage();
-        }
-        
-        function loadFullDisk(sat) {
-            document.getElementById('satelliteSelect').value = sat === 'goes19' ? 'GOES19' : 'GOES16';
-            loadFullDiskImage();
-        }
-        
         // ===== REPROJEÇÃO GEOESTACIONÁRIA → PLATE CARRÉE =====
         function reprojectFullDisk() {
             if (!originalFullDiskImage) {
@@ -709,7 +674,7 @@
                         
                         // Aplicar bounds da área visível do satélite
                         const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
-                        const visibleRange = 81; // graus de visibilidade do satélite
+                        const visibleRange = 70; // graus de visibilidade (reduzido para menos distorção)
                         
                         // Definir bounds para área visível do satélite
                         imageBounds.north = visibleRange;
@@ -748,18 +713,19 @@
             const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
             const satLon = satLonDeg * Math.PI / 180;
             
-            // Área visível do satélite (aproximadamente 81° em cada direção)
-            const visibleRange = 81 * Math.PI / 180; // em radianos
+            // Área visível do satélite - usar 70° para menos distorção nas bordas
+            const lonRange = 70 * Math.PI / 180; // longitude
+            const latRange = 70 * Math.PI / 180; // latitude
             
             // Limites da área visível
-            const minLon = satLon - visibleRange;
-            const maxLon = satLon + visibleRange;
-            const minLat = -visibleRange;
-            const maxLat = visibleRange;
+            const minLon = satLon - lonRange;
+            const maxLon = satLon + lonRange;
+            const minLat = -latRange;
+            const maxLat = latRange;
             
-            // Dimensões da imagem de saída (apenas área visível)
+            // Dimensões da imagem de saída - proporção 2:1 para Plate Carrée
             const outWidth = quality;
-            const outHeight = quality; // Quadrado para área visível
+            const outHeight = quality; // Mesma altura porque área lat/lon é igual
             
             // Criar canvas de saída
             const outCanvas = document.createElement('canvas');
