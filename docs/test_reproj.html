@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>TESTE REPROJEÇÃO</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; font-family: Arial; }
+        #map { height: 100vh; width: 100%; }
+        #controls { position: absolute; top: 10px; left: 60px; z-index: 1000; background: #333; padding: 15px; border-radius: 8px; color: white; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; font-size: 16px; }
+        #log { position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.8); color: #0f0; padding: 10px; font-family: monospace; max-height: 200px; overflow-y: auto; z-index: 1000; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h3>🧪 TESTE DE REPROJEÇÃO</h3>
+        <button onclick="testDirect()">1. DIRETO (funciona)</button>
+        <button onclick="testCanvas()">2. CANVAS VERMELHO</button>
+        <button onclick="testReproj()">3. REPROJEÇÃO REAL</button>
+    </div>
+    <div id="map"></div>
+    <div id="log"></div>
+
+    <script>
+        let map, overlay;
+        const bounds = { north: 15, south: -60, west: -100, east: -30 };
+        const leafletBounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]];
+        
+        // URL da imagem SSA
+        const imgUrl = 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg';
+        
+        function log(msg) {
+            console.log(msg);
+            document.getElementById('log').innerHTML += msg + '<br>';
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+        }
+        
+        // Inicializar mapa
+        map = L.map('map').setView([-22.5, -40.5], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        log('✅ Mapa inicializado');
+        
+        // TESTE 1: Overlay direto
+        function testDirect() {
+            if (overlay) map.removeLayer(overlay);
+            log('🔄 Carregando imagem DIRETA...');
+            overlay = L.imageOverlay(imgUrl + '?t=' + Date.now(), leafletBounds, {
+                opacity: 0.7,
+                crossOrigin: 'anonymous'
+            }).addTo(map);
+            log('✅ Overlay DIRETO adicionado!');
+        }
+        
+        // TESTE 2: Canvas vermelho simples
+        function testCanvas() {
+            if (overlay) map.removeLayer(overlay);
+            log('🔄 Criando canvas VERMELHO...');
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 400;
+            canvas.height = 300;
+            const ctx = canvas.getContext('2d');
+            
+            // Pintar de vermelho
+            ctx.fillStyle = 'red';
+            ctx.fillRect(0, 0, 400, 300);
+            
+            // Escrever texto
+            ctx.fillStyle = 'white';
+            ctx.font = '30px Arial';
+            ctx.fillText('CANVAS FUNCIONA!', 50, 150);
+            
+            const dataUrl = canvas.toDataURL('image/png');
+            log('📊 DataURL length: ' + dataUrl.length);
+            
+            overlay = L.imageOverlay(dataUrl, leafletBounds, {
+                opacity: 0.8
+            }).addTo(map);
+            log('✅ Overlay CANVAS VERMELHO adicionado!');
+        }
+        
+        // TESTE 3: Reprojeção real
+        async function testReproj() {
+            if (overlay) map.removeLayer(overlay);
+            log('🔄 Iniciando REPROJEÇÃO...');
+            
+            try {
+                // Carregar imagem
+                log('📥 Baixando imagem...');
+                const img = await loadImg(imgUrl + '?t=' + Date.now());
+                log('✅ Imagem: ' + img.width + ' x ' + img.height);
+                
+                // Canvas de saída
+                const outWidth = 600;
+                const outHeight = 450;
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = outWidth;
+                canvas.height = outHeight;
+                const ctx = canvas.getContext('2d');
+                
+                // Canvas fonte
+                const srcCanvas = document.createElement('canvas');
+                srcCanvas.width = img.width;
+                srcCanvas.height = img.height;
+                const srcCtx = srcCanvas.getContext('2d');
+                srcCtx.drawImage(img, 0, 0);
+                const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
+                log('✅ srcData: ' + srcData.width + ' x ' + srcData.height);
+                
+                // Canvas destino
+                const outData = ctx.createImageData(outWidth, outHeight);
+                log('✅ outData criado: ' + outData.width + ' x ' + outData.height);
+                
+                // REPROJEÇÃO - mapeamento direto para SSA
+                log('🔄 Processando pixels...');
+                let count = 0;
+                
+                for (let y = 0; y < outHeight; y++) {
+                    for (let x = 0; x < outWidth; x++) {
+                        // Mapear pixel de saída para pixel de entrada (proporcional)
+                        const srcX = Math.floor((x / outWidth) * img.width);
+                        const srcY = Math.floor((y / outHeight) * img.height);
+                        
+                        const srcIdx = (srcY * img.width + srcX) * 4;
+                        const outIdx = (y * outWidth + x) * 4;
+                        
+                        outData.data[outIdx] = srcData.data[srcIdx];         // R
+                        outData.data[outIdx + 1] = srcData.data[srcIdx + 1]; // G
+                        outData.data[outIdx + 2] = srcData.data[srcIdx + 2]; // B
+                        outData.data[outIdx + 3] = 255;                       // A
+                        
+                        count++;
+                    }
+                }
+                
+                log('✅ Pixels processados: ' + count);
+                
+                ctx.putImageData(outData, 0, 0);
+                log('✅ putImageData OK');
+                
+                const dataUrl = canvas.toDataURL('image/png');
+                log('✅ toDataURL OK, length: ' + dataUrl.length);
+                
+                overlay = L.imageOverlay(dataUrl, leafletBounds, {
+                    opacity: 0.8
+                }).addTo(map);
+                log('✅ OVERLAY DE REPROJEÇÃO ADICIONADO!');
+                
+            } catch (err) {
+                log('❌ ERRO: ' + err.message);
+                console.error(err);
+            }
+        }
+        
+        function loadImg(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = (e) => reject(new Error('Falha ao carregar: ' + e));
+                img.src = url;
+            });
+        }
+    </script>
+</body>
+</html>

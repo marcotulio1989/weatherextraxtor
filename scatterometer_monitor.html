@@ -875,86 +875,101 @@
     
     async function loadSatelliteLayer() {
         const opacity = (document.getElementById('satellite-opacity')?.value || 60) / 100;
-        const config = SATELLITE_CONFIG[currentSatellite];
+        const satId = currentSatellite;  // 'goes19' ou 'goes16'
         
         setStatus('satellite-status', 'loading');
-        log('info', `🛰️ Carregando ${config.name}...`);
+        log('info', `🛰️ Carregando ${satId.toUpperCase()}...`);
+        console.log('🛰️ [SATELLITE] Iniciando carregamento:', satId);
         
         try {
             // Remover camada anterior
             if (satelliteLayer) {
                 map.removeLayer(satelliteLayer);
                 satelliteLayer = null;
+                log('info', '🗑️ Camada anterior removida');
             }
             
-            const imageUrl = `${config.url}?t=${Date.now()}`;
+            // Usar imagem PRÉ-PROCESSADA localmente (process_satellite.py)
+            const imageUrl = `satellite_${satId}.png?t=${Date.now()}`;
+            const jsonUrl = `satellite_${satId}.json?t=${Date.now()}`;
             
-            // Bounds para a região de interesse (Brasil)
-            const bounds = [[-55, -75], [5, -30]];
+            console.log('📡 [SATELLITE] URLs:', { imageUrl, jsonUrl });
+            log('info', `📡 Buscando: ${jsonUrl}`);
             
-            // Tentar reprojetar com CORS
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
+            // Buscar metadados do JSON
+            let bounds = null;
             try {
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = imageUrl;
-                });
+                const response = await fetch(jsonUrl);
+                console.log('📡 [SATELLITE] Response status:', response.status);
                 
-                log('info', '🔄 Reprojetando de Geoestacionária para Web Mercator...');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
                 
-                // Reprojetar para tamanho menor (mais rápido)
-                const mercatorDataUrl = reprojectGoesToMercator(
-                    img, 
-                    1800,  // largura reprojetada
-                    1200,  // altura reprojetada
-                    bounds[0][0], bounds[1][0],  // lat min, lat max
-                    bounds[0][1], bounds[1][1]   // lon min, lon max
-                );
+                const data = await response.json();
+                console.log('📡 [SATELLITE] JSON data:', data);
                 
-                satelliteLayer = L.imageOverlay(mercatorDataUrl, bounds, {
-                    opacity: opacity,
-                    zIndex: 1
-                });
-                satelliteLayer.addTo(map);
-                log('success', `🛰️ ${config.name} reprojetado com sucesso!`);
-                
-            } catch (corsError) {
-                log('warning', '⚠️ CORS bloqueado - usando imagem original (desalinhada)');
-                // Fallback: usar imagem direta sem reprojeção
-                const fallbackBounds = [[-55, -80], [10, -25]];
-                satelliteLayer = L.imageOverlay(imageUrl, fallbackBounds, {
-                    opacity: opacity,
-                    zIndex: 1
-                });
-                satelliteLayer.addTo(map);
-            }
-            
-            // Pegar horário da imagem via HEAD request
-            try {
-                const headResponse = await fetch(config.url, { method: 'HEAD' });
-                const lastModified = headResponse.headers.get('last-modified');
-                if (lastModified) {
-                    const imageTime = new Date(lastModified);
-                    const timeStr = imageTime.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
-                    
-                    const infoEl = document.getElementById('satellite-info');
-                    if (infoEl) {
-                        infoEl.innerHTML = `📡 ${config.name} IR<br>🛰️ Captura: ${timeStr}<br>🗺️ Projeção Geoestacionária`;
-                    }
-                    log('info', `🛰️ Imagem de: ${timeStr}`);
+                if (data.leaflet_bounds) {
+                    // Formato: [[latSouth, lonWest], [latNorth, lonEast]]
+                    bounds = data.leaflet_bounds;
+                    log('success', `📍 Bounds: [${bounds[0][0].toFixed(2)},${bounds[0][1].toFixed(2)}] a [${bounds[1][0].toFixed(2)},${bounds[1][1].toFixed(2)}]`);
+                    console.log('📍 [SATELLITE] Bounds:', bounds);
                 }
             } catch (e) {
-                log('warning', '⚠️ Não foi possível verificar horário da imagem');
+                log('error', `❌ Erro ao ler JSON: ${e.message}`);
+                console.error('❌ [SATELLITE] Erro JSON:', e);
             }
             
-            setStatus('satellite-status', 'active');
+            // Se não encontrou bounds no JSON, usar padrão (100NM ao redor do navio)
+            if (!bounds) {
+                const RAIO_NM = 100;
+                const RAIO_GRAUS = RAIO_NM / 60;
+                bounds = [
+                    [CONFIG.shipLat - RAIO_GRAUS, CONFIG.shipLon - RAIO_GRAUS],  // [latSouth, lonWest]
+                    [CONFIG.shipLat + RAIO_GRAUS, CONFIG.shipLon + RAIO_GRAUS]   // [latNorth, lonEast]
+                ];
+                log('warning', '⚠️ Usando bounds padrão (100NM)');
+                console.warn('⚠️ [SATELLITE] Usando bounds padrão:', bounds);
+            }
+            
+            console.log('🖼️ [SATELLITE] Adicionando imageOverlay:', { imageUrl, bounds, opacity });
+            log('info', `🖼️ Carregando imagem: ${imageUrl}`);
+            
+            // Adicionar imagem processada ao mapa
+            satelliteLayer = L.imageOverlay(imageUrl, bounds, {
+                opacity: opacity,
+                zIndex: 1,
+                errorOverlayUrl: null,  // Não mostrar placeholder se falhar
+                alt: `Satélite ${satId.toUpperCase()}`
+            });
+            
+            satelliteLayer.on('load', function() {
+                log('success', `✅ ${satId.toUpperCase()} carregado com sucesso!`);
+                console.log('✅ [SATELLITE] Imagem carregada com sucesso');
+                setStatus('satellite-status', 'active');
+            });
+            
+            satelliteLayer.on('error', function(e) {
+                log('error', `❌ Erro ao carregar ${satId.toUpperCase()}: ${imageUrl}`);
+                console.error('❌ [SATELLITE] Erro ao carregar imagem:', e);
+                log('info', '💡 Execute: python3 process_satellite.py');
+                setStatus('satellite-status', 'error');
+            });
+            
+            console.log('🗺️ [SATELLITE] Adicionando camada ao mapa...');
+            satelliteLayer.addTo(map);
+            console.log('✅ [SATELLITE] Camada adicionada ao mapa');
+            
+            // Atualizar info
+            const infoEl = document.getElementById('satellite-info');
+            if (infoEl) {
+                infoEl.innerHTML = `📡 ${satId.toUpperCase()} IR Band 13<br>🛰️ Área: 100 NM recortada<br>🗺️ Imagem pré-processada`;
+            }
             
         } catch (error) {
             log('error', `❌ Erro satélite: ${error.message}`);
-            log('info', '💡 Verifique sua conexão ou tente novamente');
+            console.error('❌ [SATELLITE] Erro fatal:', error);
+            log('info', '💡 Execute: python3 process_satellite.py');
             setStatus('satellite-status', 'error');
         }
     }

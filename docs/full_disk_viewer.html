@@ -141,6 +141,41 @@
             display: flex;
             justify-content: space-between;
         }
+        
+        /* DEBUG LOG */
+        #debugPanel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 40vh;
+            background: rgba(0,0,0,0.95);
+            z-index: 9999;
+            display: none;
+            flex-direction: column;
+        }
+        #debugPanel.show { display: flex; }
+        #debugHeader {
+            background: #222;
+            padding: 8px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+        }
+        #debugHeader button { margin-left: 10px; padding: 5px 10px; font-size: 12px; }
+        #debugLog {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #0f0;
+            -webkit-user-select: text;
+            user-select: text;
+            white-space: pre-wrap;
+        }
+        .test-btn { background: linear-gradient(135deg, #ff6600, #cc3300) !important; }
     </style>
 </head>
 <body>
@@ -169,9 +204,8 @@
         <div class="control-group">
             <label>🔧 Método de Reprojeção</label>
             <select id="method">
-                <option value="direct">Direto (Bounds Aproximados)</option>
-                <option value="manual">Manual (Pixel a Pixel)</option>
-                <option value="bilinear">Bilinear (Suavizado)</option>
+                <option value="direct">Direto (SEM reprojeção)</option>
+                <option value="reproject">Reprojeção REAL</option>
             </select>
         </div>
         
@@ -186,6 +220,21 @@
         <button id="loadBtn" onclick="loadImage()">🌍 CARREGAR IMAGEM</button>
         <button onclick="fitBounds()">📍 Ver Tudo</button>
         <button onclick="zoomShip()">🚢 Ir ao Navio</button>
+        <button class="test-btn" onclick="testarReprojecao()">🧪 TESTAR REPROJEÇÃO</button>
+        <button onclick="toggleDebug()">📋 DEBUG</button>
+    </div>
+    
+    <!-- DEBUG PANEL -->
+    <div id="debugPanel">
+        <div id="debugHeader">
+            <span>📋 DEBUG LOG (selecione e copie)</span>
+            <div>
+                <button onclick="copiarDebug()">📋 COPIAR TUDO</button>
+                <button onclick="limparDebug()">🗑️ LIMPAR</button>
+                <button onclick="toggleDebug()">❌ FECHAR</button>
+            </div>
+        </div>
+        <div id="debugLog"></div>
     </div>
     
     <div class="map-container">
@@ -250,13 +299,111 @@
         
         const SHIP = { lat: -22.5, lon: -40.5 };
         
-        // URLs das imagens NOAA
+        // DEBUG LOG FUNCTIONS
+        function debugLog(msg) {
+            const log = document.getElementById('debugLog');
+            const time = new Date().toLocaleTimeString();
+            log.textContent += `[${time}] ${msg}\n`;
+            log.scrollTop = log.scrollHeight;
+            console.log(msg);
+        }
+        
+        function toggleDebug() {
+            document.getElementById('debugPanel').classList.toggle('show');
+        }
+        
+        function limparDebug() {
+            document.getElementById('debugLog').textContent = '';
+        }
+        
+        function copiarDebug() {
+            const log = document.getElementById('debugLog').textContent;
+            navigator.clipboard.writeText(log).then(() => {
+                alert('Log copiado!');
+            }).catch(() => {
+                // Fallback para tablets
+                const ta = document.createElement('textarea');
+                ta.value = log;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                alert('Log copiado!');
+            });
+        }
+        
+        // TESTE DE REPROJEÇÃO SIMPLES
+        async function testarReprojecao() {
+            document.getElementById('debugPanel').classList.add('show');
+            limparDebug();
+            
+            debugLog('=== INICIANDO TESTE DE REPROJEÇÃO ===');
+            
+            try {
+                // TESTE 1: Canvas simples
+                debugLog('TESTE 1: Criando canvas vermelho...');
+                const canvas1 = document.createElement('canvas');
+                canvas1.width = 400;
+                canvas1.height = 300;
+                const ctx1 = canvas1.getContext('2d');
+                ctx1.fillStyle = 'red';
+                ctx1.fillRect(0, 0, 400, 300);
+                ctx1.fillStyle = 'white';
+                ctx1.font = '24px Arial';
+                ctx1.fillText('TESTE CANVAS', 100, 150);
+                const dataUrl1 = canvas1.toDataURL('image/png');
+                debugLog('Canvas criado, dataURL length: ' + dataUrl1.length);
+                
+                // Adicionar ao mapa
+                if (overlay) map.removeLayer(overlay);
+                const bounds = [[-35, -75], [6, -34]];
+                overlay = L.imageOverlay(dataUrl1, bounds, {opacity: 0.8}).addTo(map);
+                debugLog('✅ TESTE 1 OK: Overlay canvas vermelho adicionado!');
+                
+                await sleep(2000);
+                
+                // TESTE 2: Carregar imagem externa
+                debugLog('TESTE 2: Carregando imagem da NOAA...');
+                const imgUrl = 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg';
+                const img = await loadImg(imgUrl + '?t=' + Date.now());
+                debugLog('Imagem carregada: ' + img.width + 'x' + img.height);
+                
+                // TESTE 3: Reprojetar imagem
+                debugLog('TESTE 3: Reprojetando para canvas...');
+                const canvas2 = document.createElement('canvas');
+                canvas2.width = 600;
+                canvas2.height = 450;
+                const ctx2 = canvas2.getContext('2d');
+                
+                // Desenhar imagem redimensionada
+                ctx2.drawImage(img, 0, 0, 600, 450);
+                debugLog('drawImage OK');
+                
+                const dataUrl2 = canvas2.toDataURL('image/png');
+                debugLog('toDataURL OK, length: ' + dataUrl2.length);
+                
+                // Adicionar ao mapa
+                map.removeLayer(overlay);
+                overlay = L.imageOverlay(dataUrl2, bounds, {opacity: 0.75}).addTo(map);
+                debugLog('✅ TESTE 3 OK: Overlay com imagem reprojetada!');
+                
+                debugLog('=== TODOS OS TESTES OK! ===');
+                
+            } catch (err) {
+                debugLog('❌ ERRO: ' + err.message);
+                debugLog('Stack: ' + err.stack);
+            }
+        }
+        
+        // URLs das imagens
         const IMAGES = {
             goes19: {
+                local: 'satellite_goes19.png',
                 ssa: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
                 fd: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg'
             },
             goes16: {
+                local: 'satellite_goes16.png',
                 ssa: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
                 fd: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg'
             }
@@ -265,6 +412,13 @@
         // Bounds de saída para reprojeção
         // GOES-East está em -75.2° de longitude
         const BOUNDS = {
+            local: {
+                // Será carregado do JSON
+                north: null,
+                south: null,
+                west: null,
+                east: null
+            },
             ssa: {
                 // Bounds da imagem SSA calibrados
                 north: 17,
@@ -274,10 +428,6 @@
             },
             fd: {
                 // Extremidades do Brasil (com margem)
-                // Norte: Monte Caburaí (5.27°N) → 6°
-                // Sul: Arroio Chuí (-33.75°) → -35°
-                // Oeste: Serra Contamana (-73.98°) → -75°
-                // Leste: Ponta do Seixas (-34.79°) → -34°
                 north: 6,
                 south: -35,
                 west: -75,
@@ -364,12 +514,14 @@
             const btn = document.getElementById('loadBtn');
             btn.disabled = true;
             
-            showLoading('Baixando imagem do NOAA...');
+            showLoading('Carregando imagem...');
             setProgress(10);
             
             try {
-                const url = IMAGES[sat][type];
-                const bounds = BOUNDS[type];
+                let url = IMAGES[sat][type];
+                let bounds = BOUNDS[type];
+                
+                console.log('🛰️ Carregando:', {sat, type, method, url, bounds});
                 
                 // Atualizar info
                 document.getElementById('infoSat').textContent = sat.toUpperCase();
@@ -380,14 +532,15 @@
                 if (overlay) map.removeLayer(overlay);
                 
                 setProgress(30);
-                showLoading('Processando imagem...');
                 
                 if (method === 'direct') {
-                    // Método direto: usa bounds aproximados
+                    showLoading('Carregando overlay direto...');
+                    console.log('📌 Método DIRETO (sem reprojeção)');
                     await loadDirect(url, bounds);
                 } else {
-                    // Reprojeção no browser
-                    await loadWithReprojection(url, bounds, type, sat, method);
+                    showLoading('Iniciando REPROJEÇÃO...');
+                    console.log('🔄 Método REPROJEÇÃO REAL');
+                    await loadWithReprojection(url, bounds, type, sat);
                 }
                 
                 // Atualizar bounds no painel
@@ -405,7 +558,7 @@
                 setTimeout(hideLoading, 300);
                 
             } catch (err) {
-                console.error(err);
+                console.error('❌ ERRO:', err);
                 document.getElementById('infoStatus').textContent = 'ERRO';
                 document.getElementById('infoStatus').className = 'info-value err';
                 document.getElementById('statusText').textContent = 'Erro: ' + err.message;
@@ -427,36 +580,42 @@
             setProgress(90);
         }
         
-        async function loadWithReprojection(url, bounds, type, sat, method) {
-            // Carregar imagem
-            const img = await loadImg(url + '?t=' + Date.now());
-            setProgress(50);
-            
-            showLoading('Reprojetando...');
-            
-            // Criar canvas de saída
-            const outWidth = 1800;  // Largura fixa para boa qualidade
-            const outHeight = Math.round(outWidth * (bounds.north - bounds.south) / (bounds.east - bounds.west));
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = outWidth;
-            canvas.height = outHeight;
-            const ctx = canvas.getContext('2d');
-            
-            // Canvas fonte
-            const srcCanvas = document.createElement('canvas');
-            srcCanvas.width = img.width;
-            srcCanvas.height = img.height;
-            const srcCtx = srcCanvas.getContext('2d');
-            srcCtx.drawImage(img, 0, 0);
-            const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
-            
-            // Canvas destino
-            const outData = ctx.createImageData(outWidth, outHeight);
-            
-            // Parâmetros de reprojeção
-            // GOES-East (GOES-16 ou GOES-19) está em -75.0° W
-            const sat_lon = (sat === 'goes16' || sat === 'goes19') ? -75.0 : -75.0;
+        async function loadWithReprojection(url, bounds, type, sat) {
+            try {
+                // Carregar imagem
+                console.log('🔄 REPROJEÇÃO START:', {url, bounds, type, sat});
+                const img = await loadImg(url + '?t=' + Date.now());
+                console.log('✅ Imagem carregada:', img.width, 'x', img.height);
+                setProgress(50);
+                
+                showLoading('Reprojetando (simplificado)...');
+                
+                // Criar canvas MENOR para testar
+                const outWidth = 800;  // MUITO menor para testar
+                const outHeight = Math.round(outWidth * (bounds.north - bounds.south) / (bounds.east - bounds.west));
+                console.log('📏 Canvas saída:', outWidth, 'x', outHeight);
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = outWidth;
+                canvas.height = outHeight;
+                const ctx = canvas.getContext('2d');
+                
+                // Canvas fonte
+                const srcCanvas = document.createElement('canvas');
+                srcCanvas.width = img.width;
+                srcCanvas.height = img.height;
+                const srcCtx = srcCanvas.getContext('2d');
+                srcCtx.drawImage(img, 0, 0);
+                const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
+                console.log('📊 srcData:', srcData.width, 'x', srcData.height);
+                
+                // Canvas destino
+                const outData = ctx.createImageData(outWidth, outHeight);
+                
+                // Parâmetros de reprojeção
+                // GOES-East (GOES-16 ou GOES-19) está em -75.0° W
+                const sat_lon = (sat === 'goes16' || sat === 'goes19') ? -75.0 : -75.0;
+                console.log('🛰️ Satélite longitude:', sat_lon);
             
             // Processar pixel a pixel
             // Para imagens Full Disk GEOCOLOR da NOAA STAR:
@@ -471,77 +630,92 @@
             const centerX = img.width / 2;
             const centerY = img.height / 2;
             
+            console.log('🎯 Reprojeção params:', {scanMax, imgRadius, scale, centerX, centerY});
+            
+            let pixelsProcessed = 0;
+            let pixelsVisible = 0;
+            let firstScan = null;
+            
+            console.log('🔄 Iniciando loop de reprojeção...');
+            
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
                     // Lat/lon do pixel de saída
                     const lon = bounds.west + (x / outWidth) * (bounds.east - bounds.west);
                     const lat = bounds.north - (y / outHeight) * (bounds.north - bounds.south);
                     
+                    pixelsProcessed++;
+                    
                     // Calcular posição na imagem fonte
                     let srcX, srcY;
                     
                     if (type === 'ssa') {
                         // Para SSA, mapeamento direto
-                        // Imagem SSA: x=0 é oeste, y=0 é norte
                         srcX = ((lon - bounds.west) / (bounds.east - bounds.west)) * img.width;
                         srcY = ((bounds.north - lat) / (bounds.north - bounds.south)) * img.height;
+                        pixelsVisible++;
                     } else {
                         // Para Full Disk, usar projeção geoestacionária
                         const scan = latLonToScan(lat, lon, sat_lon);
                         if (!scan) {
-                            const idx = (y * outWidth + x) * 4;
-                            outData.data[idx + 3] = 0; // Transparente
-                            continue;
+                            continue; // Pular pixel invisível
                         }
                         
-                        // Converter ângulos de scan para pixels
-                        // scan.x positivo = leste = direita = srcX maior
-                        // scan.y positivo = norte = cima = srcY menor
+                        // Log primeiro scan válido
+                        if (!firstScan) {
+                            firstScan = {lat, lon, scan, x, y};
+                            console.log('🎯 Primeiro pixel válido:', firstScan);
+                        }
+                        
                         srcX = centerX + scan.x * scale;
                         srcY = centerY - scan.y * scale;
+                        pixelsVisible++;
                     }
                     
                     if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
                         continue;
                     }
                     
+                    // Nearest neighbor simples
+                    const sx = Math.floor(srcX);
+                    const sy = Math.floor(srcY);
+                    const srcIdx = (sy * img.width + sx) * 4;
                     const idx = (y * outWidth + x) * 4;
                     
-                    if (method === 'bilinear') {
-                        // Interpolação bilinear
-                        const color = bilinear(srcData, srcX, srcY);
-                        outData.data[idx] = color.r;
-                        outData.data[idx + 1] = color.g;
-                        outData.data[idx + 2] = color.b;
-                        outData.data[idx + 3] = 255;
-                    } else {
-                        // Nearest neighbor
-                        const sx = Math.floor(srcX);
-                        const sy = Math.floor(srcY);
-                        const srcIdx = (sy * img.width + sx) * 4;
-                        outData.data[idx] = srcData.data[srcIdx];
-                        outData.data[idx + 1] = srcData.data[srcIdx + 1];
-                        outData.data[idx + 2] = srcData.data[srcIdx + 2];
-                        outData.data[idx + 3] = 255;
-                    }
+                    outData.data[idx] = srcData.data[srcIdx];
+                    outData.data[idx + 1] = srcData.data[srcIdx + 1];
+                    outData.data[idx + 2] = srcData.data[srcIdx + 2];
+                    outData.data[idx + 3] = 255;
                 }
                 
-                // Atualizar progresso
-                if (y % 50 === 0) {
+                // Atualizar progresso e log
+                if (y % 100 === 0) {
+                    console.log(`⏳ Processando linha ${y}/${outHeight}`);
                     setProgress(50 + (y / outHeight) * 40);
-                    await sleep(0);
+                    await sleep(1); // Dar um respiro pro browser
                 }
             }
             
+            console.log('📊 Reprojeção completa:', {pixelsProcessed, pixelsVisible, ratio: (pixelsVisible/pixelsProcessed*100).toFixed(1) + '%'});
+            
             ctx.putImageData(outData, 0, 0);
+            console.log('✅ putImageData done');
             
             // Criar overlay
             const dataUrl = canvas.toDataURL('image/png');
+            console.log('✅ toDataURL done, length:', dataUrl.length);
             const leafletBounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]];
             
             overlay = L.imageOverlay(dataUrl, leafletBounds, {
                 opacity: document.getElementById('opacity').value / 100
             }).addTo(map);
+            
+            console.log('✅ Overlay adicionado ao mapa!');
+            
+            } catch (err) {
+                console.error('❌ ERRO FATAL em loadWithReprojection:', err);
+                throw err;
+            }
         }
         
         // =========================================================

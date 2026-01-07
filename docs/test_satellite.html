@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste de Satélite - GOES</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: Arial; }
+        #map { height: 100vh; }
+        .controls {
+            position: absolute;
+            top: 10px;
+            left: 60px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+        #log {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        .log-entry { margin: 2px 0; }
+        .error { color: #f00; }
+        .success { color: #0f0; }
+        .info { color: #0ff; }
+    </style>
+</head>
+<body>
+
+<div class="controls">
+    <h3>Teste de Satélite GOES</h3>
+    <button onclick="loadGOES19()">GOES-19</button>
+    <button onclick="loadGOES16()">GOES-16</button>
+    <button onclick="clearMap()">Limpar</button>
+    <br>
+    <label>Opacidade: <input type="range" id="opacity" min="0" max="100" value="70" oninput="updateOpacity(this.value)"> <span id="opacityValue">70%</span></label>
+</div>
+
+<div id="log"></div>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    const SHIP_LAT = -22.5;
+    const SHIP_LON = -40.5;
+    
+    let map;
+    let satelliteLayer = null;
+    
+    function log(msg, type = 'info') {
+        const logDiv = document.getElementById('log');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + type;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+        console.log(msg);
+    }
+    
+    function initMap() {
+        map = L.map('map').setView([SHIP_LAT, SHIP_LON], 7);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Ícone do navio
+        const shipIcon = L.divIcon({
+            className: 'ship-icon',
+            html: `<svg viewBox="0 0 24 24" width="40" height="40">
+                <circle cx="12" cy="12" r="10" fill="rgba(0,255,204,0.3)" stroke="#00ffcc" stroke-width="2"/>
+                <circle cx="12" cy="12" r="4" fill="#00ffcc"/>
+            </svg>`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+        });
+        L.marker([SHIP_LAT, SHIP_LON], { icon: shipIcon })
+            .bindPopup(`<b>Deepwater Aquila</b><br>Lat: ${SHIP_LAT}<br>Lon: ${SHIP_LON}`)
+            .addTo(map);
+        
+        // Círculo de 100NM
+        L.circle([SHIP_LAT, SHIP_LON], {
+            radius: 100 * 1852,  // 100 NM em metros
+            color: "#00ffcc",
+            weight: 2,
+            fillOpacity: 0.05,
+            dashArray: '5, 5'
+        }).addTo(map);
+        
+        log('✅ Mapa inicializado', 'success');
+    }
+    
+    async function loadSatellite(satId) {
+        log(`🛰️ Carregando ${satId.toUpperCase()}...`, 'info');
+        
+        try {
+            // Remover camada anterior
+            if (satelliteLayer) {
+                map.removeLayer(satelliteLayer);
+                satelliteLayer = null;
+            }
+            
+            const imageUrl = `satellite_${satId}.png?t=${Date.now()}`;
+            const jsonUrl = `satellite_${satId}.json?t=${Date.now()}`;
+            
+            log(`📡 Buscando metadados: ${jsonUrl}`, 'info');
+            
+            // Buscar metadados
+            const response = await fetch(jsonUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            log(`✅ JSON carregado: ${JSON.stringify(data.leaflet_bounds)}`, 'success');
+            
+            const bounds = data.leaflet_bounds;
+            if (!bounds) {
+                throw new Error('leaflet_bounds não encontrado no JSON');
+            }
+            
+            log(`📍 Bounds: [[${bounds[0][0].toFixed(2)}, ${bounds[0][1].toFixed(2)}], [${bounds[1][0].toFixed(2)}, ${bounds[1][1].toFixed(2)}]]`, 'info');
+            log(`🖼️ Carregando imagem: ${imageUrl}`, 'info');
+            
+            const opacity = document.getElementById('opacity').value / 100;
+            
+            // Adicionar imagem ao mapa
+            satelliteLayer = L.imageOverlay(imageUrl, bounds, {
+                opacity: opacity,
+                zIndex: 1,
+                alt: `Satélite ${satId.toUpperCase()}`
+            });
+            
+            satelliteLayer.on('load', function() {
+                log(`✅ ${satId.toUpperCase()} carregado com sucesso!`, 'success');
+                if (data.image_time_utc) {
+                    log(`🛰️ Horário da imagem: ${data.image_time_utc}`, 'info');
+                }
+            });
+            
+            satelliteLayer.on('error', function(e) {
+                log(`❌ Erro ao carregar imagem: ${e}`, 'error');
+            });
+            
+            satelliteLayer.addTo(map);
+            
+            // Ajustar zoom para mostrar a área
+            map.fitBounds(bounds);
+            
+        } catch (error) {
+            log(`❌ Erro: ${error.message}`, 'error');
+            console.error(error);
+        }
+    }
+    
+    function loadGOES19() {
+        loadSatellite('goes19');
+    }
+    
+    function loadGOES16() {
+        loadSatellite('goes16');
+    }
+    
+    function clearMap() {
+        if (satelliteLayer) {
+            map.removeLayer(satelliteLayer);
+            satelliteLayer = null;
+            log('🗑️ Camada removida', 'info');
+        }
+    }
+    
+    function updateOpacity(value) {
+        document.getElementById('opacityValue').textContent = value + '%';
+        if (satelliteLayer) {
+            satelliteLayer.setOpacity(value / 100);
+        }
+    }
+    
+    // Inicializar
+    window.onload = function() {
+        initMap();
+        log('🚀 Sistema pronto', 'success');
+    };
+</script>
+
+</body>
+</html>
