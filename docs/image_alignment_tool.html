@@ -388,13 +388,49 @@
             <!-- Marcar Pontos -->
             <div class="control-section">
                 <h3>📌 Pontos de Referência (GCP)</h3>
+                
+                <!-- Presets de alinhamento -->
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:0.8em; color:#888;">Usar preset:</label>
+                    <select id="presetSelect" onchange="loadPreset(this.value)" style="width:100%; padding:6px; background:#1a1a2e; border:1px solid #0f3460; color:#fff; border-radius:4px; font-size:0.85em; margin-top:4px;">
+                        <option value="">-- Selecione --</option>
+                        <option value="goes_ssa">GOES SSA (América do Sul)</option>
+                        <option value="goes_car">GOES CAR (Caribe)</option>
+                        <option value="goes_gm">GOES GM (Golfo México)</option>
+                    </select>
+                </div>
+                
+                <!-- Cidade rápida -->
+                <div style="margin-bottom:10px;">
+                    <label style="font-size:0.8em; color:#888;">Adicionar cidade:</label>
+                    <select id="citySelect" onchange="addCityPoint(this.value)" style="width:100%; padding:6px; background:#1a1a2e; border:1px solid #0f3460; color:#fff; border-radius:4px; font-size:0.85em; margin-top:4px;">
+                        <option value="">-- Clique na cidade e escolha --</option>
+                        <option value="bsas">Buenos Aires (-34.6, -58.4)</option>
+                        <option value="rio">Rio de Janeiro (-22.9, -43.2)</option>
+                        <option value="sp">São Paulo (-23.5, -46.6)</option>
+                        <option value="montevideo">Montevidéu (-34.9, -56.2)</option>
+                        <option value="santiago">Santiago (-33.4, -70.6)</option>
+                        <option value="lima">Lima (-12.0, -77.0)</option>
+                        <option value="bogota">Bogotá (4.7, -74.1)</option>
+                        <option value="caracas">Caracas (10.5, -66.9)</option>
+                        <option value="manaus">Manaus (-3.1, -60.0)</option>
+                        <option value="recife">Recife (-8.1, -34.9)</option>
+                        <option value="porto">Porto Alegre (-30.0, -51.2)</option>
+                        <option value="floripa">Florianópolis (-27.6, -48.5)</option>
+                    </select>
+                    <p class="instructions" style="font-size:0.7em; color:#666; margin-top:4px;">
+                        1️⃣ Clique em "Marcar Ponto" → clique na cidade na imagem<br>
+                        2️⃣ Selecione a cidade aqui para preencher as coordenadas
+                    </p>
+                </div>
+                
                 <button class="btn btn-primary" id="btnGcpMode" onclick="toggleGcpMode()">
                     🎯 Marcar Ponto na Imagem
                 </button>
                 <p class="instructions" id="gcpInstructions" style="display:none;">
                     ✨ Clique na imagem para marcar um ponto.<br>
-                    📍 Digite as coordenadas do ECDIS nos campos.<br>
-                    🔢 Mínimo 2 pontos para alinhar.
+                    📍 Depois escolha a cidade ou digite as coordenadas.<br>
+                    🔢 Mínimo 2 pontos para alinhar (3+ recomendado).
                 </p>
                 
                 <button class="btn" id="btnMeasureMode" onclick="toggleMeasureMode()" style="background:#6c5ce7; margin-top:8px;">
@@ -520,6 +556,129 @@
             if (url) {
                 loadImage(url, 'URL');
             }
+        }
+
+        // ===== PRESETS DE ALINHAMENTO GOES =====
+        // Coordenadas conhecidas para imagens GOES setoriais
+        // Nota: Imagens GOES usam projeção geoestacionária, então o alinhamento
+        // linear é uma aproximação. Use múltiplos pontos de referência para melhor precisão.
+        const ALIGNMENT_PRESETS = {
+            goes_ssa: {
+                name: 'GOES SSA (América do Sul)',
+                // Bounds do setor SSA (South America) - 1808x1015 ou similar
+                // Estas são aproximações - ajuste os pontos para locais conhecidos!
+                gcpPoints: [
+                    // Pontos em locais mais identificáveis
+                    // Buenos Aires (aproximado)
+                    { pixelX: 350, pixelY: 500, lat: -34.6, lng: -58.4 },
+                    // Rio de Janeiro (aproximado)
+                    { pixelX: 650, pixelY: 450, lat: -22.9, lng: -43.2 },
+                    // Lima (aproximado)
+                    { pixelX: 150, pixelY: 380, lat: -12.0, lng: -77.0 },
+                    // Manaus (aproximado)
+                    { pixelX: 450, pixelY: 280, lat: -3.1, lng: -60.0 }
+                ]
+            },
+            goes_car: {
+                name: 'GOES CAR (Caribe)',
+                gcpPoints: [
+                    { pixelX: 900, pixelY: 540, lat: 18.5, lng: -69.9 },  // Santo Domingo
+                    { pixelX: 600, pixelY: 300, lat: 25.8, lng: -80.2 },  // Miami
+                    { pixelX: 400, pixelY: 700, lat: 10.5, lng: -66.9 },  // Caracas
+                    { pixelX: 700, pixelY: 450, lat: 18.0, lng: -76.8 }   // Kingston
+                ]
+            },
+            goes_gm: {
+                name: 'GOES GM (Golfo México)',
+                gcpPoints: [
+                    { pixelX: 900, pixelY: 300, lat: 29.8, lng: -95.4 },  // Houston
+                    { pixelX: 600, pixelY: 600, lat: 19.4, lng: -99.1 },  // Cidade México
+                    { pixelX: 1200, pixelY: 450, lat: 25.7, lng: -80.2 }, // Miami
+                    { pixelX: 400, pixelY: 400, lat: 23.2, lng: -106.4 }  // Mazatlán
+                ]
+            }
+        };
+
+        function loadPreset(presetId) {
+            if (!presetId || !ALIGNMENT_PRESETS[presetId]) {
+                return;
+            }
+            
+            const preset = ALIGNMENT_PRESETS[presetId];
+            
+            // Limpar pontos existentes
+            clearAllPoints();
+            
+            // Adicionar pontos do preset
+            preset.gcpPoints.forEach(p => {
+                gcpCounter++;
+                const id = gcpCounter;
+                
+                const pointEl = document.createElement('div');
+                pointEl.className = 'image-point';
+                pointEl.innerHTML = id;
+                pointEl.dataset.id = id;
+                document.getElementById('imageContainer').appendChild(pointEl);
+                pointEl.style.left = (p.pixelX * currentZoom) + 'px';
+                pointEl.style.top = (p.pixelY * currentZoom) + 'px';
+                setupPointDrag(pointEl);
+
+                gcpPoints.push({
+                    id: id,
+                    pixelX: p.pixelX,
+                    pixelY: p.pixelY,
+                    lat: p.lat,
+                    lng: p.lng,
+                    element: pointEl
+                });
+            });
+            
+            updateGcpList();
+            updateSummary();
+            
+            alert(`Preset "${preset.name}" carregado!\n\n⚠️ IMPORTANTE: Os pontos estão em posições aproximadas.\nArraste-os para localizações conhecidas (cidades, ilhas, etc.) e ajuste as coordenadas para melhor precisão.`);
+        }
+
+        // ===== CIDADES CONHECIDAS =====
+        const KNOWN_CITIES = {
+            bsas: { name: 'Buenos Aires', lat: -34.6037, lng: -58.3816 },
+            rio: { name: 'Rio de Janeiro', lat: -22.9068, lng: -43.1729 },
+            sp: { name: 'São Paulo', lat: -23.5505, lng: -46.6333 },
+            montevideo: { name: 'Montevidéu', lat: -34.9011, lng: -56.1645 },
+            santiago: { name: 'Santiago', lat: -33.4489, lng: -70.6693 },
+            lima: { name: 'Lima', lat: -12.0464, lng: -77.0428 },
+            bogota: { name: 'Bogotá', lat: 4.7110, lng: -74.0721 },
+            caracas: { name: 'Caracas', lat: 10.4806, lng: -66.9036 },
+            manaus: { name: 'Manaus', lat: -3.1190, lng: -60.0217 },
+            recife: { name: 'Recife', lat: -8.0476, lng: -34.8770 },
+            porto: { name: 'Porto Alegre', lat: -30.0346, lng: -51.2177 },
+            floripa: { name: 'Florianópolis', lat: -27.5954, lng: -48.5480 }
+        };
+
+        function addCityPoint(cityId) {
+            if (!cityId || !KNOWN_CITIES[cityId]) {
+                return;
+            }
+            
+            const city = KNOWN_CITIES[cityId];
+            
+            // Verificar se há um ponto recente sem coordenadas
+            const lastPoint = gcpPoints[gcpPoints.length - 1];
+            if (lastPoint && lastPoint.lat === 0 && lastPoint.lng === 0) {
+                // Atualizar o último ponto com as coordenadas da cidade
+                lastPoint.lat = city.lat;
+                lastPoint.lng = city.lng;
+                updateGcpList();
+                updateSummary();
+                
+                // Resetar o select
+                document.getElementById('citySelect').value = '';
+                return;
+            }
+            
+            // Se não há ponto recente, avisar o usuário
+            alert(`Para usar esta opção:\n1. Clique em "Marcar Ponto na Imagem"\n2. Clique na localização de ${city.name} na imagem\n3. Então selecione ${city.name} nesta lista`);
+            document.getElementById('citySelect').value = '';
         }
 
         // ===== CARREGAR IMAGEM NOAA DIRETO =====
@@ -670,8 +829,17 @@
                 
                 const pixel = clientToImagePixel(e.clientX, e.clientY);
                 if (pixel) {
-                    document.getElementById('mouseInfo').innerHTML = 
-                        `Pixel: <b>${Math.round(pixel.x)}</b> , <b>${Math.round(pixel.y)}</b>`;
+                    let info = `Pixel: <b>${Math.round(pixel.x)}</b> , <b>${Math.round(pixel.y)}</b>`;
+                    
+                    // Se temos alinhamento, mostrar coordenadas estimadas
+                    const geo = pixelToGeo(pixel.x, pixel.y);
+                    if (geo) {
+                        const latDir = geo.lat >= 0 ? 'N' : 'S';
+                        const lngDir = geo.lng >= 0 ? 'E' : 'W';
+                        info += `<br><span style="color:#00ff00;">≈ ${Math.abs(geo.lat).toFixed(4)}°${latDir}, ${Math.abs(geo.lng).toFixed(4)}°${lngDir}</span>`;
+                    }
+                    
+                    document.getElementById('mouseInfo').innerHTML = info;
                 }
             });
 
@@ -821,48 +989,20 @@
         }
 
         function pixelToGeo(pixelX, pixelY) {
-            // Calcular coordenadas geográficas a partir do alinhamento GCP
+            // Calcular coordenadas geográficas usando transformação afim
             const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
             if (validPoints.length < 2) return null;
 
-            // Usar mesma lógica do calculateAlignment
-            let minPixelX = Infinity, maxPixelX = -Infinity;
-            let minPixelY = Infinity, maxPixelY = -Infinity;
-
-            validPoints.forEach(p => {
-                minPixelX = Math.min(minPixelX, p.pixelX);
-                maxPixelX = Math.max(maxPixelX, p.pixelX);
-                minPixelY = Math.min(minPixelY, p.pixelY);
-                maxPixelY = Math.max(maxPixelY, p.pixelY);
-            });
-
-            const pixelRangeX = maxPixelX - minPixelX;
-            const pixelRangeY = maxPixelY - minPixelY;
-
-            let minLat = Infinity, maxLat = -Infinity;
-            let minLng = Infinity, maxLng = -Infinity;
-
-            validPoints.forEach(p => {
-                minLat = Math.min(minLat, p.lat);
-                maxLat = Math.max(maxLat, p.lat);
-                minLng = Math.min(minLng, p.lng);
-                maxLng = Math.max(maxLng, p.lng);
-            });
-
-            const latRange = maxLat - minLat;
-            const lngRange = maxLng - minLng;
-
-            const scaleX = pixelRangeX > 0 ? lngRange / pixelRangeX : 0;
-            const scaleY = pixelRangeY > 0 ? latRange / pixelRangeY : 0;
-
-            const refPoint = validPoints[0];
-            const offsetLng = refPoint.lng - (refPoint.pixelX * scaleX);
-            const offsetLat = refPoint.lat + (refPoint.pixelY * scaleY);
-
-            return {
-                lat: offsetLat - (pixelY * scaleY),
-                lng: offsetLng + (pixelX * scaleX)
-            };
+            // Usar transformação afim se disponível
+            if (affineTransform) {
+                return applyAffineTransform(affineTransform, pixelX, pixelY);
+            }
+            
+            // Recalcular se necessário
+            const transform = calculateAffineTransform(validPoints);
+            if (!transform) return null;
+            
+            return applyAffineTransform(transform, pixelX, pixelY);
         }
 
         function drawMeasureLine() {
@@ -1139,7 +1279,156 @@
             updateSummary();
         }
 
-        // ===== CALCULAR ALINHAMENTO =====
+        // ===== CALCULAR ALINHAMENTO COM TRANSFORMAÇÃO AFIM =====
+        // Matriz de transformação global (pixel -> geo)
+        let affineTransform = null;
+        
+        function calculateAffineTransform(points) {
+            // Calcular transformação afim usando mínimos quadrados
+            // Para pelo menos 3 pontos, resolve o sistema linear
+            // [lng]   [a b c] [pixelX]
+            // [lat] = [d e f] [pixelY]
+            //                 [1     ]
+            
+            const n = points.length;
+            
+            if (n < 2) return null;
+            
+            if (n === 2) {
+                // Com apenas 2 pontos, assumir sem rotação
+                const p1 = points[0];
+                const p2 = points[1];
+                
+                const dPixelX = p2.pixelX - p1.pixelX;
+                const dPixelY = p2.pixelY - p1.pixelY;
+                const dLng = p2.lng - p1.lng;
+                const dLat = p2.lat - p1.lat;
+                
+                // Calcular escala média
+                const pixelDist = Math.sqrt(dPixelX * dPixelX + dPixelY * dPixelY);
+                const geoDist = Math.sqrt(dLng * dLng + dLat * dLat);
+                
+                if (pixelDist === 0) return null;
+                
+                // Estimar escala separada para X e Y
+                let scaleX, scaleY;
+                
+                if (Math.abs(dPixelX) > 1) {
+                    scaleX = dLng / dPixelX;
+                } else {
+                    scaleX = geoDist / pixelDist;
+                }
+                
+                if (Math.abs(dPixelY) > 1) {
+                    scaleY = dLat / dPixelY;
+                } else {
+                    scaleY = -geoDist / pixelDist; // Negativo porque Y aumenta para baixo
+                }
+                
+                // Ajuste: latitude decresce quando Y aumenta (imagem)
+                // Offset calculado a partir do primeiro ponto
+                const offsetLng = p1.lng - (p1.pixelX * scaleX);
+                const offsetLat = p1.lat - (p1.pixelY * scaleY);
+                
+                return {
+                    a: scaleX, b: 0, c: offsetLng,
+                    d: 0, e: scaleY, f: offsetLat
+                };
+            }
+            
+            // Para 3+ pontos: resolver usando mínimos quadrados
+            // Construir matrizes para o sistema Ax = b
+            
+            // Para longitude: a*px + b*py + c = lng
+            // Para latitude:  d*px + e*py + f = lat
+            
+            let sumPx = 0, sumPy = 0, sumPx2 = 0, sumPy2 = 0, sumPxPy = 0;
+            let sumLng = 0, sumLat = 0;
+            let sumPxLng = 0, sumPyLng = 0, sumPxLat = 0, sumPyLat = 0;
+            
+            points.forEach(p => {
+                sumPx += p.pixelX;
+                sumPy += p.pixelY;
+                sumPx2 += p.pixelX * p.pixelX;
+                sumPy2 += p.pixelY * p.pixelY;
+                sumPxPy += p.pixelX * p.pixelY;
+                sumLng += p.lng;
+                sumLat += p.lat;
+                sumPxLng += p.pixelX * p.lng;
+                sumPyLng += p.pixelY * p.lng;
+                sumPxLat += p.pixelX * p.lat;
+                sumPyLat += p.pixelY * p.lat;
+            });
+            
+            // Matriz A (3x3) para o sistema normal
+            const A = [
+                [sumPx2, sumPxPy, sumPx],
+                [sumPxPy, sumPy2, sumPy],
+                [sumPx, sumPy, n]
+            ];
+            
+            // Resolver para longitude (a, b, c)
+            const bLng = [sumPxLng, sumPyLng, sumLng];
+            const lngCoeffs = solveLinearSystem(A, bLng);
+            
+            // Resolver para latitude (d, e, f)
+            const bLat = [sumPxLat, sumPyLat, sumLat];
+            const latCoeffs = solveLinearSystem(A, bLat);
+            
+            if (!lngCoeffs || !latCoeffs) return null;
+            
+            return {
+                a: lngCoeffs[0], b: lngCoeffs[1], c: lngCoeffs[2],
+                d: latCoeffs[0], e: latCoeffs[1], f: latCoeffs[2]
+            };
+        }
+        
+        function solveLinearSystem(A, b) {
+            // Resolver sistema 3x3 usando eliminação de Gauss
+            const n = 3;
+            const aug = A.map((row, i) => [...row, b[i]]);
+            
+            for (let col = 0; col < n; col++) {
+                // Pivotação parcial
+                let maxRow = col;
+                for (let row = col + 1; row < n; row++) {
+                    if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) {
+                        maxRow = row;
+                    }
+                }
+                [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
+                
+                if (Math.abs(aug[col][col]) < 1e-10) return null; // Matriz singular
+                
+                // Eliminação
+                for (let row = col + 1; row < n; row++) {
+                    const factor = aug[row][col] / aug[col][col];
+                    for (let j = col; j <= n; j++) {
+                        aug[row][j] -= factor * aug[col][j];
+                    }
+                }
+            }
+            
+            // Substituição reversa
+            const x = new Array(n);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = aug[i][n];
+                for (let j = i + 1; j < n; j++) {
+                    x[i] -= aug[i][j] * x[j];
+                }
+                x[i] /= aug[i][i];
+            }
+            
+            return x;
+        }
+        
+        function applyAffineTransform(transform, pixelX, pixelY) {
+            return {
+                lng: transform.a * pixelX + transform.b * pixelY + transform.c,
+                lat: transform.d * pixelX + transform.e * pixelY + transform.f
+            };
+        }
+        
         function calculateAlignment() {
             if (gcpPoints.length < 2) {
                 return null;
@@ -1151,53 +1440,43 @@
                 return null;
             }
 
-            // Calcular transformação linear simples (escala + offset)
-            // Usando os pontos para calcular bounds geográficos
-
-            let minPixelX = Infinity, maxPixelX = -Infinity;
-            let minPixelY = Infinity, maxPixelY = -Infinity;
-            let minLat = Infinity, maxLat = -Infinity;
-            let minLng = Infinity, maxLng = -Infinity;
-
-            validPoints.forEach(p => {
-                minPixelX = Math.min(minPixelX, p.pixelX);
-                maxPixelX = Math.max(maxPixelX, p.pixelX);
-                minPixelY = Math.min(minPixelY, p.pixelY);
-                maxPixelY = Math.max(maxPixelY, p.pixelY);
-                minLat = Math.min(minLat, p.lat);
-                maxLat = Math.max(maxLat, p.lat);
-                minLng = Math.min(minLng, p.lng);
-                maxLng = Math.max(maxLng, p.lng);
-            });
-
-            // Calcular escala (graus por pixel)
-            const pixelRangeX = maxPixelX - minPixelX;
-            const pixelRangeY = maxPixelY - minPixelY;
-            const latRange = maxLat - minLat;
-            const lngRange = maxLng - minLng;
-
-            // Escala
-            const scaleX = pixelRangeX > 0 ? lngRange / pixelRangeX : 0;
-            const scaleY = pixelRangeY > 0 ? latRange / pixelRangeY : 0;
-
-            // Extrapolar para os cantos da imagem
-            // Pixel (0,0) está no topo-esquerdo
-            // Lat aumenta para cima (Norte), Y de pixel aumenta para baixo
+            // Calcular transformação afim
+            affineTransform = calculateAffineTransform(validPoints);
+            if (!affineTransform) return null;
             
-            // Calcular offset usando um ponto de referência
-            const refPoint = validPoints[0];
-            const offsetLng = refPoint.lng - (refPoint.pixelX * scaleX);
-            const offsetLat = refPoint.lat + (refPoint.pixelY * scaleY); // + porque Y é invertido
-
-            // Calcular bounds da imagem completa
-            const north = offsetLat;  // Y=0
-            const south = offsetLat - (imageNaturalSize.height * scaleY);
-            const west = offsetLng;   // X=0
-            const east = offsetLng + (imageNaturalSize.width * scaleX);
+            // Calcular bounds usando os 4 cantos da imagem
+            const corners = [
+                { x: 0, y: 0 },                                           // Top-left
+                { x: imageNaturalSize.width, y: 0 },                      // Top-right
+                { x: 0, y: imageNaturalSize.height },                     // Bottom-left
+                { x: imageNaturalSize.width, y: imageNaturalSize.height } // Bottom-right
+            ];
+            
+            const cornerGeo = corners.map(c => applyAffineTransform(affineTransform, c.x, c.y));
+            
+            // Encontrar bounds geográficos
+            const lats = cornerGeo.map(g => g.lat);
+            const lngs = cornerGeo.map(g => g.lng);
+            
+            const north = Math.max(...lats);
+            const south = Math.min(...lats);
+            const east = Math.max(...lngs);
+            const west = Math.min(...lngs);
+            
+            // Calcular erro RMS para diagnóstico
+            let sumError2 = 0;
+            validPoints.forEach(p => {
+                const predicted = applyAffineTransform(affineTransform, p.pixelX, p.pixelY);
+                const errLat = predicted.lat - p.lat;
+                const errLng = predicted.lng - p.lng;
+                sumError2 += errLat * errLat + errLng * errLng;
+            });
+            const rmsError = Math.sqrt(sumError2 / validPoints.length);
 
             return {
                 bounds: { north, south, east, west },
-                scale: { x: scaleX, y: scaleY },
+                transform: affineTransform,
+                rmsError: rmsError,
                 gcpPoints: validPoints.map(p => ({
                     pixelX: p.pixelX,
                     pixelY: p.pixelY,
@@ -1228,10 +1507,22 @@
             const alignment = calculateAlignment();
             if (alignment) {
                 html += `<br><b style="color:#00ff00;">✅ Pronto para alinhar!</b><br>`;
-                html += `N: ${alignment.bounds.north.toFixed(6)}°<br>`;
-                html += `S: ${alignment.bounds.south.toFixed(6)}°<br>`;
-                html += `E: ${alignment.bounds.east.toFixed(6)}°<br>`;
-                html += `W: ${alignment.bounds.west.toFixed(6)}°`;
+                html += `N: ${alignment.bounds.north.toFixed(4)}°<br>`;
+                html += `S: ${alignment.bounds.south.toFixed(4)}°<br>`;
+                html += `E: ${alignment.bounds.east.toFixed(4)}°<br>`;
+                html += `W: ${alignment.bounds.west.toFixed(4)}°<br>`;
+                
+                if (alignment.rmsError !== undefined) {
+                    const errorKm = alignment.rmsError * 111; // ~111 km por grau
+                    const errorColor = errorKm < 10 ? '#00ff00' : errorKm < 50 ? '#ffff00' : '#ff6600';
+                    html += `<br><span style="color:${errorColor};">📊 Erro RMS: ~${errorKm.toFixed(1)} km</span>`;
+                    
+                    if (validPoints.length < 3) {
+                        html += `<br><span style="color:#ffaa00;">⚠️ Adicione mais pontos para melhor precisão</span>`;
+                    } else if (validPoints.length >= 4) {
+                        html += `<br><span style="color:#00ff00;">✨ ${validPoints.length} pontos = boa precisão</span>`;
+                    }
+                }
             } else {
                 html += `<span style="color:#ffaa00;">⚠️ Adicione coordenadas aos pontos</span>`;
             }
@@ -1264,7 +1555,7 @@
 
                 // Limpar camadas anteriores
                 previewMap.eachLayer(layer => {
-                    if (layer instanceof L.ImageOverlay || layer instanceof L.Marker) {
+                    if (layer instanceof L.ImageOverlay || layer instanceof L.Marker || layer instanceof L.Circle || layer instanceof L.Polygon) {
                         previewMap.removeLayer(layer);
                     }
                 });
@@ -1276,15 +1567,50 @@
                 );
 
                 L.imageOverlay(imageElement.src, bounds, {
-                    opacity: 0.8
+                    opacity: 0.75
                 }).addTo(previewMap);
 
-                // Adicionar marcadores dos GCPs
-                alignment.gcpPoints.forEach((p, i) => {
-                    L.marker([p.lat, p.lng])
-                        .bindPopup(`GCP ${i+1}: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`)
-                        .addTo(previewMap);
+                // Ícone personalizado para GCPs
+                const gcpIcon = L.divIcon({
+                    className: 'gcp-map-marker',
+                    html: '<div style="background:#ff00ff;border:2px solid white;border-radius:50%;width:16px;height:16px;box-shadow:0 0 10px rgba(255,0,255,0.8);"></div>',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
                 });
+
+                // Adicionar marcadores dos GCPs com círculos de erro
+                alignment.gcpPoints.forEach((p, i) => {
+                    // Marcador do GCP
+                    L.marker([p.lat, p.lng], {icon: gcpIcon})
+                        .bindPopup(`<b>GCP ${i+1}</b><br>Lat: ${p.lat.toFixed(6)}°<br>Lng: ${p.lng.toFixed(6)}°<br>Pixel: (${Math.round(p.pixelX)}, ${Math.round(p.pixelY)})`)
+                        .addTo(previewMap);
+                    
+                    // Mostrar posição calculada pela transformação
+                    if (affineTransform) {
+                        const calculated = applyAffineTransform(affineTransform, p.pixelX, p.pixelY);
+                        // Círculo mostrando a posição calculada
+                        L.circle([calculated.lat, calculated.lng], {
+                            radius: 5000, // 5km
+                            color: '#00ff00',
+                            fillColor: '#00ff00',
+                            fillOpacity: 0.3,
+                            weight: 2
+                        }).bindPopup(`Posição calculada para GCP ${i+1}`).addTo(previewMap);
+                    }
+                });
+
+                // Desenhar retângulo dos bounds
+                const boundsRect = L.polygon([
+                    [alignment.bounds.north, alignment.bounds.west],
+                    [alignment.bounds.north, alignment.bounds.east],
+                    [alignment.bounds.south, alignment.bounds.east],
+                    [alignment.bounds.south, alignment.bounds.west]
+                ], {
+                    color: '#00d9ff',
+                    weight: 2,
+                    fillOpacity: 0,
+                    dashArray: '5, 5'
+                }).addTo(previewMap);
 
                 previewMap.fitBounds(bounds);
                 previewMap.invalidateSize();
