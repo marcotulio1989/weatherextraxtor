@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌍 GOES Full Disk Viewer - Reprojeção</title>
+    <title>🌍 GOES Full Disk - Reprojeção Real</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,7 +16,6 @@
             flex-direction: column;
         }
         
-        /* Header */
         .header {
             background: linear-gradient(90deg, #1a1a2e, #16213e);
             padding: 10px 20px;
@@ -26,12 +25,8 @@
             border-bottom: 2px solid #00d4ff;
             flex-shrink: 0;
         }
-        .header h1 {
-            color: #00d4ff;
-            font-size: 1.3em;
-        }
+        .header h1 { color: #00d4ff; font-size: 1.3em; }
         
-        /* Controls */
         .controls {
             background: rgba(0,0,0,0.7);
             padding: 10px 20px;
@@ -60,10 +55,6 @@
             font-size: 0.9em;
             cursor: pointer;
         }
-        select:focus, button:focus {
-            outline: none;
-            border-color: #00d4ff;
-        }
         button {
             background: linear-gradient(135deg, #00d4ff, #0099cc);
             color: #000;
@@ -74,31 +65,28 @@
             transform: translateY(-1px);
             box-shadow: 0 3px 10px rgba(0,212,255,0.3);
         }
-        button.secondary {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a5a);
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
         
-        /* Map Container */
         .map-wrapper {
             flex: 1;
             position: relative;
         }
-        #map {
-            width: 100%;
-            height: 100%;
-        }
+        #map { width: 100%; height: 100%; }
         
-        /* Info Panel */
         .info-panel {
             position: absolute;
             top: 10px;
             right: 10px;
-            background: rgba(0,0,0,0.85);
+            background: rgba(0,0,0,0.9);
             padding: 12px 15px;
             border-radius: 8px;
-            font-size: 0.85em;
+            font-size: 0.8em;
             z-index: 1000;
-            min-width: 200px;
+            min-width: 220px;
         }
         .info-panel h3 {
             color: #00d4ff;
@@ -108,37 +96,29 @@
         .info-row {
             display: flex;
             justify-content: space-between;
-            padding: 4px 0;
+            padding: 3px 0;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .info-row:last-child { border-bottom: none; }
         .info-label { color: #888; }
         .info-value { color: #00d4ff; font-weight: bold; }
-        .info-value.error { color: #e74c3c; }
         .info-value.success { color: #2ecc71; }
+        .info-value.error { color: #e74c3c; }
         
-        /* Opacity Slider */
         .opacity-control {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
-        .opacity-control input {
-            width: 100px;
-        }
-        .opacity-value {
-            color: #00d4ff;
-            font-weight: bold;
-            min-width: 40px;
-        }
+        .opacity-control input { width: 80px; }
+        .opacity-value { color: #00d4ff; font-weight: bold; min-width: 35px; }
         
-        /* Loading */
         .loading {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             padding: 30px 50px;
             border-radius: 10px;
             z-index: 9999;
@@ -156,7 +136,21 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         
-        /* Status Bar */
+        .progress-bar {
+            width: 200px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            width: 0%;
+            transition: width 0.1s;
+        }
+        
         .status-bar {
             background: rgba(0,0,0,0.8);
             padding: 8px 20px;
@@ -166,13 +160,17 @@
             justify-content: space-between;
             flex-shrink: 0;
         }
+        
+        #processingCanvas { display: none; }
     </style>
 </head>
 <body>
+    <canvas id="processingCanvas"></canvas>
+    
     <header class="header">
-        <h1>🌍 GOES Full Disk Viewer</h1>
+        <h1>🌍 GOES Full Disk - Reprojeção Real</h1>
         <div style="color: #888; font-size: 0.9em;">
-            Reprojeção Geoestacionária → Plate Carrée
+            Geoestacionária → Plate Carrée (pixel a pixel)
         </div>
     </header>
     
@@ -180,49 +178,42 @@
         <div class="control-group">
             <label>🛰️ Satélite</label>
             <select id="satelliteSelect">
-                <option value="goes19">GOES-19 (East)</option>
-                <option value="goes16">GOES-16 (East)</option>
+                <option value="goes19">GOES-19</option>
+                <option value="goes16">GOES-16</option>
             </select>
         </div>
         
         <div class="control-group">
-            <label>🔧 Método de Reprojeção</label>
+            <label>🔧 Método</label>
             <select id="methodSelect">
-                <option value="manual">Manual (Matemática Pura)</option>
-                <option value="gdal">GDAL (rasterio + pyproj)</option>
-                <option value="cartopy">Cartopy</option>
-                <option value="satpy">SatPy (pyresample)</option>
+                <option value="bilinear">Bilinear (Suave)</option>
+                <option value="nearest">Nearest (Rápido)</option>
             </select>
         </div>
         
         <div class="control-group">
-            <label>📐 Qualidade</label>
-            <select id="qualitySelect">
-                <option value="1000">1000px (Rápido)</option>
-                <option value="2000" selected>2000px (Normal)</option>
-                <option value="3000">3000px (Alta)</option>
-                <option value="4000">4000px (Máxima)</option>
+            <label>📐 Resolução</label>
+            <select id="resolutionSelect">
+                <option value="0.5">0.5° (Alta - Lento)</option>
+                <option value="1" selected>1° (Normal)</option>
+                <option value="2">2° (Rápido)</option>
             </select>
         </div>
         
         <div class="control-group">
             <label>🔍 Opacidade</label>
             <div class="opacity-control">
-                <input type="range" id="opacitySlider" min="0" max="100" value="70">
-                <span class="opacity-value" id="opacityValue">70%</span>
+                <input type="range" id="opacitySlider" min="0" max="100" value="80">
+                <span class="opacity-value" id="opacityValue">80%</span>
             </div>
         </div>
         
-        <button id="loadBtn" onclick="loadFullDisk()">
-            🌍 Carregar Full Disk
+        <button id="loadBtn" onclick="loadAndReproject()">
+            🌍 CARREGAR E REPROJETAR
         </button>
         
-        <button id="reprocessBtn" onclick="reprocessImage()" class="secondary">
-            🔄 Reprojetar
-        </button>
-        
-        <button onclick="fitToBounds()">
-            📍 Ajustar Visão
+        <button onclick="fitFullDisk()">
+            📍 Ver Tudo
         </button>
     </div>
     
@@ -233,326 +224,375 @@
             <h3>📊 Informações</h3>
             <div class="info-row">
                 <span class="info-label">Satélite:</span>
-                <span class="info-value" id="infoSatellite">-</span>
+                <span class="info-value" id="infoSat">-</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Método:</span>
                 <span class="info-value" id="infoMethod">-</span>
             </div>
             <div class="info-row">
+                <span class="info-label">Resolução:</span>
+                <span class="info-value" id="infoRes">-</span>
+            </div>
+            <div class="info-row">
                 <span class="info-label">Status:</span>
-                <span class="info-value" id="infoStatus">Aguardando...</span>
+                <span class="info-value" id="infoStatus">Aguardando</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Bounds N:</span>
-                <span class="info-value" id="infoBoundsN">-</span>
+                <span class="info-label">Pixels:</span>
+                <span class="info-value" id="infoPixels">-</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Bounds S:</span>
-                <span class="info-value" id="infoBoundsS">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Bounds W:</span>
-                <span class="info-value" id="infoBoundsW">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Bounds E:</span>
-                <span class="info-value" id="infoBoundsE">-</span>
+                <span class="info-label">Tempo:</span>
+                <span class="info-value" id="infoTime">-</span>
             </div>
         </div>
         
         <div class="loading hidden" id="loadingOverlay">
             <div class="spinner"></div>
             <div id="loadingText">Carregando...</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div id="progressText" style="margin-top:8px; font-size:0.85em; color:#888;">0%</div>
         </div>
     </div>
     
     <div class="status-bar">
-        <span id="statusText">Pronto</span>
+        <span id="statusText">Pronto para carregar</span>
         <span id="lastUpdate">-</span>
     </div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // =====================================================
-        // CONFIGURAÇÃO
+        // CONFIGURAÇÃO GOES
         // =====================================================
         
-        // GOES-19/16 Full Disk URLs
         const SATELLITES = {
             goes19: {
                 name: 'GOES-19',
-                fullDiskUrl: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg',
                 sat_lon: -75.2
             },
             goes16: {
                 name: 'GOES-16',
-                fullDiskUrl: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg',
                 sat_lon: -75.2
             }
         };
         
-        // Parâmetros da projeção geoestacionária (GOES-R PUG)
-        const GOES_PARAMS = {
-            sat_height: 35786023.0,  // metros
-            r_eq: 6378137.0,         // metros
-            r_pol: 6356752.31414,    // metros
-            // Full Disk scan angles (aproximado para imagem completa)
-            // O Full Disk cobre aproximadamente ±60° de latitude visível
-            scan_range: 0.151844    // radianos (aproximadamente ±8.7°)
+        // Parâmetros GOES-R (PUG - Product User's Guide)
+        const GOES = {
+            H: 42164160.0,      // Distância do centro da Terra ao satélite (m)
+            r_eq: 6378137.0,    // Raio equatorial (m)
+            r_pol: 6356752.31414, // Raio polar (m)
+            scan_max: 0.151844  // Full Disk scan range (rad)
         };
         
-        // Mapa e overlay
-        let map;
-        let satelliteOverlay = null;
-        let currentBounds = null;
+        let map, satelliteOverlay = null;
         
         // =====================================================
         // INICIALIZAÇÃO
         // =====================================================
         
         function initMap() {
-            // Criar mapa centrado nas Américas
             map = L.map('map', {
                 center: [-15, -60],
                 zoom: 3,
-                minZoom: 2,
-                maxZoom: 10
+                minZoom: 1,
+                maxZoom: 8
             });
             
-            // Camada base (mapa escuro)
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                 maxZoom: 19,
-                attribution: '© OpenStreetMap © CartoDB'
+                attribution: '© CartoDB'
             }).addTo(map);
             
-            // Adicionar grid de referência
-            addReferenceGrid();
+            // Grid de 10 em 10 graus (com linha a cada 1 grau seria muito pesado visualmente)
+            addLatLonGrid();
             
-            // Eventos
             document.getElementById('opacitySlider').addEventListener('input', updateOpacity);
-            document.getElementById('methodSelect').addEventListener('change', updateInfo);
-            document.getElementById('satelliteSelect').addEventListener('change', updateInfo);
         }
         
-        function addReferenceGrid() {
-            // Linhas de latitude importantes
-            const latLines = [-60, -30, 0, 30, 60];
-            const lonLines = [-120, -90, -60, -30, 0];
-            
-            latLines.forEach(lat => {
-                L.polyline([
-                    [lat, -180],
-                    [lat, 180]
-                ], {
-                    color: '#444',
-                    weight: 1,
-                    dashArray: '5, 5',
-                    opacity: 0.5
-                }).addTo(map);
+        function addLatLonGrid() {
+            // Linhas de latitude a cada 10 graus
+            for (let lat = -80; lat <= 80; lat += 10) {
+                const weight = (lat % 30 === 0) ? 1.5 : 0.5;
+                const color = (lat === 0) ? '#ff6600' : '#444';
                 
-                // Label
-                L.marker([lat, -140], {
-                    icon: L.divIcon({
-                        className: 'grid-label',
-                        html: `<span style="color:#666;font-size:10px;">${lat}°</span>`,
-                        iconSize: [30, 15]
-                    })
+                L.polyline([[lat, -180], [lat, 180]], {
+                    color: color,
+                    weight: weight,
+                    opacity: 0.6,
+                    dashArray: lat % 30 === 0 ? null : '2,4'
                 }).addTo(map);
-            });
-            
-            lonLines.forEach(lon => {
-                L.polyline([
-                    [-80, lon],
-                    [80, lon]
-                ], {
-                    color: '#444',
-                    weight: 1,
-                    dashArray: '5, 5',
-                    opacity: 0.5
-                }).addTo(map);
-            });
-        }
-        
-        // =====================================================
-        // REPROJEÇÃO GEOESTACIONÁRIA → LAT/LON
-        // =====================================================
-        
-        function scanToLatLon(x, y, sat_lon) {
-            /**
-             * Converte coordenadas de scan (radianos) para lat/lon.
-             * Baseado no GOES-R Product User's Guide (PUG).
-             */
-            const H = GOES_PARAMS.sat_height + GOES_PARAMS.r_eq;
-            const r_eq = GOES_PARAMS.r_eq;
-            const r_pol = GOES_PARAMS.r_pol;
-            
-            const cos_x = Math.cos(x);
-            const cos_y = Math.cos(y);
-            const sin_x = Math.sin(x);
-            const sin_y = Math.sin(y);
-            
-            // Fator de achatamento
-            const f = (r_eq * r_eq) / (r_pol * r_pol);
-            
-            // Cálculos intermediários
-            const a = sin_x * sin_x + cos_x * cos_x * (cos_y * cos_y + f * sin_y * sin_y);
-            const b = -2.0 * H * cos_x * cos_y;
-            const c = H * H - r_eq * r_eq;
-            
-            const discriminant = b * b - 4.0 * a * c;
-            
-            if (discriminant < 0) {
-                return null; // Ponto fora do disco visível
             }
             
-            const r_s = (-b - Math.sqrt(discriminant)) / (2.0 * a);
-            
-            const s_x = r_s * cos_x * cos_y;
-            const s_y = -r_s * sin_x;
-            const s_z = r_s * cos_x * sin_y;
-            
-            // Latitude geocêntrica
-            const lat_geo = Math.atan(f * s_z / Math.sqrt((H - s_x) * (H - s_x) + s_y * s_y));
-            
-            // Longitude
-            const lon = sat_lon + Math.atan(s_y / (H - s_x)) * 180 / Math.PI;
-            
-            // Converter para graus
-            const lat = lat_geo * 180 / Math.PI;
-            
-            return { lat, lon };
-        }
-        
-        function calculateFullDiskBounds(sat_lon) {
-            /**
-             * Calcula os bounds da imagem Full Disk reprojetada.
-             * Limita latitudes a ±70° para evitar distorções extremas.
-             */
-            const scanRange = GOES_PARAMS.scan_range;
-            
-            // Testar pontos nas bordas da imagem para encontrar bounds reais
-            let minLat = 90, maxLat = -90;
-            let minLon = 180, maxLon = -180;
-            
-            // Amostrar a borda da imagem
-            const steps = 100;
-            for (let i = 0; i <= steps; i++) {
-                const t = (i / steps) * 2 * Math.PI;
-                const x = scanRange * Math.cos(t);
-                const y = scanRange * Math.sin(t);
+            // Linhas de longitude a cada 10 graus
+            for (let lon = -180; lon <= 180; lon += 10) {
+                const weight = (lon % 30 === 0) ? 1.5 : 0.5;
+                const color = (lon === 0) ? '#ff6600' : '#444';
                 
-                const coords = scanToLatLon(x, y, sat_lon);
-                if (coords) {
-                    if (coords.lat < minLat) minLat = coords.lat;
-                    if (coords.lat > maxLat) maxLat = coords.lat;
-                    if (coords.lon < minLon) minLon = coords.lon;
-                    if (coords.lon > maxLon) maxLon = coords.lon;
-                }
+                L.polyline([[-85, lon], [85, lon]], {
+                    color: color,
+                    weight: weight,
+                    opacity: 0.6,
+                    dashArray: lon % 30 === 0 ? null : '2,4'
+                }).addTo(map);
             }
-            
-            // Centro da imagem
-            const center = scanToLatLon(0, 0, sat_lon);
-            if (center) {
-                // O centro deve ter lon próximo de sat_lon
-            }
-            
-            // Limitar latitudes a ±70°
-            minLat = Math.max(minLat, -70);
-            maxLat = Math.min(maxLat, 70);
-            
-            // Para Full Disk GOES, a cobertura é aproximadamente:
-            // Lat: -81° a +81° (limitamos a ±70°)
-            // Lon: sat_lon ± 81° (aproximadamente -156° a +6° para GOES-East)
-            
-            return {
-                south: -70,
-                north: 70,
-                west: sat_lon - 75,  // Aproximadamente ±75° de longitude visível
-                east: sat_lon + 75
-            };
         }
         
         // =====================================================
-        // CARREGAMENTO DE IMAGEM
+        // MATEMÁTICA DA PROJEÇÃO GEOESTACIONÁRIA
         // =====================================================
         
-        async function loadFullDisk() {
+        function latLonToScan(lat, lon, sat_lon) {
+            const lat_rad = lat * Math.PI / 180;
+            const lon_rad = (lon - sat_lon) * Math.PI / 180;
+            
+            const r_eq = GOES.r_eq;
+            const r_pol = GOES.r_pol;
+            const H = GOES.H;
+            
+            const cos_lat = Math.cos(lat_rad);
+            const sin_lat = Math.sin(lat_rad);
+            
+            // Raio geocêntrico
+            const r_geo = r_eq * r_pol / Math.sqrt(
+                r_pol * r_pol * cos_lat * cos_lat + 
+                r_eq * r_eq * sin_lat * sin_lat
+            );
+            
+            // Posição do ponto
+            const r_1 = H - r_geo * cos_lat * Math.cos(lon_rad);
+            const r_2 = -r_geo * cos_lat * Math.sin(lon_rad);
+            const r_3 = r_geo * sin_lat;
+            
+            const r_n = Math.sqrt(r_1*r_1 + r_2*r_2 + r_3*r_3);
+            
+            if (r_1 > H) return null;
+            
+            const x = Math.atan2(-r_2, r_1);
+            const y = Math.asin(-r_3 / r_n);
+            
+            if (Math.abs(x) > GOES.scan_max || Math.abs(y) > GOES.scan_max) {
+                return null;
+            }
+            
+            return { x, y };
+        }
+        
+        function scanToPixel(x, y, imgWidth, imgHeight) {
+            const px = (x + GOES.scan_max) / (2 * GOES.scan_max) * imgWidth;
+            const py = (-y + GOES.scan_max) / (2 * GOES.scan_max) * imgHeight;
+            return { px, py };
+        }
+        
+        // =====================================================
+        // REPROJEÇÃO REAL - PIXEL A PIXEL
+        // =====================================================
+        
+        async function loadAndReproject() {
             const satellite = document.getElementById('satelliteSelect').value;
             const method = document.getElementById('methodSelect').value;
+            const resolution = parseFloat(document.getElementById('resolutionSelect').value);
             const satConfig = SATELLITES[satellite];
             
-            showLoading('Carregando imagem Full Disk...');
+            const btn = document.getElementById('loadBtn');
+            btn.disabled = true;
+            
+            showLoading('Baixando imagem Full Disk...');
+            updateProgress(5);
+            
+            const startTime = Date.now();
             
             try {
-                // Calcular bounds para reprojeção
-                const bounds = calculateFullDiskBounds(satConfig.sat_lon);
-                currentBounds = bounds;
+                // 1. Carregar imagem original
+                const img = await loadImage(satConfig.url + '?t=' + Date.now());
                 
-                // Atualizar info
-                document.getElementById('infoSatellite').textContent = satConfig.name;
-                document.getElementById('infoMethod').textContent = method;
-                document.getElementById('infoBoundsN').textContent = bounds.north.toFixed(1) + '°';
-                document.getElementById('infoBoundsS').textContent = bounds.south.toFixed(1) + '°';
-                document.getElementById('infoBoundsW').textContent = bounds.west.toFixed(1) + '°';
-                document.getElementById('infoBoundsE').textContent = bounds.east.toFixed(1) + '°';
+                updateProgress(20);
+                showLoading('Reprojetando pixel a pixel...');
                 
-                // Remover overlay anterior
+                // 2. Reprojetar
+                const result = await reprojectImage(img, satConfig.sat_lon, resolution, method);
+                
+                updateProgress(90);
+                showLoading('Adicionando ao mapa...');
+                
+                // 3. Adicionar ao mapa
                 if (satelliteOverlay) {
                     map.removeLayer(satelliteOverlay);
                 }
                 
-                // Carregar imagem diretamente do NOAA
-                const imgUrl = satConfig.fullDiskUrl + '?t=' + Date.now();
-                
-                // Criar bounds para Leaflet
-                const leafletBounds = [
-                    [bounds.south, bounds.west],
-                    [bounds.north, bounds.east]
+                const bounds = [
+                    [-70, satConfig.sat_lon - 75],
+                    [70, satConfig.sat_lon + 75]
                 ];
                 
-                // Criar overlay
-                satelliteOverlay = L.imageOverlay(imgUrl, leafletBounds, {
-                    opacity: document.getElementById('opacitySlider').value / 100,
-                    crossOrigin: 'anonymous'
-                });
+                satelliteOverlay = L.imageOverlay(result.dataUrl, bounds, {
+                    opacity: document.getElementById('opacitySlider').value / 100
+                }).addTo(map);
                 
-                // Esperar imagem carregar
-                await new Promise((resolve, reject) => {
-                    const img = new Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = imgUrl;
-                });
+                // 4. Atualizar info
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
                 
-                satelliteOverlay.addTo(map);
-                
-                // Ajustar visão
-                map.fitBounds(leafletBounds);
-                
-                // Atualizar status
-                document.getElementById('infoStatus').textContent = 'Carregado';
+                document.getElementById('infoSat').textContent = satConfig.name;
+                document.getElementById('infoMethod').textContent = method;
+                document.getElementById('infoRes').textContent = resolution + '°';
+                document.getElementById('infoStatus').textContent = 'OK';
                 document.getElementById('infoStatus').className = 'info-value success';
-                document.getElementById('statusText').textContent = `${satConfig.name} Full Disk carregado`;
+                document.getElementById('infoPixels').textContent = result.width + ' x ' + result.height;
+                document.getElementById('infoTime').textContent = elapsed + 's';
+                
+                document.getElementById('statusText').textContent = `Reprojeção: ${result.width}x${result.height} pixels em ${elapsed}s`;
                 document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
                 
-                hideLoading();
+                updateProgress(100);
+                setTimeout(hideLoading, 300);
                 
             } catch (error) {
-                console.error('Erro ao carregar imagem:', error);
-                document.getElementById('infoStatus').textContent = 'Erro!';
+                console.error('Erro:', error);
+                document.getElementById('infoStatus').textContent = 'ERRO';
                 document.getElementById('infoStatus').className = 'info-value error';
                 document.getElementById('statusText').textContent = 'Erro: ' + error.message;
                 hideLoading();
             }
+            
+            btn.disabled = false;
         }
         
-        async function reprocessImage() {
-            // Por enquanto, apenas recarrega
-            // TODO: Implementar chamada para backend de reprojeção
-            const method = document.getElementById('methodSelect').value;
-            alert(`Reprojeção com método "${method}" será implementada no backend.\n\nPor enquanto, a imagem é carregada diretamente do NOAA com bounds calculados.`);
+        function loadImage(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Falha ao carregar imagem'));
+                img.src = url;
+            });
+        }
+        
+        async function reprojectImage(srcImg, sat_lon, resolution, method) {
+            // Bounds de saída (±70° lat, ±75° lon do satélite)
+            const latMin = -70, latMax = 70;
+            const lonMin = sat_lon - 75, lonMax = sat_lon + 75;
+            
+            // Dimensões da imagem de saída baseado na resolução (graus por pixel)
+            const outWidth = Math.round((lonMax - lonMin) / resolution);
+            const outHeight = Math.round((latMax - latMin) / resolution);
+            
+            // Canvas de entrada
+            const srcCanvas = document.createElement('canvas');
+            srcCanvas.width = srcImg.width;
+            srcCanvas.height = srcImg.height;
+            const srcCtx = srcCanvas.getContext('2d');
+            srcCtx.drawImage(srcImg, 0, 0);
+            const srcData = srcCtx.getImageData(0, 0, srcImg.width, srcImg.height);
+            
+            // Canvas de saída
+            const outCanvas = document.getElementById('processingCanvas');
+            outCanvas.width = outWidth;
+            outCanvas.height = outHeight;
+            const outCtx = outCanvas.getContext('2d');
+            const outData = outCtx.createImageData(outWidth, outHeight);
+            
+            const totalPixels = outWidth * outHeight;
+            
+            // Processar CADA pixel
+            for (let row = 0; row < outHeight; row++) {
+                for (let col = 0; col < outWidth; col++) {
+                    // Lat/lon do pixel de saída
+                    const lon = lonMin + (col + 0.5) * resolution;
+                    const lat = latMax - (row + 0.5) * resolution;
+                    
+                    // Converter para coordenadas de scan
+                    const scan = latLonToScan(lat, lon, sat_lon);
+                    
+                    const outIdx = (row * outWidth + col) * 4;
+                    
+                    if (scan === null) {
+                        // Fora do disco - transparente
+                        outData.data[outIdx] = 0;
+                        outData.data[outIdx + 1] = 0;
+                        outData.data[outIdx + 2] = 0;
+                        outData.data[outIdx + 3] = 0;
+                    } else {
+                        const pixel = scanToPixel(scan.x, scan.y, srcImg.width, srcImg.height);
+                        
+                        if (pixel.px >= 0 && pixel.px < srcImg.width && 
+                            pixel.py >= 0 && pixel.py < srcImg.height) {
+                            
+                            let r, g, b;
+                            
+                            if (method === 'bilinear') {
+                                const result = bilinearSample(srcData, pixel.px, pixel.py);
+                                r = result.r;
+                                g = result.g;
+                                b = result.b;
+                            } else {
+                                const srcX = Math.floor(pixel.px);
+                                const srcY = Math.floor(pixel.py);
+                                const srcIdx = (srcY * srcImg.width + srcX) * 4;
+                                
+                                r = srcData.data[srcIdx];
+                                g = srcData.data[srcIdx + 1];
+                                b = srcData.data[srcIdx + 2];
+                            }
+                            
+                            outData.data[outIdx] = r;
+                            outData.data[outIdx + 1] = g;
+                            outData.data[outIdx + 2] = b;
+                            outData.data[outIdx + 3] = 255;
+                        } else {
+                            outData.data[outIdx + 3] = 0;
+                        }
+                    }
+                }
+                
+                // Atualizar progresso a cada 10 linhas
+                if (row % 10 === 0) {
+                    const progress = 20 + (row / outHeight) * 70;
+                    updateProgress(progress);
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+            
+            outCtx.putImageData(outData, 0, 0);
+            
+            return {
+                dataUrl: outCanvas.toDataURL('image/png'),
+                width: outWidth,
+                height: outHeight
+            };
+        }
+        
+        function bilinearSample(srcData, x, y) {
+            const x0 = Math.floor(x);
+            const y0 = Math.floor(y);
+            const x1 = Math.min(x0 + 1, srcData.width - 1);
+            const y1 = Math.min(y0 + 1, srcData.height - 1);
+            
+            const xFrac = x - x0;
+            const yFrac = y - y0;
+            
+            const w00 = (1 - xFrac) * (1 - yFrac);
+            const w10 = xFrac * (1 - yFrac);
+            const w01 = (1 - xFrac) * yFrac;
+            const w11 = xFrac * yFrac;
+            
+            const idx00 = (y0 * srcData.width + x0) * 4;
+            const idx10 = (y0 * srcData.width + x1) * 4;
+            const idx01 = (y1 * srcData.width + x0) * 4;
+            const idx11 = (y1 * srcData.width + x1) * 4;
+            
+            return {
+                r: Math.round(srcData.data[idx00] * w00 + srcData.data[idx10] * w10 + 
+                              srcData.data[idx01] * w01 + srcData.data[idx11] * w11),
+                g: Math.round(srcData.data[idx00 + 1] * w00 + srcData.data[idx10 + 1] * w10 + 
+                              srcData.data[idx01 + 1] * w01 + srcData.data[idx11 + 1] * w11),
+                b: Math.round(srcData.data[idx00 + 2] * w00 + srcData.data[idx10 + 2] * w10 + 
+                              srcData.data[idx01 + 2] * w01 + srcData.data[idx11 + 2] * w11)
+            };
         }
         
         // =====================================================
@@ -567,20 +607,9 @@
             }
         }
         
-        function updateInfo() {
-            const satellite = document.getElementById('satelliteSelect').value;
-            const method = document.getElementById('methodSelect').value;
-            document.getElementById('infoSatellite').textContent = SATELLITES[satellite].name;
-            document.getElementById('infoMethod').textContent = method;
-        }
-        
-        function fitToBounds() {
-            if (currentBounds) {
-                map.fitBounds([
-                    [currentBounds.south, currentBounds.west],
-                    [currentBounds.north, currentBounds.east]
-                ]);
-            }
+        function fitFullDisk() {
+            const sat = SATELLITES[document.getElementById('satelliteSelect').value];
+            map.fitBounds([[-70, sat.sat_lon - 75], [70, sat.sat_lon + 75]]);
         }
         
         function showLoading(text) {
@@ -592,8 +621,13 @@
             document.getElementById('loadingOverlay').classList.add('hidden');
         }
         
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = Math.round(percent) + '%';
+        }
+        
         // =====================================================
-        // INICIALIZAÇÃO
+        // INIT
         // =====================================================
         
         initMap();
