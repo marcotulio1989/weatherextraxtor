@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ Alinhador de Imagem - SIMPLES</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #1a1a2e; 
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: #16213e;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            border-bottom: 2px solid #e94560;
+        }
+        
+        .header h1 { color: #e94560; font-size: 1.2em; }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .btn:hover { transform: scale(1.05); }
+        .btn-primary { background: #e94560; color: white; }
+        .btn-success { background: #00b894; color: white; }
+        .btn-warning { background: #fdcb6e; color: #333; }
+        .btn-active { background: #ff00ff !important; animation: pulse 1s infinite; }
+        
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 5px #ff00ff; }
+            50% { box-shadow: 0 0 20px #ff00ff; }
+        }
+        
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Lado esquerdo - Imagem */
+        .image-panel {
+            flex: 1;
+            position: relative;
+            background: #000;
+            overflow: hidden;
+        }
+        
+        .image-panel h3 {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 100;
+            color: #00d9ff;
+        }
+        
+        #imageContainer {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #satelliteImage {
+            max-width: 100%;
+            max-height: 100%;
+            cursor: crosshair;
+        }
+        
+        .image-point {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #ff00ff;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+            transform: translate(-50%, -50%);
+            cursor: move;
+            z-index: 200;
+            box-shadow: 0 0 15px rgba(255,0,255,0.8);
+        }
+        
+        /* Lado direito - Mapa */
+        .map-panel {
+            flex: 1;
+            position: relative;
+            border-left: 2px solid #0f3460;
+        }
+        
+        .map-panel h3 {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            color: #00ff00;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Instruções */
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(22, 33, 62, 0.95);
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: 2px solid #00d9ff;
+            z-index: 2000;
+            text-align: center;
+            max-width: 600px;
+        }
+        
+        .instructions h2 { color: #00d9ff; margin-bottom: 10px; }
+        .instructions p { color: #888; }
+        .instructions .step { color: #ff00ff; font-weight: bold; }
+        
+        /* Status */
+        .status-bar {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 2000;
+            border: 1px solid #0f3460;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .dot-pending { background: #666; }
+        .dot-done { background: #00ff00; }
+        
+        /* Controle de opacidade */
+        .opacity-control {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(22, 33, 62, 0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+        
+        .opacity-control label { color: #888; font-size: 0.9em; }
+        .opacity-control input[type="range"] { width: 150px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛰️ Alinhador de Imagem Satélite</h1>
+        
+        <input type="file" id="imageInput" accept="image/*" style="display:none;">
+        <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">📂 Carregar Imagem</button>
+        <button class="btn btn-primary" onclick="loadGoesImage()">🛰️ GOES-19 SSA</button>
+        
+        <button class="btn btn-warning" id="btnMarkImage" onclick="startMarkingImage()">1️⃣ Marcar na Imagem</button>
+        <button class="btn btn-warning" id="btnMarkMap" onclick="startMarkingMap()" disabled>2️⃣ Marcar no Mapa</button>
+        <button class="btn btn-success" id="btnAlign" onclick="alignImage()" disabled>✅ Alinhar!</button>
+        <button class="btn" style="background:#e74c3c;color:white;" onclick="resetAll()">🗑️ Limpar</button>
+    </div>
+    
+    <div class="main-container">
+        <!-- Painel da Imagem -->
+        <div class="image-panel" id="imagePanel">
+            <h3>📷 IMAGEM SATÉLITE</h3>
+            <div id="imageContainer">
+                <p style="color:#666;">Carregue uma imagem para começar</p>
+            </div>
+        </div>
+        
+        <!-- Painel do Mapa -->
+        <div class="map-panel">
+            <h3>🗺️ MAPA DE REFERÊNCIA</h3>
+            <div id="map"></div>
+            
+            <div class="opacity-control" id="opacityControl" style="display:none;">
+                <label>Opacidade da imagem:</label><br>
+                <input type="range" min="0" max="100" value="70" id="opacitySlider" oninput="updateOpacity(this.value)">
+                <span id="opacityValue">70%</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Status -->
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="status-dot dot-pending" id="dotImage"></div>
+            <span>Pontos na imagem: <span id="countImage">0</span>/3</span>
+        </div>
+        <div class="status-item">
+            <div class="status-dot dot-pending" id="dotMap"></div>
+            <span>Pontos no mapa: <span id="countMap">0</span>/3</span>
+        </div>
+    </div>
+    
+    <!-- Instruções -->
+    <div class="instructions" id="instructions">
+        <h2>📋 Instruções</h2>
+        <p>1. Carregue uma imagem de satélite</p>
+        <p>2. Clique em <span class="step">"Marcar na Imagem"</span> e clique em 3 pontos conhecidos</p>
+        <p>3. Clique em <span class="step">"Marcar no Mapa"</span> e clique nos MESMOS 3 locais no mapa</p>
+        <p>4. Clique em <span class="step">"Alinhar!"</span></p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ===== ESTADO =====
+        let imageLoaded = false;
+        let imageElement = null;
+        let imageNaturalSize = { width: 0, height: 0 };
+        
+        let imagePoints = [];  // [{x, y, element}] - coordenadas de pixel na imagem
+        let mapPoints = [];    // [{lat, lng, marker}] - coordenadas geográficas
+        
+        let markingImage = false;
+        let markingMap = false;
+        
+        let map = null;
+        let imageOverlay = null;
+        
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar mapa centrado na América do Sul
+            map = L.map('map').setView([-15, -55], 4);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            
+            // Evento de clique no mapa
+            map.on('click', function(e) {
+                if (markingMap && mapPoints.length < 3) {
+                    addMapPoint(e.latlng.lat, e.latlng.lng);
+                }
+            });
+        });
+        
+        // ===== CARREGAR IMAGEM =====
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    loadImage(event.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+        
+        function loadGoesImage() {
+            const url = 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg?t=' + Date.now();
+            loadImage(url);
+        }
+        
+        function loadImage(src) {
+            const container = document.getElementById('imageContainer');
+            container.innerHTML = '<p style="color:#ffff00;">Carregando...</p>';
+            
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                imageNaturalSize = { width: this.naturalWidth, height: this.naturalHeight };
+                
+                container.innerHTML = '';
+                img.id = 'satelliteImage';
+                container.appendChild(img);
+                
+                imageElement = img;
+                imageLoaded = true;
+                
+                // Evento de clique na imagem
+                img.addEventListener('click', function(e) {
+                    if (markingImage && imagePoints.length < 3) {
+                        const rect = img.getBoundingClientRect();
+                        // Calcular posição do pixel na imagem original
+                        const scaleX = imageNaturalSize.width / rect.width;
+                        const scaleY = imageNaturalSize.height / rect.height;
+                        const pixelX = (e.clientX - rect.left) * scaleX;
+                        const pixelY = (e.clientY - rect.top) * scaleY;
+                        
+                        addImagePoint(pixelX, pixelY, e.clientX, e.clientY, rect);
+                    }
+                });
+                
+                document.getElementById('btnMarkImage').disabled = false;
+                updateInstructions('Imagem carregada! Agora clique em "Marcar na Imagem".');
+            };
+            img.onerror = function() {
+                container.innerHTML = '<p style="color:#ff4444;">Erro ao carregar imagem</p>';
+            };
+            img.src = src;
+        }
+        
+        // ===== MARCAR PONTOS NA IMAGEM =====
+        function startMarkingImage() {
+            if (!imageLoaded) {
+                alert('Carregue uma imagem primeiro!');
+                return;
+            }
+            
+            markingImage = true;
+            markingMap = false;
+            
+            document.getElementById('btnMarkImage').classList.add('btn-active');
+            document.getElementById('btnMarkMap').classList.remove('btn-active');
+            
+            updateInstructions('CLIQUE em 3 pontos CONHECIDOS na imagem (cidades, ilhas, cabos)');
+        }
+        
+        function addImagePoint(pixelX, pixelY, clientX, clientY, imgRect) {
+            const panel = document.getElementById('imagePanel');
+            const num = imagePoints.length + 1;
+            
+            // Criar marcador visual
+            const point = document.createElement('div');
+            point.className = 'image-point';
+            point.innerHTML = num;
+            
+            // Posicionar o ponto na tela (relativo ao painel)
+            const panelRect = panel.getBoundingClientRect();
+            point.style.left = (clientX - panelRect.left) + 'px';
+            point.style.top = (clientY - panelRect.top) + 'px';
+            
+            panel.appendChild(point);
+            
+            imagePoints.push({
+                pixelX: pixelX,
+                pixelY: pixelY,
+                element: point
+            });
+            
+            document.getElementById('countImage').textContent = imagePoints.length;
+            
+            if (imagePoints.length >= 3) {
+                document.getElementById('dotImage').classList.remove('dot-pending');
+                document.getElementById('dotImage').classList.add('dot-done');
+                document.getElementById('btnMarkImage').classList.remove('btn-active');
+                document.getElementById('btnMarkMap').disabled = false;
+                markingImage = false;
+                
+                updateInstructions('✅ 3 pontos marcados! Agora clique em "Marcar no Mapa".');
+            } else {
+                updateInstructions(`Ponto ${num} marcado. Marque mais ${3 - imagePoints.length} ponto(s).`);
+            }
+        }
+        
+        // ===== MARCAR PONTOS NO MAPA =====
+        function startMarkingMap() {
+            if (imagePoints.length < 3) {
+                alert('Marque 3 pontos na imagem primeiro!');
+                return;
+            }
+            
+            markingImage = false;
+            markingMap = true;
+            
+            document.getElementById('btnMarkImage').classList.remove('btn-active');
+            document.getElementById('btnMarkMap').classList.add('btn-active');
+            
+            updateInstructions(`CLIQUE no mapa no MESMO local do ponto 1 da imagem (${imagePoints.length > 0 ? 'primeiro ponto rosa' : ''})`);
+        }
+        
+        function addMapPoint(lat, lng) {
+            const num = mapPoints.length + 1;
+            
+            // Criar marcador no mapa
+            const icon = L.divIcon({
+                className: 'map-marker',
+                html: `<div style="background:#00ff00;border:3px solid white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:bold;color:#000;box-shadow:0 0 15px rgba(0,255,0,0.8);">${num}</div>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            
+            const marker = L.marker([lat, lng], {icon: icon}).addTo(map);
+            marker.bindPopup(`Ponto ${num}<br>Lat: ${lat.toFixed(4)}°<br>Lng: ${lng.toFixed(4)}°`);
+            
+            mapPoints.push({
+                lat: lat,
+                lng: lng,
+                marker: marker
+            });
+            
+            document.getElementById('countMap').textContent = mapPoints.length;
+            
+            if (mapPoints.length >= 3) {
+                document.getElementById('dotMap').classList.remove('dot-pending');
+                document.getElementById('dotMap').classList.add('dot-done');
+                document.getElementById('btnMarkMap').classList.remove('btn-active');
+                document.getElementById('btnAlign').disabled = false;
+                markingMap = false;
+                
+                updateInstructions('✅ 3 pontos marcados! Clique em "Alinhar!" para ver o resultado.');
+            } else {
+                updateInstructions(`Ponto ${num} marcado no mapa. Marque o ponto ${num + 1} (mesmo local do ponto ${num + 1} rosa na imagem).`);
+            }
+        }
+        
+        // ===== ALINHAR IMAGEM =====
+        function alignImage() {
+            if (imagePoints.length < 3 || mapPoints.length < 3) {
+                alert('Precisa de 3 pontos na imagem e 3 no mapa!');
+                return;
+            }
+            
+            console.log('Image points:', imagePoints);
+            console.log('Map points:', mapPoints);
+            
+            // Calcular transformação afim
+            // Temos 3 pares de pontos: (pixelX, pixelY) -> (lng, lat)
+            // 
+            // lng = a * pixelX + b * pixelY + c
+            // lat = d * pixelX + e * pixelY + f
+            //
+            // Sistema de 6 equações, 6 incógnitas
+            
+            const p = imagePoints;
+            const g = mapPoints;
+            
+            // Matriz para resolver sistema linear
+            // Para longitude:
+            // a * p0.x + b * p0.y + c = g0.lng
+            // a * p1.x + b * p1.y + c = g1.lng
+            // a * p2.x + b * p2.y + c = g2.lng
+            
+            const A = [
+                [p[0].pixelX, p[0].pixelY, 1],
+                [p[1].pixelX, p[1].pixelY, 1],
+                [p[2].pixelX, p[2].pixelY, 1]
+            ];
+            
+            const bLng = [g[0].lng, g[1].lng, g[2].lng];
+            const bLat = [g[0].lat, g[1].lat, g[2].lat];
+            
+            // Resolver sistemas
+            const lngCoeffs = solve3x3(A, bLng);
+            const latCoeffs = solve3x3(A, bLat);
+            
+            if (!lngCoeffs || !latCoeffs) {
+                alert('Erro ao calcular transformação. Os pontos estão muito próximos ou colineares.');
+                return;
+            }
+            
+            console.log('Transform coefficients:', {lngCoeffs, latCoeffs});
+            
+            // Calcular os 4 cantos da imagem em coordenadas geográficas
+            const corners = [
+                {x: 0, y: 0},                                              // top-left
+                {x: imageNaturalSize.width, y: 0},                         // top-right
+                {x: imageNaturalSize.width, y: imageNaturalSize.height},   // bottom-right
+                {x: 0, y: imageNaturalSize.height}                         // bottom-left
+            ];
+            
+            const geoCorners = corners.map(c => ({
+                lng: lngCoeffs[0] * c.x + lngCoeffs[1] * c.y + lngCoeffs[2],
+                lat: latCoeffs[0] * c.x + latCoeffs[1] * c.y + latCoeffs[2]
+            }));
+            
+            console.log('Geo corners:', geoCorners);
+            
+            // Calcular bounds (retângulo alinhado aos eixos)
+            const lats = geoCorners.map(c => c.lat);
+            const lngs = geoCorners.map(c => c.lng);
+            
+            const north = Math.max(...lats);
+            const south = Math.min(...lats);
+            const east = Math.max(...lngs);
+            const west = Math.min(...lngs);
+            
+            console.log('Bounds:', {north, south, east, west});
+            
+            // Remover overlay anterior se existir
+            if (imageOverlay) {
+                map.removeLayer(imageOverlay);
+            }
+            
+            // Adicionar imagem ao mapa
+            const bounds = L.latLngBounds(
+                [south, west],
+                [north, east]
+            );
+            
+            imageOverlay = L.imageOverlay(imageElement.src, bounds, {
+                opacity: 0.7,
+                interactive: true
+            }).addTo(map);
+            
+            // Ajustar visualização
+            map.fitBounds(bounds.pad(0.1));
+            
+            // Mostrar controle de opacidade
+            document.getElementById('opacityControl').style.display = 'block';
+            
+            // Adicionar marcadores de verificação (onde os GCPs caem na imagem alinhada)
+            for (let i = 0; i < 3; i++) {
+                const calcLng = lngCoeffs[0] * p[i].pixelX + lngCoeffs[1] * p[i].pixelY + lngCoeffs[2];
+                const calcLat = latCoeffs[0] * p[i].pixelX + latCoeffs[1] * p[i].pixelY + latCoeffs[2];
+                
+                // Comparar com o ponto real
+                const errorDist = haversineNM(g[i].lat, g[i].lng, calcLat, calcLng);
+                
+                console.log(`Ponto ${i+1}: real=(${g[i].lat.toFixed(4)}, ${g[i].lng.toFixed(4)}), calc=(${calcLat.toFixed(4)}, ${calcLng.toFixed(4)}), erro=${errorDist.toFixed(1)} NM`);
+            }
+            
+            updateInstructions('✅ Imagem alinhada! Use o slider para ajustar a opacidade.');
+            
+            // Esconder instruções após alguns segundos
+            setTimeout(() => {
+                document.getElementById('instructions').style.display = 'none';
+            }, 3000);
+        }
+        
+        // ===== FUNÇÕES AUXILIARES =====
+        function solve3x3(A, b) {
+            // Resolver sistema 3x3 usando eliminação de Gauss
+            // Cria cópia aumentada
+            const aug = A.map((row, i) => [...row, b[i]]);
+            
+            const n = 3;
+            for (let col = 0; col < n; col++) {
+                // Pivotação parcial
+                let maxRow = col;
+                for (let row = col + 1; row < n; row++) {
+                    if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) {
+                        maxRow = row;
+                    }
+                }
+                [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
+                
+                if (Math.abs(aug[col][col]) < 1e-10) return null;
+                
+                for (let row = col + 1; row < n; row++) {
+                    const factor = aug[row][col] / aug[col][col];
+                    for (let j = col; j <= n; j++) {
+                        aug[row][j] -= factor * aug[col][j];
+                    }
+                }
+            }
+            
+            // Substituição reversa
+            const x = new Array(n);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = aug[i][n];
+                for (let j = i + 1; j < n; j++) {
+                    x[i] -= aug[i][j] * x[j];
+                }
+                x[i] /= aug[i][i];
+            }
+            
+            return x;
+        }
+        
+        function haversineNM(lat1, lng1, lat2, lng2) {
+            const R = 3440.065; // Raio da Terra em NM
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+        
+        function updateOpacity(value) {
+            document.getElementById('opacityValue').textContent = value + '%';
+            if (imageOverlay) {
+                imageOverlay.setOpacity(value / 100);
+            }
+        }
+        
+        function updateInstructions(text) {
+            const el = document.getElementById('instructions');
+            el.style.display = 'block';
+            el.innerHTML = `<p style="color:#00d9ff; font-size:1.1em;">${text}</p>`;
+        }
+        
+        function resetAll() {
+            // Limpar pontos da imagem
+            imagePoints.forEach(p => p.element.remove());
+            imagePoints = [];
+            
+            // Limpar pontos do mapa
+            mapPoints.forEach(p => map.removeLayer(p.marker));
+            mapPoints = [];
+            
+            // Limpar overlay
+            if (imageOverlay) {
+                map.removeLayer(imageOverlay);
+                imageOverlay = null;
+            }
+            
+            // Resetar UI
+            document.getElementById('countImage').textContent = '0';
+            document.getElementById('countMap').textContent = '0';
+            document.getElementById('dotImage').className = 'status-dot dot-pending';
+            document.getElementById('dotMap').className = 'status-dot dot-pending';
+            document.getElementById('btnMarkImage').classList.remove('btn-active');
+            document.getElementById('btnMarkMap').classList.remove('btn-active');
+            document.getElementById('btnMarkMap').disabled = true;
+            document.getElementById('btnAlign').disabled = true;
+            document.getElementById('opacityControl').style.display = 'none';
+            
+            markingImage = false;
+            markingMap = false;
+            
+            document.getElementById('instructions').innerHTML = `
+                <h2>📋 Instruções</h2>
+                <p>1. Carregue uma imagem de satélite</p>
+                <p>2. Clique em <span class="step">"Marcar na Imagem"</span> e clique em 3 pontos conhecidos</p>
+                <p>3. Clique em <span class="step">"Marcar no Mapa"</span> e clique nos MESMOS 3 locais no mapa</p>
+                <p>4. Clique em <span class="step">"Alinhar!"</span></p>
+            `;
+            document.getElementById('instructions').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
