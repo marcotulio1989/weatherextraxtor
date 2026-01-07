@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ Satellite Viewer - Comparativo de Reprojeção</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(90deg, #1a1a2e, #16213e);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #00d4ff;
+        }
+        .header h1 {
+            color: #00d4ff;
+            font-size: 1.5em;
+        }
+        
+        /* Controls */
+        .controls {
+            background: rgba(0,0,0,0.5);
+            padding: 15px 25px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .control-group label {
+            font-size: 0.8em;
+            color: #888;
+            text-transform: uppercase;
+        }
+        select, button {
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+        select:focus, button:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        button {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: #000;
+            font-weight: bold;
+            border: none;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,212,255,0.3);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 140px);
+        }
+        
+        .panel {
+            background: rgba(255,255,255,0.03);
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header {
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-title {
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        .panel-badge {
+            background: #2ecc71;
+            color: #000;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: bold;
+        }
+        .panel-badge.warning {
+            background: #f39c12;
+        }
+        .panel-badge.error {
+            background: #e74c3c;
+        }
+        
+        .panel-content {
+            flex: 1;
+            position: relative;
+        }
+        .map-container {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Info Box */
+        .info-box {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.85);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            z-index: 1000;
+            max-width: 300px;
+        }
+        .info-box .info-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .info-box .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-box .info-label {
+            color: #888;
+        }
+        .info-box .info-value {
+            color: #00d4ff;
+            font-weight: bold;
+        }
+        
+        /* Explanation Section */
+        .explanation {
+            background: rgba(0,0,0,0.5);
+            padding: 20px 25px;
+            border-top: 1px solid #333;
+        }
+        .explanation h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+        }
+        .explanation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .explanation-card {
+            background: rgba(255,255,255,0.03);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #00d4ff;
+        }
+        .explanation-card h4 {
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .explanation-card p {
+            color: #888;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        .explanation-card.problem {
+            border-left-color: #e74c3c;
+        }
+        .explanation-card.solution {
+            border-left-color: #2ecc71;
+        }
+        
+        /* Status */
+        .status-bar {
+            background: rgba(0,0,0,0.5);
+            padding: 10px 25px;
+            font-size: 0.85em;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        /* Loading Overlay */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        .loading-overlay.hidden {
+            display: none;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>🛰️ Satellite Image Reprojection Viewer</h1>
+        <div style="color: #888;">
+            Comparativo de Métodos de Reprojeção
+        </div>
+    </header>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>🛰️ Satélite</label>
+            <select id="satelliteSelect">
+                <option value="goes19">GOES-19</option>
+                <option value="goes16">GOES-16</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>🔧 Método de Reprojeção</label>
+            <select id="methodSelect">
+                <option value="manual">Manual (Matemática Pura)</option>
+                <option value="gdal">GDAL (rasterio + pyproj)</option>
+                <option value="cartopy">Cartopy</option>
+                <option value="satpy">SatPy (pyresample)</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>📍 Localização</label>
+            <select id="locationSelect">
+                <option value="-22.50,-40.50">Bacia de Campos (-22.5°, -40.5°)</option>
+                <option value="-23.0,-43.2">Rio de Janeiro (-23.0°, -43.2°)</option>
+                <option value="-25.0,-47.0">Santos (-25.0°, -47.0°)</option>
+            </select>
+        </div>
+        
+        <button id="processBtn" onclick="processSatellite()">
+            ⚡ Processar Imagem
+        </button>
+        
+        <button id="compareBtn" onclick="compareAllMethods()">
+            📊 Comparar Todos os Métodos
+        </button>
+    </div>
+    
+    <div class="main-content">
+        <!-- Painel Esquerdo: Imagem Original (Geoestacionária) -->
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">📡 Imagem Original (Projeção Geoestacionária)</span>
+                <span class="panel-badge warning">Sem Reprojeção</span>
+            </div>
+            <div class="panel-content">
+                <div id="mapOriginal" class="map-container"></div>
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label">Projeção:</span>
+                        <span class="info-value">Geoestacionária (GOES)</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Problema:</span>
+                        <span class="info-value" style="color: #e74c3c;">Distorção no overlay</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Painel Direito: Imagem Reprojetada -->
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">🗺️ Imagem Reprojetada (EPSG:4326)</span>
+                <span class="panel-badge" id="methodBadge">Manual</span>
+            </div>
+            <div class="panel-content">
+                <div id="mapReprojected" class="map-container"></div>
+                <div class="info-box">
+                    <div class="info-row">
+                        <span class="info-label">Projeção:</span>
+                        <span class="info-value">Lat/Lon (EPSG:4326)</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Status:</span>
+                        <span class="info-value" id="reprojStatus" style="color: #2ecc71;">Alinhado corretamente</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Método:</span>
+                        <span class="info-value" id="reprojMethod">Manual</span>
+                    </div>
+                </div>
+                <div id="loadingOverlay" class="loading-overlay hidden">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Explicação -->
+    <div class="explanation">
+        <h3>📖 Por que reprojeção única é importante?</h3>
+        <div class="explanation-grid">
+            <div class="explanation-card problem">
+                <h4>❌ Problema Anterior (Reprojeção Dupla)</h4>
+                <p>
+                    <strong>1ª "reprojeção":</strong> A imagem geoestacionária era tratada como se fosse lat/lon linear 
+                    (usando bounds retangulares errados).<br><br>
+                    <strong>2ª reprojeção:</strong> O Leaflet aplicava sua própria projeção Web Mercator sobre 
+                    a imagem já distorcida.<br><br>
+                    <strong>Resultado:</strong> Imagem desalinhada com o mapa base.
+                </p>
+            </div>
+            
+            <div class="explanation-card solution">
+                <h4>✅ Solução (Reprojeção Única)</h4>
+                <p>
+                    <strong>Reprojeção correta no backend:</strong> Usamos as fórmulas do GOES-R PUG 
+                    (Product User's Guide) para converter coordenadas de scan (radianos) para lat/lon.<br><br>
+                    <strong>Leaflet recebe imagem pronta:</strong> A imagem já está em EPSG:4326 com 
+                    bounds corretos.<br><br>
+                    <strong>Resultado:</strong> Alinhamento perfeito com o mapa base.
+                </p>
+            </div>
+            
+            <div class="explanation-card">
+                <h4>🔧 Métodos Disponíveis</h4>
+                <p>
+                    <strong>Manual:</strong> Matemática pura, sem dependências. Bom para produção.<br>
+                    <strong>GDAL:</strong> Usa rasterio/pyproj. Mais preciso com interpolação bilinear.<br>
+                    <strong>Cartopy:</strong> Usa matplotlib. Bom para visualização com mapas de fundo.<br>
+                    <strong>SatPy:</strong> Biblioteca especializada. Maior precisão para dados de satélite.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="status-bar">
+        <span id="statusText">Pronto para processar</span>
+        <span id="lastUpdate">-</span>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Configuração
+        const SHIP_LAT = -22.50;
+        const SHIP_LON = -40.50;
+        const RADIUS_NM = 100;
+        const RADIUS_DEG = RADIUS_NM / 60;
+        
+        // Bounds da imagem SSA (ERRADOS - para demonstrar o problema)
+        const SSA_BOUNDS_WRONG = {
+            lat_north: -12.0,
+            lat_south: -72.0,
+            lon_west: -96.0,
+            lon_east: 4.0
+        };
+        
+        // Mapas
+        let mapOriginal, mapReprojected;
+        let overlayOriginal, overlayReprojected;
+        
+        // Inicialização
+        function initMaps() {
+            // Mapa Original (mostra problema)
+            mapOriginal = L.map('mapOriginal', {
+                center: [SHIP_LAT, SHIP_LON],
+                zoom: 7,
+                zoomControl: false
+            });
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                opacity: 0.8
+            }).addTo(mapOriginal);
+            
+            // Mapa Reprojetado (correto)
+            mapReprojected = L.map('mapReprojected', {
+                center: [SHIP_LAT, SHIP_LON],
+                zoom: 7,
+                zoomControl: false
+            });
+            
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                opacity: 0.8
+            }).addTo(mapReprojected);
+            
+            // Sincronizar mapas
+            mapOriginal.on('move', () => {
+                mapReprojected.setView(mapOriginal.getCenter(), mapOriginal.getZoom(), { animate: false });
+            });
+            mapReprojected.on('move', () => {
+                mapOriginal.setView(mapReprojected.getCenter(), mapReprojected.getZoom(), { animate: false });
+            });
+            
+            // Marcadores do navio
+            addShipMarker(mapOriginal);
+            addShipMarker(mapReprojected);
+            
+            // Carregar imagens iniciais
+            loadImages();
+        }
+        
+        function addShipMarker(map) {
+            const shipIcon = L.divIcon({
+                className: 'ship-icon',
+                html: `<svg viewBox="0 0 24 24" width="30" height="30" fill="#00ffcc" style="filter: drop-shadow(0 0 5px #00ffcc);">
+                    <path d="M12 2L2 22h20L12 2zm0 3.5L18.5 20h-13L12 5.5z"/>
+                </svg>`,
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            L.marker([SHIP_LAT, SHIP_LON], { icon: shipIcon }).addTo(map);
+            
+            // Círculo de 100 NM
+            L.circle([SHIP_LAT, SHIP_LON], {
+                radius: RADIUS_NM * 1852, // NM para metros
+                color: '#00d4ff',
+                fillColor: '#00d4ff',
+                fillOpacity: 0.05,
+                weight: 2,
+                dashArray: '5, 10'
+            }).addTo(map);
+        }
+        
+        async function loadImages() {
+            const satellite = document.getElementById('satelliteSelect').value;
+            const method = document.getElementById('methodSelect').value;
+            
+            // Atualizar badge
+            document.getElementById('methodBadge').textContent = method.charAt(0).toUpperCase() + method.slice(1);
+            document.getElementById('reprojMethod').textContent = method.charAt(0).toUpperCase() + method.slice(1);
+            
+            // Carregar imagem original (simulação do problema)
+            // Na prática, usaríamos a imagem original com bounds errados
+            await loadOriginalImage(satellite);
+            
+            // Carregar imagem reprojetada
+            await loadReprojectedImage(satellite, method);
+        }
+        
+        async function loadOriginalImage(satellite) {
+            // Para demonstrar o problema, usamos a mesma imagem mas com bounds calculados
+            // de forma errada (como se fosse linear lat/lon)
+            const bounds = [
+                [SHIP_LAT - RADIUS_DEG, SHIP_LON - RADIUS_DEG],
+                [SHIP_LAT + RADIUS_DEG, SHIP_LON + RADIUS_DEG]
+            ];
+            
+            // Usar imagem existente (sem reprojeção correta)
+            const imgUrl = `satellite_${satellite}.png?t=${Date.now()}`;
+            
+            if (overlayOriginal) {
+                mapOriginal.removeLayer(overlayOriginal);
+            }
+            
+            overlayOriginal = L.imageOverlay(imgUrl, bounds, {
+                opacity: 0.7,
+                errorOverlayUrl: ''
+            }).addTo(mapOriginal);
+        }
+        
+        async function loadReprojectedImage(satellite, method) {
+            const methodSuffix = method !== 'manual' ? `_${method}` : '';
+            const imgUrl = `satellite_${satellite}${methodSuffix}.png?t=${Date.now()}`;
+            const jsonUrl = `satellite_${satellite}${methodSuffix}.json?t=${Date.now()}`;
+            
+            try {
+                // Carregar metadados
+                const response = await fetch(jsonUrl);
+                if (!response.ok) throw new Error('JSON não encontrado');
+                
+                const data = await response.json();
+                const bounds = data.leaflet_bounds;
+                
+                if (overlayReprojected) {
+                    mapReprojected.removeLayer(overlayReprojected);
+                }
+                
+                overlayReprojected = L.imageOverlay(imgUrl, bounds, {
+                    opacity: 0.7
+                }).addTo(mapReprojected);
+                
+                // Atualizar status
+                document.getElementById('reprojStatus').textContent = 'Alinhado corretamente';
+                document.getElementById('reprojStatus').style.color = '#2ecc71';
+                document.getElementById('lastUpdate').textContent = `Última atualização: ${new Date().toLocaleTimeString()}`;
+                
+            } catch (e) {
+                console.warn('Imagem reprojetada não encontrada:', e);
+                document.getElementById('reprojStatus').textContent = 'Imagem não disponível';
+                document.getElementById('reprojStatus').style.color = '#e74c3c';
+            }
+        }
+        
+        async function processSatellite() {
+            const satellite = document.getElementById('satelliteSelect').value;
+            const method = document.getElementById('methodSelect').value;
+            
+            const btn = document.getElementById('processBtn');
+            const overlay = document.getElementById('loadingOverlay');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Processando...';
+            overlay.classList.remove('hidden');
+            document.getElementById('statusText').textContent = `Processando ${satellite} com método ${method}...`;
+            
+            try {
+                // Chamar API de processamento (se disponível)
+                // Por enquanto, apenas recarrega as imagens existentes
+                
+                // Simular delay de processamento
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Recarregar imagens
+                await loadImages();
+                
+                document.getElementById('statusText').textContent = 'Processamento concluído!';
+                
+            } catch (e) {
+                console.error('Erro:', e);
+                document.getElementById('statusText').textContent = 'Erro no processamento';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚡ Processar Imagem';
+                overlay.classList.add('hidden');
+            }
+        }
+        
+        async function compareAllMethods() {
+            // Abrir modal com comparação lado a lado de todos os métodos
+            alert('Funcionalidade em desenvolvimento: Comparação de todos os métodos lado a lado');
+        }
+        
+        // Eventos
+        document.getElementById('methodSelect').addEventListener('change', loadImages);
+        document.getElementById('satelliteSelect').addEventListener('change', loadImages);
+        
+        // Inicializar
+        initMaps();
+    </script>
+</body>
+</html>

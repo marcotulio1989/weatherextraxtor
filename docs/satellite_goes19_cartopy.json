@@ -1,10 +1,10 @@
 {
   "satellite_id": "goes19",
   "satellite_name": "GOES-19",
-  "reprojection_method": "manual",
-  "processed_at": "2026-01-07T09:20:30.743902+00:00",
-  "image_time": "2026-01-07T09:11:48+00:00",
-  "image_time_utc": "2026-01-07 09:11:48 UTC",
+  "reprojection_method": "cartopy",
+  "processed_at": "2026-01-07T09:26:49.738450+00:00",
+  "image_time": "2026-01-07T09:22:16+00:00",
+  "image_time_utc": "2026-01-07 09:22:16 UTC",
   "source": "https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg",
   "ship": {
     "lat": -22.5,
@@ -27,7 +27,7 @@
       -38.696012999512675
     ]
   ],
-  "image_url": "satellite_goes19.png",
+  "image_url": "satellite_goes19_cartopy.png",
   "resolution": 512,
   "note": "Imagem reprojetada para EPSG:4326 (lat/lon). Pronta para uso direto no Leaflet."
 }
