@@ -1871,6 +1871,9 @@
                 alert('Você precisa de pelo menos 2 pontos com coordenadas para ver o alinhamento!');
                 return;
             }
+            
+            console.log('Preview alignment:', alignment);
+            console.log('Affine transform:', affineTransform);
 
             document.getElementById('previewModal').style.display = 'flex';
 
@@ -1893,51 +1896,131 @@
                     }
                 });
 
-                // Adicionar overlay da imagem
+                // Calcular os 4 cantos da imagem em coordenadas geográficas
+                const corners = [
+                    { x: 0, y: 0 },                                           // Top-left
+                    { x: imageNaturalSize.width, y: 0 },                      // Top-right
+                    { x: imageNaturalSize.width, y: imageNaturalSize.height }, // Bottom-right
+                    { x: 0, y: imageNaturalSize.height }                       // Bottom-left
+                ];
+                
+                const cornerGeo = corners.map(c => applyAffineTransform(affineTransform, c.x, c.y));
+                console.log('Corner geo coordinates:', cornerGeo);
+                
+                // Para imagens sem rotação significativa, usar bounds simples
+                // Calcular bounds a partir dos GCPs para melhor precisão
+                const validPoints = gcpPoints.filter(p => p.lat !== 0 || p.lng !== 0);
+                
+                // Método alternativo: calcular bounds baseado nos GCPs reais
+                // para garantir que pelo menos os GCPs batam
+                
+                // Calcular a escala baseada nos GCPs
+                let minPixelX = Infinity, maxPixelX = -Infinity;
+                let minPixelY = Infinity, maxPixelY = -Infinity;
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLng = Infinity, maxLng = -Infinity;
+                
+                validPoints.forEach(p => {
+                    minPixelX = Math.min(minPixelX, p.pixelX);
+                    maxPixelX = Math.max(maxPixelX, p.pixelX);
+                    minPixelY = Math.min(minPixelY, p.pixelY);
+                    maxPixelY = Math.max(maxPixelY, p.pixelY);
+                    minLat = Math.min(minLat, p.lat);
+                    maxLat = Math.max(maxLat, p.lat);
+                    minLng = Math.min(minLng, p.lng);
+                    maxLng = Math.max(maxLng, p.lng);
+                });
+                
+                // Calcular escala em graus por pixel
+                const pixelRangeX = maxPixelX - minPixelX;
+                const pixelRangeY = maxPixelY - minPixelY;
+                const latRange = maxLat - minLat;
+                const lngRange = maxLng - minLng;
+                
+                // Escala: quantos graus por pixel
+                const lngPerPixel = pixelRangeX > 0 ? lngRange / pixelRangeX : 0.01;
+                const latPerPixel = pixelRangeY > 0 ? latRange / pixelRangeY : -0.01;
+                
+                console.log('Escala calculada:', {lngPerPixel, latPerPixel, pixelRangeX, pixelRangeY});
+                
+                // Calcular bounds da imagem completa baseado na escala
+                // Pixel (0,0) = canto superior esquerdo
+                // Pixel (width, height) = canto inferior direito
+                
+                // Para longitude: começa em minLng - (minPixelX * lngPerPixel) para chegar ao pixel 0
+                // Para latitude: começa em maxLat + (minPixelY * |latPerPixel|) para chegar ao pixel 0
+                
+                const westBound = minLng - (minPixelX * lngPerPixel);
+                const eastBound = westBound + (imageNaturalSize.width * lngPerPixel);
+                
+                // Latitude: Y aumenta pra baixo na imagem, lat diminui
+                const northBound = maxLat + (minPixelY * Math.abs(latPerPixel));
+                const southBound = northBound - (imageNaturalSize.height * Math.abs(latPerPixel));
+                
+                console.log('Calculated bounds:', {northBound, southBound, eastBound, westBound});
+                
+                // Usar os bounds calculados
                 const bounds = L.latLngBounds(
-                    [alignment.bounds.south, alignment.bounds.west],
-                    [alignment.bounds.north, alignment.bounds.east]
+                    [southBound, westBound],
+                    [northBound, eastBound]
                 );
 
                 L.imageOverlay(imageElement.src, bounds, {
                     opacity: 0.75
                 }).addTo(previewMap);
 
-                // Ícone personalizado para GCPs
+                // Ícone personalizado para GCPs (posição REAL onde o usuário quer)
                 const gcpIcon = L.divIcon({
                     className: 'gcp-map-marker',
-                    html: '<div style="background:#ff00ff;border:2px solid white;border-radius:50%;width:16px;height:16px;box-shadow:0 0 10px rgba(255,0,255,0.8);"></div>',
+                    html: '<div style="background:#ff00ff;border:3px solid white;border-radius:50%;width:20px;height:20px;box-shadow:0 0 15px rgba(255,0,255,1);"></div>',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+                
+                // Ícone para posição calculada (onde a imagem pensa que o ponto está)
+                const calcIcon = L.divIcon({
+                    className: 'calc-map-marker',
+                    html: '<div style="background:#00ff00;border:3px solid white;border-radius:50%;width:16px;height:16px;box-shadow:0 0 15px rgba(0,255,0,1);"></div>',
                     iconSize: [16, 16],
                     iconAnchor: [8, 8]
                 });
 
-                // Adicionar marcadores dos GCPs com círculos de erro
-                alignment.gcpPoints.forEach((p, i) => {
-                    // Marcador do GCP
+                // Adicionar marcadores dos GCPs
+                validPoints.forEach((p, i) => {
+                    // Marcador ROSA = onde o ponto DEVERIA estar (coordenada real digitada)
                     L.marker([p.lat, p.lng], {icon: gcpIcon})
-                        .bindPopup(`<b>GCP ${i+1}</b><br>Lat: ${p.lat.toFixed(6)}°<br>Lng: ${p.lng.toFixed(6)}°<br>Pixel: (${Math.round(p.pixelX)}, ${Math.round(p.pixelY)})`)
+                        .bindPopup(`<b style="color:#ff00ff;">GCP ${i+1} - REAL</b><br>
+                            Lat: ${p.lat.toFixed(6)}°<br>
+                            Lng: ${p.lng.toFixed(6)}°<br>
+                            Pixel: (${Math.round(p.pixelX)}, ${Math.round(p.pixelY)})`)
                         .addTo(previewMap);
                     
-                    // Mostrar posição calculada pela transformação
-                    if (affineTransform) {
-                        const calculated = applyAffineTransform(affineTransform, p.pixelX, p.pixelY);
-                        // Círculo mostrando a posição calculada
-                        L.circle([calculated.lat, calculated.lng], {
-                            radius: 5000, // 5km
-                            color: '#00ff00',
-                            fillColor: '#00ff00',
-                            fillOpacity: 0.3,
-                            weight: 2
-                        }).bindPopup(`Posição calculada para GCP ${i+1}`).addTo(previewMap);
-                    }
+                    // Calcular onde a transformação ACHA que este pixel está
+                    const calculated = applyAffineTransform(affineTransform, p.pixelX, p.pixelY);
+                    console.log(`GCP ${i+1}: real=(${p.lat}, ${p.lng}), calc=(${calculated.lat}, ${calculated.lng})`);
+                    
+                    // Marcador VERDE = onde a transformação calcula que o pixel está
+                    L.marker([calculated.lat, calculated.lng], {icon: calcIcon})
+                        .bindPopup(`<b style="color:#00ff00;">GCP ${i+1} - CALCULADO</b><br>
+                            Lat: ${calculated.lat.toFixed(6)}°<br>
+                            Lng: ${calculated.lng.toFixed(6)}°<br>
+                            <span style="color:#ff6600;">Erro: ${haversineDistance(p.lat, p.lng, calculated.lat, calculated.lng).toFixed(1)} NM</span>`)
+                        .addTo(previewMap);
+                    
+                    // Linha conectando real e calculado
+                    L.polyline([[p.lat, p.lng], [calculated.lat, calculated.lng]], {
+                        color: '#ff6600',
+                        weight: 2,
+                        dashArray: '5, 5'
+                    }).addTo(previewMap);
                 });
 
                 // Desenhar retângulo dos bounds
-                const boundsRect = L.polygon([
-                    [alignment.bounds.north, alignment.bounds.west],
-                    [alignment.bounds.north, alignment.bounds.east],
-                    [alignment.bounds.south, alignment.bounds.east],
-                    [alignment.bounds.south, alignment.bounds.west]
+                L.polygon([
+                    [northBound, westBound],
+                    [northBound, eastBound],
+                    [southBound, eastBound],
+                    [southBound, westBound]
                 ], {
                     color: '#00d9ff',
                     weight: 2,
