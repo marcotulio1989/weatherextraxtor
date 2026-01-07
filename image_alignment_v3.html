@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛰️ Alinhamento Satélite - Distorção Completa</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-distortableimage@0.16.5/dist/leaflet.distortableimage.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a15;
+            color: #eee;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Painel de Controle */
+        .control-panel {
+            width: 320px;
+            background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+            padding: 15px;
+            overflow-y: auto;
+            border-right: 2px solid #0f3460;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .control-panel h1 {
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            color: #e94560;
+            text-align: center;
+            border-bottom: 1px solid #0f3460;
+            padding-bottom: 10px;
+        }
+
+        .control-section {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: rgba(15, 52, 96, 0.5);
+            border-radius: 8px;
+        }
+
+        .control-section h3 {
+            color: #00d9ff;
+            margin-bottom: 8px;
+            font-size: 0.85em;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 6px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 0.85em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560, #c23a51);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #0f3460, #16213e);
+            color: #00d9ff;
+            border: 1px solid #00d9ff;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00b894, #00a381);
+            color: white;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #fdcb6e, #e17055);
+            color: #1a1a2e;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        #map {
+            flex: 1;
+            background: #1a1a2e;
+        }
+
+        .status-bar {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 6px;
+            padding: 6px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+
+        .instructions {
+            font-size: 0.75em;
+            color: #aaa;
+            line-height: 1.5;
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+            border-left: 3px solid #00d9ff;
+        }
+
+        .slider-container {
+            margin: 8px 0;
+        }
+
+        .slider-container label {
+            display: block;
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .slider-container input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #0f3460;
+            outline: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #00d9ff;
+            cursor: pointer;
+        }
+
+        .coords-display {
+            font-family: monospace;
+            font-size: 0.75em;
+            background: #0a0a15;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Custom Leaflet styles */
+        .leaflet-container {
+            background: #1a1a2e;
+        }
+
+        /* Estilos para os handles de distorção */
+        .leaflet-distortableimage .corner {
+            width: 20px !important;
+            height: 20px !important;
+            background: #ff00ff !important;
+            border: 3px solid white !important;
+            border-radius: 50% !important;
+            box-shadow: 0 0 15px rgba(255,0,255,0.8) !important;
+        }
+
+        .corner-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 0.7em;
+        }
+
+        .corner-info div {
+            background: #0a0a15;
+            padding: 4px 6px;
+            border-radius: 3px;
+        }
+
+        .corner-info span {
+            color: #00ff00;
+        }
+
+        /* Marker do navio/posição */
+        .ship-marker {
+            background: #00ff00;
+            border: 3px solid white;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            box-shadow: 0 0 15px rgba(0,255,0,0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Painel de Controle -->
+        <div class="control-panel">
+            <h1>🛰️ Distorção de Imagem</h1>
+
+            <!-- Carregar Imagem -->
+            <div class="control-section">
+                <h3>📁 Carregar Imagem Satélite</h3>
+                
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px; margin-bottom:8px;">
+                    <button class="btn" onclick="loadNoaaImage('goes19')" style="background:#e74c3c; font-size:0.75em; padding:8px;">
+                        🛰️ GOES-19
+                    </button>
+                    <button class="btn" onclick="loadNoaaImage('goes16')" style="background:#3498db; font-size:0.75em; padding:8px;">
+                        🛰️ GOES-16
+                    </button>
+                </div>
+                
+                <div class="file-input-wrapper">
+                    <button class="btn btn-primary">📂 Selecionar Arquivo</button>
+                    <input type="file" id="imageInput" accept="image/*">
+                </div>
+
+                <input type="text" id="imageUrl" placeholder="Ou cole URL da imagem..." 
+                       style="width: 100%; padding: 8px; margin-top: 8px; background: #1a1a2e; border: 1px solid #0f3460; color: #fff; border-radius: 5px; font-size: 0.8em;">
+                <button class="btn btn-secondary" onclick="loadImageFromUrl()" style="margin-top: 5px;">🔗 Carregar URL</button>
+                
+                <div class="status-bar" id="imageStatus">Nenhuma imagem carregada</div>
+            </div>
+
+            <!-- Controles de Opacidade -->
+            <div class="control-section">
+                <h3>🎨 Opacidade da Imagem</h3>
+                <div class="slider-container">
+                    <label>Opacidade: <span id="opacityValue">70</span>%</label>
+                    <input type="range" id="opacitySlider" min="10" max="100" value="70" 
+                           onchange="setImageOpacity(this.value)">
+                </div>
+            </div>
+
+            <!-- Instruções -->
+            <div class="control-section">
+                <h3>📌 Como Usar</h3>
+                <div class="instructions">
+                    <b>1.</b> Carregue a imagem de satélite<br><br>
+                    <b>2.</b> <span style="color:#ff00ff;">Arraste os 4 cantos</span> da imagem para alinhar com o mapa:<br>
+                    • Clique na imagem para ativar edição<br>
+                    • Arraste os círculos rosa nos cantos<br>
+                    • Use o scroll para zoom<br><br>
+                    <b>3.</b> Alinhe referências visuais:<br>
+                    • Costas, ilhas, rios<br>
+                    • Fronteiras de países<br><br>
+                    <b style="color:#00ff00;">DICA:</b> Use opacidade 50-70% para ver o mapa embaixo
+                </div>
+            </div>
+
+            <!-- Posição do Navio -->
+            <div class="control-section">
+                <h3>🚢 Posição do Navio</h3>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
+                    <input type="number" id="shipLat" step="0.0001" placeholder="Latitude" 
+                           style="padding:6px; background:#1a1a2e; border:1px solid #0f3460; color:#fff; border-radius:4px; font-size:0.85em;"
+                           value="-34.5">
+                    <input type="number" id="shipLng" step="0.0001" placeholder="Longitude" 
+                           style="padding:6px; background:#1a1a2e; border:1px solid #0f3460; color:#fff; border-radius:4px; font-size:0.85em;"
+                           value="-54.0">
+                </div>
+                <button class="btn btn-success" onclick="updateShipPosition()" style="margin-top:6px;">
+                    📍 Atualizar Posição
+                </button>
+            </div>
+
+            <!-- Coordenadas dos Cantos -->
+            <div class="control-section">
+                <h3>📐 Cantos da Imagem</h3>
+                <div class="coords-display" id="cornerCoords">
+                    Carregue uma imagem para ver as coordenadas
+                </div>
+            </div>
+
+            <!-- Ações -->
+            <div class="control-section">
+                <h3>⚡ Ações</h3>
+                <button class="btn btn-warning" onclick="resetImage()">
+                    🔄 Resetar Posição
+                </button>
+                <button class="btn btn-secondary" onclick="exportAlignment()">
+                    📤 Exportar Alinhamento
+                </button>
+                <button class="btn btn-secondary" onclick="importAlignment()">
+                    📥 Importar Alinhamento
+                </button>
+            </div>
+        </div>
+
+        <!-- Mapa -->
+        <div id="map"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-distortableimage@0.16.5/dist/leaflet.distortableimage.js"></script>
+    <script>
+        // ===== ESTADO GLOBAL =====
+        let map = null;
+        let distortableImage = null;
+        let shipMarker = null;
+        let currentImageUrl = null;
+
+        // Bounds iniciais para América do Sul
+        const DEFAULT_CORNERS = {
+            // Ordem: NW, NE, SW, SE
+            nw: L.latLng(10, -85),
+            ne: L.latLng(10, -30),
+            sw: L.latLng(-55, -85),
+            se: L.latLng(-55, -30)
+        };
+
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            setupFileInput();
+        });
+
+        function initMap() {
+            map = L.map('map', {
+                center: [-25, -55],
+                zoom: 4,
+                zoomControl: true
+            });
+
+            // Camada base - OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                opacity: 0.7
+            }).addTo(map);
+
+            // Adicionar marcador do navio
+            updateShipPosition();
+
+            // Atualizar coordenadas quando mover o mouse
+            map.on('mousemove', function(e) {
+                // Podemos mostrar coordenadas do cursor se necessário
+            });
+        }
+
+        function setupFileInput() {
+            document.getElementById('imageInput').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        loadDistortableImage(event.target.result, file.name);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // ===== CARREGAR IMAGENS NOAA =====
+        const NOAA_URLS = {
+            goes19: {
+                name: 'GOES-19 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg'
+            },
+            goes16: {
+                name: 'GOES-16 (SSA)',
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg'
+            }
+        };
+
+        function loadNoaaImage(satellite) {
+            const sat = NOAA_URLS[satellite];
+            if (!sat) return;
+
+            const status = document.getElementById('imageStatus');
+            status.innerHTML = `⏳ Baixando ${sat.name}...`;
+            status.style.color = '#ffff00';
+
+            // Usar proxy CORS ou tentar direto
+            const urlWithCache = sat.url + '?t=' + Date.now();
+            loadDistortableImage(urlWithCache, sat.name);
+        }
+
+        function loadImageFromUrl() {
+            const url = document.getElementById('imageUrl').value.trim();
+            if (url) {
+                loadDistortableImage(url, 'URL');
+            }
+        }
+
+        // ===== CARREGAR IMAGEM DISTORCÍVEL =====
+        function loadDistortableImage(imageUrl, name) {
+            const status = document.getElementById('imageStatus');
+            
+            // Remover imagem anterior se existir
+            if (distortableImage) {
+                map.removeLayer(distortableImage);
+                distortableImage = null;
+            }
+
+            currentImageUrl = imageUrl;
+
+            // Criar imagem distorcível com 4 cantos
+            // Ordem dos cantos: NW, NE, SW, SE
+            const corners = [
+                DEFAULT_CORNERS.nw,
+                DEFAULT_CORNERS.ne,
+                DEFAULT_CORNERS.sw,
+                DEFAULT_CORNERS.se
+            ];
+
+            try {
+                distortableImage = L.distortableImageOverlay(imageUrl, {
+                    corners: corners,
+                    mode: 'distort',
+                    opacity: 0.7,
+                    crossOrigin: 'anonymous',
+                    editable: true,
+                    actions: [
+                        L.DragAction,
+                        L.ScaleAction,
+                        L.DistortAction,
+                        L.RotateAction,
+                        L.FreeRotateAction,
+                        L.LockAction,
+                        L.OpacityAction,
+                        L.BorderAction,
+                        L.ExportAction,
+                        L.DeleteAction,
+                        L.RestoreAction
+                    ]
+                });
+
+                distortableImage.addTo(map);
+
+                // Quando a imagem carregar
+                distortableImage.on('load', function() {
+                    status.innerHTML = `✅ ${name} carregada!<br>🎯 Clique na imagem e arraste os cantos`;
+                    status.style.color = '#00ff00';
+                    updateCornerDisplay();
+                    
+                    // Ajustar view para mostrar a imagem
+                    map.fitBounds(L.latLngBounds(corners));
+                });
+
+                // Quando os cantos mudarem
+                distortableImage.on('edit', function() {
+                    updateCornerDisplay();
+                });
+
+                distortableImage.on('dragend', function() {
+                    updateCornerDisplay();
+                });
+
+                status.innerHTML = `⏳ Carregando ${name}...`;
+                status.style.color = '#ffff00';
+
+            } catch (err) {
+                status.innerHTML = `❌ Erro: ${err.message}`;
+                status.style.color = '#ff4444';
+                console.error(err);
+            }
+        }
+
+        // ===== ATUALIZAR DISPLAY DOS CANTOS =====
+        function updateCornerDisplay() {
+            const display = document.getElementById('cornerCoords');
+            
+            if (!distortableImage || !distortableImage._corners) {
+                display.innerHTML = 'Imagem não carregada';
+                return;
+            }
+
+            const corners = distortableImage.getCorners();
+            
+            display.innerHTML = `
+                <div class="corner-info">
+                    <div>NW: <span>${corners[0].lat.toFixed(4)}, ${corners[0].lng.toFixed(4)}</span></div>
+                    <div>NE: <span>${corners[1].lat.toFixed(4)}, ${corners[1].lng.toFixed(4)}</span></div>
+                    <div>SW: <span>${corners[2].lat.toFixed(4)}, ${corners[2].lng.toFixed(4)}</span></div>
+                    <div>SE: <span>${corners[3].lat.toFixed(4)}, ${corners[3].lng.toFixed(4)}</span></div>
+                </div>
+            `;
+        }
+
+        // ===== OPACIDADE =====
+        function setImageOpacity(value) {
+            document.getElementById('opacityValue').textContent = value;
+            if (distortableImage) {
+                distortableImage.setOpacity(value / 100);
+            }
+        }
+
+        // ===== POSIÇÃO DO NAVIO =====
+        function updateShipPosition() {
+            const lat = parseFloat(document.getElementById('shipLat').value) || -34.5;
+            const lng = parseFloat(document.getElementById('shipLng').value) || -54.0;
+
+            if (shipMarker) {
+                map.removeLayer(shipMarker);
+            }
+
+            const shipIcon = L.divIcon({
+                className: 'ship-marker',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+
+            shipMarker = L.marker([lat, lng], { icon: shipIcon })
+                .bindPopup(`<b>🚢 Posição</b><br>Lat: ${lat}<br>Lng: ${lng}`)
+                .addTo(map);
+
+            map.setView([lat, lng], map.getZoom());
+        }
+
+        // ===== RESETAR IMAGEM =====
+        function resetImage() {
+            if (distortableImage && currentImageUrl) {
+                loadDistortableImage(currentImageUrl, 'Reset');
+            }
+        }
+
+        // ===== EXPORTAR/IMPORTAR =====
+        function exportAlignment() {
+            if (!distortableImage) {
+                alert('Carregue uma imagem primeiro!');
+                return;
+            }
+
+            const corners = distortableImage.getCorners();
+            const data = {
+                timestamp: new Date().toISOString(),
+                imageUrl: currentImageUrl,
+                corners: {
+                    nw: { lat: corners[0].lat, lng: corners[0].lng },
+                    ne: { lat: corners[1].lat, lng: corners[1].lng },
+                    sw: { lat: corners[2].lat, lng: corners[2].lng },
+                    se: { lat: corners[3].lat, lng: corners[3].lng }
+                }
+            };
+
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `alignment_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importAlignment() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        try {
+                            const data = JSON.parse(event.target.result);
+                            applyImportedAlignment(data);
+                        } catch (err) {
+                            alert('Erro ao ler arquivo: ' + err.message);
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            };
+            input.click();
+        }
+
+        function applyImportedAlignment(data) {
+            if (data.corners && data.imageUrl) {
+                // Carregar imagem com os cantos salvos
+                currentImageUrl = data.imageUrl;
+                
+                if (distortableImage) {
+                    map.removeLayer(distortableImage);
+                }
+
+                const corners = [
+                    L.latLng(data.corners.nw.lat, data.corners.nw.lng),
+                    L.latLng(data.corners.ne.lat, data.corners.ne.lng),
+                    L.latLng(data.corners.sw.lat, data.corners.sw.lng),
+                    L.latLng(data.corners.se.lat, data.corners.se.lng)
+                ];
+
+                distortableImage = L.distortableImageOverlay(data.imageUrl, {
+                    corners: corners,
+                    mode: 'distort',
+                    opacity: 0.7,
+                    editable: true
+                }).addTo(map);
+
+                distortableImage.on('load', function() {
+                    updateCornerDisplay();
+                    map.fitBounds(L.latLngBounds(corners));
+                });
+
+                distortableImage.on('edit', updateCornerDisplay);
+
+                document.getElementById('imageStatus').innerHTML = '✅ Alinhamento importado!';
+                document.getElementById('imageStatus').style.color = '#00ff00';
+            }
+        }
+    </script>
+</body>
+</html>
