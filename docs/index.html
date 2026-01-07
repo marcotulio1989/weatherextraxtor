@@ -2,10 +2,103 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="refresh" content="0; url=scatterometer_monitor.html">
-    <title>DP Monitor - Deepwater Aquila</title>
+    <title>Weather Extractor - Ferramentas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            margin: 0;
+            padding: 40px;
+        }
+        h1 { color: #00d9ff; text-align: center; }
+        .tools {
+            max-width: 600px;
+            margin: 40px auto;
+        }
+        .tool-card {
+            background: rgba(15, 52, 96, 0.6);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #e94560;
+            transition: transform 0.2s;
+        }
+        .tool-card:hover {
+            transform: translateX(10px);
+        }
+        .tool-card h3 {
+            margin: 0 0 10px 0;
+            color: #00d9ff;
+        }
+        .tool-card p {
+            margin: 0 0 15px 0;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .tool-card a {
+            display: inline-block;
+            background: #e94560;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .tool-card a:hover {
+            background: #c23a51;
+        }
+        .recommended {
+            border-left-color: #00ff00;
+        }
+        .recommended::after {
+            content: "⭐ RECOMENDADO";
+            background: #00ff00;
+            color: #000;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7em;
+            font-weight: bold;
+            float: right;
+            margin-top: -30px;
+        }
+    </style>
 </head>
 <body>
-    <p>Redirecionando para <a href="scatterometer_monitor.html">DP Monitor</a>...</p>
+    <h1>🛰️ Weather Extractor - Ferramentas</h1>
+    
+    <div class="tools">
+        <div class="tool-card">
+            <h3>📡 Scatterometer Monitor</h3>
+            <p>Monitor de dados de escaterômetro para análise de ventos oceânicos</p>
+            <a href="scatterometer_monitor.html">Abrir</a>
+        </div>
+        
+        <div class="tool-card recommended">
+            <h3>🛰️ Alinhamento Multi-Ponto (V4)</h3>
+            <p>Grade de pontos configurável (até 5x5), adicione pontos extras, triangulação de Delaunay para distorção precisa</p>
+            <a href="image_alignment_v4.html">Abrir</a>
+        </div>
+        
+        <div class="tool-card">
+            <h3>🛰️ Distorção por Cantos (V3)</h3>
+            <p>Arraste os 4 cantos da imagem diretamente no mapa</p>
+            <a href="image_alignment_v3.html">Abrir</a>
+        </div>
+        
+        <div class="tool-card">
+            <h3>🛰️ Alinhamento por GCP (V2)</h3>
+            <p>Marque pontos de referência e digite coordenadas</p>
+            <a href="image_alignment_v2.html">Abrir</a>
+        </div>
+        
+        <div class="tool-card">
+            <h3>🛰️ Ferramenta Original</h3>
+            <p>Versão original com transformação afim</p>
+            <a href="image_alignment_tool.html">Abrir</a>
+        </div>
+    </div>
 </body>
 </html>
+
