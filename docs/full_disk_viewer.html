@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🛰️ Satellite Viewer - Métodos de Reprojeção</title>
+    <title>🛰️ GOES Satellite Viewer - Imagem Completa</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -18,226 +18,188 @@
         
         .header {
             background: linear-gradient(90deg, #1a1a2e, #16213e);
-            padding: 12px 20px;
+            padding: 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 2px solid #00d4ff;
-            flex-shrink: 0;
         }
-        .header h1 { color: #00d4ff; font-size: 1.4em; }
+        .header h1 { color: #00d4ff; font-size: 1.2em; }
         
         .controls {
-            background: rgba(0,0,0,0.8);
-            padding: 12px 20px;
+            background: rgba(0,0,0,0.85);
+            padding: 10px 20px;
             display: flex;
-            gap: 20px;
+            gap: 15px;
             align-items: center;
             flex-wrap: wrap;
-            flex-shrink: 0;
             border-bottom: 1px solid #333;
         }
         .control-group {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
         .control-group label {
-            font-size: 0.75em;
+            font-size: 0.7em;
             color: #888;
             text-transform: uppercase;
-            font-weight: bold;
         }
         select, button {
-            padding: 10px 15px;
-            border-radius: 6px;
+            padding: 8px 12px;
+            border-radius: 5px;
             border: 1px solid #444;
             background: #1a1a2e;
             color: #e0e0e0;
-            font-size: 0.95em;
+            font-size: 0.85em;
             cursor: pointer;
-            min-width: 180px;
         }
-        select:focus { outline: none; border-color: #00d4ff; }
-        
         button {
             background: linear-gradient(135deg, #00d4ff, #0099cc);
             color: #000;
             font-weight: bold;
             border: none;
-            min-width: 150px;
         }
-        button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0,212,255,0.4);
-        }
-        button.secondary {
-            background: linear-gradient(135deg, #f39c12, #e67e22);
-        }
-        button.danger {
-            background: linear-gradient(135deg, #e74c3c, #c0392b);
-        }
+        button:hover { box-shadow: 0 3px 10px rgba(0,212,255,0.4); }
+        button:disabled { opacity: 0.5; cursor: wait; }
         
-        .opacity-slider {
+        .slider-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
-        .opacity-slider input { width: 120px; }
-        .opacity-value { 
-            color: #00d4ff; 
-            font-weight: bold; 
-            min-width: 45px;
-            text-align: center;
-        }
+        .slider-group input { width: 100px; }
+        .slider-value { color: #00d4ff; font-weight: bold; min-width: 40px; }
         
-        .map-container {
-            flex: 1;
-            position: relative;
-        }
-        #map { width: 100%; height: 100%; }
+        .map-container { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; background: #111; }
         
-        /* Info Panel */
         .info-panel {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(0,0,0,0.92);
-            padding: 15px 18px;
-            border-radius: 10px;
-            font-size: 0.85em;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.9);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.8em;
             z-index: 1000;
-            min-width: 260px;
+            min-width: 200px;
             border: 1px solid #333;
         }
-        .info-panel h3 {
-            color: #00d4ff;
-            margin-bottom: 12px;
-            font-size: 1em;
-            border-bottom: 1px solid #333;
-            padding-bottom: 8px;
-        }
+        .info-panel h3 { color: #00d4ff; margin-bottom: 8px; font-size: 0.9em; }
         .info-row {
             display: flex;
             justify-content: space-between;
-            padding: 5px 0;
+            padding: 3px 0;
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .info-row:last-child { border-bottom: none; }
-        .info-label { color: #888; }
-        .info-value { color: #00d4ff; font-weight: bold; }
-        .info-value.success { color: #2ecc71; }
-        .info-value.error { color: #e74c3c; }
-        .info-value.warning { color: #f39c12; }
+        .info-label { color: #666; }
+        .info-value { color: #00d4ff; }
+        .info-value.ok { color: #2ecc71; }
+        .info-value.err { color: #e74c3c; }
         
-        /* Status Bar */
-        .status-bar {
-            background: rgba(0,0,0,0.9);
-            padding: 10px 20px;
-            font-size: 0.85em;
-            color: #888;
-            display: flex;
-            justify-content: space-between;
-            flex-shrink: 0;
-            border-top: 1px solid #333;
-        }
-        .status-bar .status-ok { color: #2ecc71; }
-        .status-bar .status-error { color: #e74c3c; }
-        
-        /* Loading */
-        .loading-overlay {
+        .loading {
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95);
+            padding: 30px 50px;
+            border-radius: 10px;
             z-index: 9999;
+            text-align: center;
         }
-        .loading-overlay.hidden { display: none; }
+        .loading.hidden { display: none; }
         .spinner {
-            width: 50px;
-            height: 50px;
+            width: 40px; height: 40px;
             border: 4px solid #333;
             border-top-color: #00d4ff;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+            margin: 0 auto 15px;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         
-        /* Method comparison badges */
-        .method-badge {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-size: 0.75em;
-            font-weight: bold;
-            text-transform: uppercase;
+        .progress { margin-top: 10px; }
+        .progress-bar {
+            width: 200px; height: 6px;
+            background: #333;
+            border-radius: 3px;
+            overflow: hidden;
         }
-        .method-badge.manual { background: #3498db; color: #fff; }
-        .method-badge.gdal { background: #9b59b6; color: #fff; }
-        .method-badge.cartopy { background: #2ecc71; color: #fff; }
-        .method-badge.satpy { background: #e74c3c; color: #fff; }
+        .progress-fill {
+            height: 100%;
+            background: #00d4ff;
+            width: 0%;
+        }
+        .progress-text { margin-top: 5px; font-size: 0.8em; color: #888; }
+        
+        .status-bar {
+            background: #111;
+            padding: 8px 20px;
+            font-size: 0.75em;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+        }
     </style>
 </head>
 <body>
     <header class="header">
-        <h1>🛰️ Satellite Image Viewer</h1>
-        <div style="color: #888; font-size: 0.9em;">
-            Comparação de Métodos de Reprojeção
-        </div>
+        <h1>🛰️ GOES Satellite - Imagem Completa</h1>
+        <span style="color:#888; font-size:0.85em;">Reprojeção em tempo real no browser</span>
     </header>
     
     <div class="controls">
         <div class="control-group">
             <label>🛰️ Satélite</label>
-            <select id="satelliteSelect">
-                <option value="goes19">GOES-19 (East)</option>
-                <option value="goes16">GOES-16 (East)</option>
+            <select id="satellite">
+                <option value="goes19">GOES-19</option>
+                <option value="goes16">GOES-16</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>📷 Tipo de Imagem</label>
+            <select id="imageType">
+                <option value="ssa">SSA (América do Sul)</option>
+                <option value="fd">Full Disk (Disco Completo)</option>
             </select>
         </div>
         
         <div class="control-group">
             <label>🔧 Método de Reprojeção</label>
-            <select id="methodSelect">
-                <option value="manual">Manual (Matemática Pura)</option>
-                <option value="gdal">GDAL (rasterio + pyproj)</option>
-                <option value="cartopy">Cartopy (matplotlib)</option>
-                <option value="satpy">SatPy (pyresample)</option>
+            <select id="method">
+                <option value="direct">Direto (Bounds Aproximados)</option>
+                <option value="manual">Manual (Pixel a Pixel)</option>
+                <option value="bilinear">Bilinear (Suavizado)</option>
             </select>
         </div>
         
         <div class="control-group">
-            <label>🔍 Opacidade da Imagem</label>
-            <div class="opacity-slider">
-                <input type="range" id="opacitySlider" min="0" max="100" value="80">
-                <span class="opacity-value" id="opacityValue">80%</span>
+            <label>🔍 Opacidade</label>
+            <div class="slider-group">
+                <input type="range" id="opacity" min="0" max="100" value="75">
+                <span class="slider-value" id="opacityVal">75%</span>
             </div>
         </div>
         
-        <button onclick="loadSatelliteImage()">
-            🔄 Carregar Imagem
-        </button>
-        
-        <button class="secondary" onclick="zoomToShip()">
-            📍 Ir para Navio
-        </button>
-        
-        <button class="danger" onclick="runReprojection()">
-            ⚡ Executar Reprojeção
-        </button>
+        <button id="loadBtn" onclick="loadImage()">🌍 CARREGAR IMAGEM</button>
+        <button onclick="fitBounds()">📍 Ver Tudo</button>
+        <button onclick="zoomShip()">🚢 Ir ao Navio</button>
     </div>
     
     <div class="map-container">
         <div id="map"></div>
         
         <div class="info-panel">
-            <h3>📊 Informações da Imagem</h3>
+            <h3>📊 Status</h3>
             <div class="info-row">
                 <span class="info-label">Satélite:</span>
-                <span class="info-value" id="infoSatellite">-</span>
+                <span class="info-value" id="infoSat">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Tipo:</span>
+                <span class="info-value" id="infoType">-</span>
             </div>
             <div class="info-row">
                 <span class="info-label">Método:</span>
@@ -245,231 +207,435 @@
             </div>
             <div class="info-row">
                 <span class="info-label">Status:</span>
-                <span class="info-value" id="infoStatus">Aguardando...</span>
+                <span class="info-value" id="infoStatus">Aguardando</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Última Atualização:</span>
-                <span class="info-value" id="infoTime">-</span>
+                <span class="info-label">Lat Norte:</span>
+                <span class="info-value" id="infoN">-</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Bounds N:</span>
-                <span class="info-value" id="infoBoundsN">-</span>
+                <span class="info-label">Lat Sul:</span>
+                <span class="info-value" id="infoS">-</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Bounds S:</span>
-                <span class="info-value" id="infoBoundsS">-</span>
+                <span class="info-label">Lon Oeste:</span>
+                <span class="info-value" id="infoW">-</span>
             </div>
             <div class="info-row">
-                <span class="info-label">Bounds W:</span>
-                <span class="info-value" id="infoBoundsW">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Bounds E:</span>
-                <span class="info-value" id="infoBoundsE">-</span>
+                <span class="info-label">Lon Leste:</span>
+                <span class="info-value" id="infoE">-</span>
             </div>
         </div>
         
-        <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="loading hidden" id="loading">
             <div class="spinner"></div>
             <div id="loadingText">Carregando...</div>
+            <div class="progress">
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-text" id="progressText">0%</div>
+            </div>
         </div>
     </div>
     
     <div class="status-bar">
         <span id="statusText">Pronto</span>
-        <span id="lastUpdate">-</span>
+        <span id="timestamp">-</span>
     </div>
     
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // =====================================================
+        // =========================================================
         // CONFIGURAÇÃO
-        // =====================================================
+        // =========================================================
         
-        const SHIP_LAT = -22.5;
-        const SHIP_LON = -40.5;
-        const RADIUS_NM = 100;
+        const SHIP = { lat: -22.5, lon: -40.5 };
         
-        let map;
-        let satelliteOverlay = null;
-        let shipMarker = null;
-        let radiusCircle = null;
+        // URLs das imagens NOAA
+        const IMAGES = {
+            goes19: {
+                ssa: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
+                fd: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg'
+            },
+            goes16: {
+                ssa: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/GEOCOLOR/latest.jpg',
+                fd: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg'
+            }
+        };
         
-        // =====================================================
+        // Bounds aproximados (CORRIGIDOS para SSA)
+        // SSA = South America Sector
+        // Estes são bounds empíricos calibrados para alinhar com o mapa
+        const BOUNDS = {
+            ssa: {
+                // Bounds da imagem SSA (Sul América)
+                // Calibrados empiricamente
+                north: 15,      // Latitude norte
+                south: -60,     // Latitude sul  
+                west: -110,     // Longitude oeste
+                east: -20       // Longitude leste
+            },
+            fd: {
+                // Full Disk - cobertura completa do hemisfério
+                north: 70,
+                south: -70,
+                west: -150,
+                east: 0
+            }
+        };
+        
+        let map, overlay = null;
+        
+        // =========================================================
         // INICIALIZAÇÃO
-        // =====================================================
+        // =========================================================
         
-        function initMap() {
+        function init() {
             map = L.map('map', {
-                center: [SHIP_LAT, SHIP_LON],
-                zoom: 6,
-                minZoom: 3,
-                maxZoom: 12
+                center: [-20, -50],
+                zoom: 4,
+                minZoom: 2,
+                maxZoom: 10
             });
             
-            // Mapa base escuro
+            // Mapa base
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                maxZoom: 19,
-                attribution: '© CartoDB © OpenStreetMap'
+                maxZoom: 19
             }).addTo(map);
             
-            // Adicionar marcador do navio
+            // Grid de referência
+            addGrid();
+            
+            // Marcador do navio
             addShipMarker();
             
-            // Adicionar círculo de raio
-            addRadiusCircle();
-            
             // Eventos
-            document.getElementById('opacitySlider').addEventListener('input', updateOpacity);
-            document.getElementById('satelliteSelect').addEventListener('change', loadSatelliteImage);
-            document.getElementById('methodSelect').addEventListener('change', loadSatelliteImage);
-            
-            // Carregar imagem inicial
-            loadSatelliteImage();
+            document.getElementById('opacity').addEventListener('input', updateOpacity);
+        }
+        
+        function addGrid() {
+            // Linhas de latitude
+            for (let lat = -60; lat <= 60; lat += 10) {
+                L.polyline([[lat, -180], [lat, 180]], {
+                    color: lat === 0 ? '#f80' : '#444',
+                    weight: lat % 30 === 0 ? 1 : 0.5,
+                    opacity: 0.5
+                }).addTo(map);
+            }
+            // Linhas de longitude
+            for (let lon = -180; lon <= 180; lon += 10) {
+                L.polyline([[-80, lon], [80, lon]], {
+                    color: lon === 0 ? '#f80' : '#444',
+                    weight: lon % 30 === 0 ? 1 : 0.5,
+                    opacity: 0.5
+                }).addTo(map);
+            }
         }
         
         function addShipMarker() {
-            const shipIcon = L.divIcon({
-                className: 'ship-icon',
-                html: `<svg viewBox="0 0 24 24" width="32" height="32" style="filter: drop-shadow(0 0 6px #00ffcc);">
-                    <polygon points="12,2 22,22 12,18 2,22" fill="#00ffcc" stroke="#000" stroke-width="1"/>
-                </svg>`,
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
+            const icon = L.divIcon({
+                html: '<div style="font-size:24px;filter:drop-shadow(0 0 5px #0ff);">🚢</div>',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
             });
+            L.marker([SHIP.lat, SHIP.lon], { icon }).addTo(map)
+                .bindPopup(`<b>Deepwater Aquila</b><br>${SHIP.lat}°, ${SHIP.lon}°`);
             
-            shipMarker = L.marker([SHIP_LAT, SHIP_LON], { icon: shipIcon })
-                .addTo(map)
-                .bindPopup(`<b>Deepwater Aquila</b><br>Lat: ${SHIP_LAT}°<br>Lon: ${SHIP_LON}°`);
-        }
-        
-        function addRadiusCircle() {
-            radiusCircle = L.circle([SHIP_LAT, SHIP_LON], {
-                radius: RADIUS_NM * 1852, // NM para metros
-                color: '#00ffcc',
-                fillColor: '#00ffcc',
+            // Círculo de 100 NM
+            L.circle([SHIP.lat, SHIP.lon], {
+                radius: 100 * 1852,
+                color: '#0ff',
                 fillOpacity: 0.05,
                 weight: 2,
-                dashArray: '10, 5'
+                dashArray: '5,5'
             }).addTo(map);
         }
         
-        // =====================================================
+        // =========================================================
         // CARREGAMENTO DE IMAGEM
-        // =====================================================
+        // =========================================================
         
-        async function loadSatelliteImage() {
-            const satellite = document.getElementById('satelliteSelect').value;
-            const method = document.getElementById('methodSelect').value;
+        async function loadImage() {
+            const sat = document.getElementById('satellite').value;
+            const type = document.getElementById('imageType').value;
+            const method = document.getElementById('method').value;
             
-            showLoading('Carregando imagem...');
+            const btn = document.getElementById('loadBtn');
+            btn.disabled = true;
+            
+            showLoading('Baixando imagem do NOAA...');
+            setProgress(10);
             
             try {
-                // Construir nome do arquivo baseado no método
-                let imgFile, jsonFile;
+                const url = IMAGES[sat][type];
+                const bounds = BOUNDS[type];
                 
-                if (method === 'manual') {
-                    imgFile = `satellite_${satellite}.png`;
-                    jsonFile = `satellite_${satellite}.json`;
-                } else {
-                    imgFile = `satellite_${satellite}_${method}.png`;
-                    jsonFile = `satellite_${satellite}_${method}.json`;
-                }
-                
-                // Carregar JSON com metadados
-                const jsonUrl = jsonFile + '?t=' + Date.now();
-                const response = await fetch(jsonUrl);
-                
-                if (!response.ok) {
-                    throw new Error(`Imagem não encontrada: ${jsonFile}`);
-                }
-                
-                const data = await response.json();
+                // Atualizar info
+                document.getElementById('infoSat').textContent = sat.toUpperCase();
+                document.getElementById('infoType').textContent = type.toUpperCase();
+                document.getElementById('infoMethod').textContent = method;
                 
                 // Remover overlay anterior
-                if (satelliteOverlay) {
-                    map.removeLayer(satelliteOverlay);
+                if (overlay) map.removeLayer(overlay);
+                
+                setProgress(30);
+                showLoading('Processando imagem...');
+                
+                if (method === 'direct') {
+                    // Método direto: usa bounds aproximados
+                    await loadDirect(url, bounds);
+                } else {
+                    // Reprojeção no browser
+                    await loadWithReprojection(url, bounds, type, sat, method);
                 }
                 
-                // Adicionar novo overlay
-                const imgUrl = imgFile + '?t=' + Date.now();
-                const bounds = data.leaflet_bounds;
+                // Atualizar bounds no painel
+                document.getElementById('infoN').textContent = bounds.north + '°';
+                document.getElementById('infoS').textContent = bounds.south + '°';
+                document.getElementById('infoW').textContent = bounds.west + '°';
+                document.getElementById('infoE').textContent = bounds.east + '°';
                 
-                satelliteOverlay = L.imageOverlay(imgUrl, bounds, {
-                    opacity: document.getElementById('opacitySlider').value / 100
-                }).addTo(map);
+                document.getElementById('infoStatus').textContent = 'OK';
+                document.getElementById('infoStatus').className = 'info-value ok';
+                document.getElementById('statusText').textContent = 'Imagem carregada com sucesso';
+                document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
                 
-                // Atualizar informações
-                document.getElementById('infoSatellite').textContent = data.satellite_name || satellite.toUpperCase();
-                document.getElementById('infoMethod').innerHTML = `<span class="method-badge ${method}">${method}</span>`;
-                document.getElementById('infoStatus').textContent = 'Carregado';
-                document.getElementById('infoStatus').className = 'info-value success';
-                document.getElementById('infoTime').textContent = data.image_time_utc || '-';
+                setProgress(100);
+                setTimeout(hideLoading, 300);
                 
-                if (data.bounds) {
-                    document.getElementById('infoBoundsN').textContent = data.bounds.lat_max.toFixed(2) + '°';
-                    document.getElementById('infoBoundsS').textContent = data.bounds.lat_min.toFixed(2) + '°';
-                    document.getElementById('infoBoundsW').textContent = data.bounds.lon_min.toFixed(2) + '°';
-                    document.getElementById('infoBoundsE').textContent = data.bounds.lon_max.toFixed(2) + '°';
-                }
-                
-                document.getElementById('statusText').innerHTML = `<span class="status-ok">✓</span> Imagem carregada: ${imgFile}`;
-                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-                
-                hideLoading();
-                
-            } catch (error) {
-                console.error('Erro:', error);
-                
-                document.getElementById('infoStatus').textContent = 'Não disponível';
-                document.getElementById('infoStatus').className = 'info-value error';
-                document.getElementById('statusText').innerHTML = `<span class="status-error">✗</span> ${error.message}`;
-                
+            } catch (err) {
+                console.error(err);
+                document.getElementById('infoStatus').textContent = 'ERRO';
+                document.getElementById('infoStatus').className = 'info-value err';
+                document.getElementById('statusText').textContent = 'Erro: ' + err.message;
                 hideLoading();
             }
+            
+            btn.disabled = false;
         }
         
-        async function runReprojection() {
-            const satellite = document.getElementById('satelliteSelect').value;
-            const method = document.getElementById('methodSelect').value;
+        async function loadDirect(url, bounds) {
+            // Carregar imagem diretamente com bounds aproximados
+            const leafletBounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]];
             
-            // Mostrar instruções para rodar o backend
-            const cmd = `python satellite_reprojector.py --satellite ${satellite} --method ${method}`;
+            overlay = L.imageOverlay(url + '?t=' + Date.now(), leafletBounds, {
+                opacity: document.getElementById('opacity').value / 100,
+                crossOrigin: 'anonymous'
+            }).addTo(map);
             
-            alert(`Para gerar uma nova imagem reprojetada, execute no terminal:\n\n${cmd}\n\nApós a execução, clique em "Carregar Imagem" para visualizar.`);
+            setProgress(90);
         }
         
-        // =====================================================
+        async function loadWithReprojection(url, bounds, type, sat, method) {
+            // Carregar imagem
+            const img = await loadImg(url + '?t=' + Date.now());
+            setProgress(50);
+            
+            showLoading('Reprojetando...');
+            
+            // Criar canvas de saída
+            const outWidth = 1800;  // Largura fixa para boa qualidade
+            const outHeight = Math.round(outWidth * (bounds.north - bounds.south) / (bounds.east - bounds.west));
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = outWidth;
+            canvas.height = outHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // Canvas fonte
+            const srcCanvas = document.createElement('canvas');
+            srcCanvas.width = img.width;
+            srcCanvas.height = img.height;
+            const srcCtx = srcCanvas.getContext('2d');
+            srcCtx.drawImage(img, 0, 0);
+            const srcData = srcCtx.getImageData(0, 0, img.width, img.height);
+            
+            // Canvas destino
+            const outData = ctx.createImageData(outWidth, outHeight);
+            
+            // Parâmetros de reprojeção
+            const sat_lon = -75.2; // Longitude do GOES-East
+            
+            // Processar pixel a pixel
+            for (let y = 0; y < outHeight; y++) {
+                for (let x = 0; x < outWidth; x++) {
+                    // Lat/lon do pixel de saída
+                    const lon = bounds.west + (x / outWidth) * (bounds.east - bounds.west);
+                    const lat = bounds.north - (y / outHeight) * (bounds.north - bounds.south);
+                    
+                    // Calcular posição na imagem fonte
+                    let srcX, srcY;
+                    
+                    if (type === 'ssa') {
+                        // Para SSA, usar mapeamento linear ajustado
+                        srcX = (lon - bounds.west) / (bounds.east - bounds.west) * img.width;
+                        srcY = (bounds.north - lat) / (bounds.north - bounds.south) * img.height;
+                    } else {
+                        // Para Full Disk, usar projeção geoestacionária
+                        const scan = latLonToScan(lat, lon, sat_lon);
+                        if (!scan) {
+                            const idx = (y * outWidth + x) * 4;
+                            outData.data[idx + 3] = 0; // Transparente
+                            continue;
+                        }
+                        srcX = (scan.x + 0.151844) / (2 * 0.151844) * img.width;
+                        srcY = (-scan.y + 0.151844) / (2 * 0.151844) * img.height;
+                    }
+                    
+                    if (srcX < 0 || srcX >= img.width || srcY < 0 || srcY >= img.height) {
+                        continue;
+                    }
+                    
+                    const idx = (y * outWidth + x) * 4;
+                    
+                    if (method === 'bilinear') {
+                        // Interpolação bilinear
+                        const color = bilinear(srcData, srcX, srcY);
+                        outData.data[idx] = color.r;
+                        outData.data[idx + 1] = color.g;
+                        outData.data[idx + 2] = color.b;
+                        outData.data[idx + 3] = 255;
+                    } else {
+                        // Nearest neighbor
+                        const sx = Math.floor(srcX);
+                        const sy = Math.floor(srcY);
+                        const srcIdx = (sy * img.width + sx) * 4;
+                        outData.data[idx] = srcData.data[srcIdx];
+                        outData.data[idx + 1] = srcData.data[srcIdx + 1];
+                        outData.data[idx + 2] = srcData.data[srcIdx + 2];
+                        outData.data[idx + 3] = 255;
+                    }
+                }
+                
+                // Atualizar progresso
+                if (y % 50 === 0) {
+                    setProgress(50 + (y / outHeight) * 40);
+                    await sleep(0);
+                }
+            }
+            
+            ctx.putImageData(outData, 0, 0);
+            
+            // Criar overlay
+            const dataUrl = canvas.toDataURL('image/png');
+            const leafletBounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]];
+            
+            overlay = L.imageOverlay(dataUrl, leafletBounds, {
+                opacity: document.getElementById('opacity').value / 100
+            }).addTo(map);
+        }
+        
+        // =========================================================
+        // FUNÇÕES DE PROJEÇÃO
+        // =========================================================
+        
+        function latLonToScan(lat, lon, sat_lon) {
+            const H = 42164160.0;
+            const r_eq = 6378137.0;
+            const r_pol = 6356752.31414;
+            
+            const lat_rad = lat * Math.PI / 180;
+            const lon_rad = (lon - sat_lon) * Math.PI / 180;
+            
+            const cos_lat = Math.cos(lat_rad);
+            const sin_lat = Math.sin(lat_rad);
+            
+            const r_geo = r_eq * r_pol / Math.sqrt(
+                r_pol * r_pol * cos_lat * cos_lat + 
+                r_eq * r_eq * sin_lat * sin_lat
+            );
+            
+            const r_1 = H - r_geo * cos_lat * Math.cos(lon_rad);
+            const r_2 = -r_geo * cos_lat * Math.sin(lon_rad);
+            const r_3 = r_geo * sin_lat;
+            
+            if (r_1 > H) return null;
+            
+            const r_n = Math.sqrt(r_1*r_1 + r_2*r_2 + r_3*r_3);
+            const x = Math.atan2(-r_2, r_1);
+            const y = Math.asin(-r_3 / r_n);
+            
+            if (Math.abs(x) > 0.151844 || Math.abs(y) > 0.151844) return null;
+            
+            return { x, y };
+        }
+        
+        function bilinear(srcData, x, y) {
+            const x0 = Math.floor(x);
+            const y0 = Math.floor(y);
+            const x1 = Math.min(x0 + 1, srcData.width - 1);
+            const y1 = Math.min(y0 + 1, srcData.height - 1);
+            
+            const fx = x - x0;
+            const fy = y - y0;
+            
+            const w00 = (1 - fx) * (1 - fy);
+            const w10 = fx * (1 - fy);
+            const w01 = (1 - fx) * fy;
+            const w11 = fx * fy;
+            
+            const i00 = (y0 * srcData.width + x0) * 4;
+            const i10 = (y0 * srcData.width + x1) * 4;
+            const i01 = (y1 * srcData.width + x0) * 4;
+            const i11 = (y1 * srcData.width + x1) * 4;
+            
+            return {
+                r: Math.round(srcData.data[i00] * w00 + srcData.data[i10] * w10 + srcData.data[i01] * w01 + srcData.data[i11] * w11),
+                g: Math.round(srcData.data[i00+1] * w00 + srcData.data[i10+1] * w10 + srcData.data[i01+1] * w01 + srcData.data[i11+1] * w11),
+                b: Math.round(srcData.data[i00+2] * w00 + srcData.data[i10+2] * w10 + srcData.data[i01+2] * w01 + srcData.data[i11+2] * w11)
+            };
+        }
+        
+        // =========================================================
         // UTILIDADES
-        // =====================================================
+        // =========================================================
+        
+        function loadImg(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Falha ao carregar imagem'));
+                img.src = url;
+            });
+        }
+        
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         function updateOpacity() {
-            const value = document.getElementById('opacitySlider').value;
-            document.getElementById('opacityValue').textContent = value + '%';
-            
-            if (satelliteOverlay) {
-                satelliteOverlay.setOpacity(value / 100);
-            }
+            const v = document.getElementById('opacity').value;
+            document.getElementById('opacityVal').textContent = v + '%';
+            if (overlay) overlay.setOpacity(v / 100);
         }
         
-        function zoomToShip() {
-            map.setView([SHIP_LAT, SHIP_LON], 7);
+        function fitBounds() {
+            const type = document.getElementById('imageType').value;
+            const b = BOUNDS[type];
+            map.fitBounds([[b.south, b.west], [b.north, b.east]]);
+        }
+        
+        function zoomShip() {
+            map.setView([SHIP.lat, SHIP.lon], 6);
         }
         
         function showLoading(text) {
             document.getElementById('loadingText').textContent = text;
-            document.getElementById('loadingOverlay').classList.remove('hidden');
+            document.getElementById('loading').classList.remove('hidden');
         }
         
         function hideLoading() {
-            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('loading').classList.add('hidden');
         }
         
-        // =====================================================
-        // INIT
-        // =====================================================
+        function setProgress(pct) {
+            document.getElementById('progressFill').style.width = pct + '%';
+            document.getElementById('progressText').textContent = Math.round(pct) + '%';
+        }
         
-        initMap();
+        // =========================================================
+        // INIT
+        // =========================================================
+        
+        init();
     </script>
 </body>
 </html>
