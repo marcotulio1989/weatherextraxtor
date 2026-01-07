@@ -248,30 +248,37 @@
             right: 20px;
             display: flex;
             flex-direction: column;
-            gap: 5px;
+            gap: 8px;
             z-index: 500;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #0f3460;
         }
 
         .zoom-btn {
-            width: 40px;
-            height: 40px;
-            background: rgba(22, 33, 62, 0.9);
-            border: 1px solid #0f3460;
+            width: 50px;
+            height: 50px;
+            background: rgba(22, 33, 62, 0.95);
+            border: 2px solid #00d9ff;
             color: #00d9ff;
-            font-size: 20px;
+            font-size: 24px;
             cursor: pointer;
-            border-radius: 5px;
+            border-radius: 8px;
+            touch-action: manipulation;
         }
 
-        .zoom-btn:hover {
+        .zoom-btn:hover, .zoom-btn:active {
             background: #0f3460;
+            transform: scale(1.05);
         }
 
         .zoom-level {
             text-align: center;
-            font-size: 0.8em;
-            color: #888;
+            font-size: 0.9em;
+            color: #00d9ff;
             padding: 5px;
+            font-weight: bold;
         }
 
         /* Info de posição do mouse */
@@ -497,10 +504,11 @@
             </div>
 
             <div class="zoom-controls">
-                <button class="zoom-btn" onclick="zoomImage(1.2)">+</button>
+                <button class="zoom-btn" onclick="zoomImage(1.2)" title="Zoom In">+</button>
                 <div class="zoom-level" id="zoomLevel">100%</div>
-                <button class="zoom-btn" onclick="zoomImage(0.8)">−</button>
-                <button class="zoom-btn" onclick="resetZoom()" style="font-size:12px;">⟲</button>
+                <button class="zoom-btn" onclick="zoomImage(0.8)" title="Zoom Out">−</button>
+                <button class="zoom-btn" onclick="centerImage()" title="Centralizar" style="font-size:16px;">⊕</button>
+                <button class="zoom-btn" onclick="resetZoom()" title="Ajustar à tela" style="font-size:16px;">⟲</button>
             </div>
         </div>
     </div>
@@ -774,6 +782,14 @@
             const scaleY = (areaRect.height - 100) / imageNaturalSize.height;
             currentZoom = Math.min(scaleX, scaleY, 1);
             
+            imageOffset = { x: 0, y: 0 };
+            applyZoom();
+        }
+
+        function centerImage() {
+            if (!imageLoaded) return;
+            
+            // Centralizar mantendo o zoom atual
             imageOffset = { x: 0, y: 0 };
             applyZoom();
         }
