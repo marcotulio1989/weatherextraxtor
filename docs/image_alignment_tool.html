@@ -1478,15 +1478,17 @@
                         <div class="gcp-coords">
                             <div>
                                 <label>Latitude</label>
-                                <input type="number" step="0.000001" value="${point.lat}" 
+                                <input type="text" inputmode="decimal" value="${point.lat}" 
                                        placeholder="-22.123456"
-                                       onchange="updatePointCoord(${point.id}, 'lat', this.value)">
+                                       onchange="updatePointCoord(${point.id}, 'lat', this.value)"
+                                       pattern="-?[0-9]*\\.?[0-9]*">
                             </div>
                             <div>
                                 <label>Longitude</label>
-                                <input type="number" step="0.000001" value="${point.lng}" 
+                                <input type="text" inputmode="decimal" value="${point.lng}" 
                                        placeholder="-41.567890"
-                                       onchange="updatePointCoord(${point.id}, 'lng', this.value)">
+                                       onchange="updatePointCoord(${point.id}, 'lng', this.value)"
+                                       pattern="-?[0-9]*\\.?[0-9]*">
                             </div>
                         </div>
                     </div>
