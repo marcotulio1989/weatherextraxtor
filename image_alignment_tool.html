@@ -789,9 +789,15 @@
         function centerImage() {
             if (!imageLoaded) return;
             
-            // Centralizar mantendo o zoom atual
-            imageOffset = { x: 0, y: 0 };
-            applyZoom();
+            // Resetar offset para centralizar (flexbox já centraliza quando offset é 0)
+            imageOffset.x = 0;
+            imageOffset.y = 0;
+            
+            // Forçar aplicação
+            const container = document.getElementById('imageContainer');
+            container.style.transform = `translate(0px, 0px) scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+            updatePointPositions();
         }
 
         function applyZoom() {
