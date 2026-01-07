@@ -165,6 +165,14 @@
         .corner-sw { background: #f39c12; }
         .corner-se { background: #27ae60; }
         
+        /* Garantir que marcadores Leaflet fiquem acima dos canvas */
+        .leaflet-marker-pane {
+            z-index: 600 !important;
+        }
+        .leaflet-popup-pane {
+            z-index: 700 !important;
+        }
+        
         /* Marcador de ponto de grade */
         .control-point {
             width: 14px;
@@ -182,20 +190,21 @@
             color: white;
         }
         
-        /* Canvas overlay */
+        /* Canvas overlay - z-index baixo para não bloquear marcadores Leaflet */
         #imageCanvas {
             position: absolute;
             top: 0;
             left: 0;
             pointer-events: none;
-            z-index: 400;
+            z-index: 200;
         }
         
         #selectionCanvas {
             position: absolute;
             top: 0;
             left: 0;
-            z-index: 450;
+            pointer-events: none;
+            z-index: 250;
         }
         
         .corner-coords {
