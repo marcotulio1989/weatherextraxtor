@@ -617,6 +617,7 @@
             console.log('🎯 Reprojeção params:', {scanMax, imgRadius, scale, centerX, centerY});
             
             let pixelsVisible = 0;
+            let debugCount = 0;
             
             console.log('🔄 Iniciando reprojeção para Web Mercator...');
             
@@ -630,8 +631,20 @@
                     const lon = mercatorXToLon(mercX);
                     const lat = mercatorYToLat(mercY);
                     
+                    // Debug primeiro pixel
+                    if (debugCount < 5) {
+                        console.log('🔍 Debug pixel:', {x, y, mercX, mercY, lon, lat});
+                        debugCount++;
+                    }
+                    
                     // Converter lat/lon para coordenadas de scan do satélite
                     const scan = latLonToScan(lat, lon, sat_lon);
+                    
+                    // Debug scan
+                    if (debugCount <= 5 && scan) {
+                        console.log('✅ Scan encontrado:', scan);
+                    }
+                    
                     if (!scan) continue; // Ponto fora da visão do satélite
                     
                     // Mapear coordenadas de scan para pixels da imagem fonte
@@ -744,16 +757,15 @@
             const sy = -rc * Math.cos(lat_geo) * Math.sin(dlon);
             const sz = rc * Math.sin(lat_geo);
             
-            // Verificar visibilidade
-            const sn_sq = sx * sx + sy * sy + sz * sz;
-            const vis_check = H * (H - sx) - sn_sq;
-            if (vis_check < 0) return null;
+            // Verificar visibilidade - SIMPLIFICADO
+            // Um ponto é visível se estiver no mesmo lado da Terra que o satélite
+            // e dentro de ~81 graus do ponto subsatélite
+            const dlon_deg = Math.abs(lon - sat_lon);
+            if (dlon_deg > 81 || Math.abs(lat) > 81) return null;
             
-            const sn = Math.sqrt(sn_sq);
+            const sn = Math.sqrt(sx * sx + sy * sy + sz * sz);
             
             // Ângulos de scan
-            // x (lambda): ângulo leste-oeste, positivo para leste do satélite
-            // y (theta): ângulo norte-sul, positivo para norte
             const x = Math.asin(-sy / sn);
             const y = Math.atan(sz / sx);
             
