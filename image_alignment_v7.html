@@ -279,11 +279,37 @@
                     <button class="btn btn-primary" onclick="loadNoaaImage('goes19')" style="font-size:0.7em;">🛰️ GOES-19</button>
                     <button class="btn btn-primary" onclick="loadNoaaImage('goes16')" style="font-size:0.7em; background:#3498db;">🛰️ GOES-16</button>
                 </div>
+                <div class="btn-grid" style="margin-top: 4px;">
+                    <button class="btn btn-success" onclick="loadFullDisk('goes19')" style="font-size:0.65em;">🌎 Full Disk 19</button>
+                    <button class="btn btn-success" onclick="loadFullDisk('goes16')" style="font-size:0.65em;">🌎 Full Disk 16</button>
+                </div>
                 <div class="file-input-wrapper">
                     <button class="btn btn-secondary">📂 Arquivo Local</button>
                     <input type="file" id="imageInput" accept="image/*">
                 </div>
                 <div class="status-bar" id="imageStatus">Nenhuma imagem carregada</div>
+            </div>
+
+            <!-- Reprojeção Full Disk -->
+            <div class="control-section" id="reprojectionSection" style="display: none;">
+                <h3>🌍 Reprojeção Full Disk → Plano</h3>
+                <div class="instructions" style="margin-bottom: 8px;">
+                    Transforma o disco esférico em mapa plano (Plate Carrée).
+                </div>
+                <button class="btn btn-warning" onclick="reprojectFullDisk()" id="btnReproject">
+                    🔄 Reprojetar para Plano
+                </button>
+                <div class="slider-row" style="margin-top: 8px;">
+                    <label>Qualidade:</label>
+                    <input type="range" id="reprojQuality" min="200" max="1000" step="100" value="600">
+                    <span class="value" id="reprojQualityVal">600px</span>
+                </div>
+                <div class="slider-row">
+                    <label>Sat Lon:</label>
+                    <input type="range" id="satLongitude" min="-180" max="0" step="0.1" value="-75.2">
+                    <span class="value" id="satLongitudeVal">-75.2°</span>
+                </div>
+                <div class="status-bar" id="reprojStatus">Aguardando...</div>
             </div>
 
             <!-- Mapa de Fundo -->
@@ -846,6 +872,15 @@
                 if (!deleteMode) return;
                 selCanvas.style.cursor = 'crosshair';
             });
+            
+            // Eventos para sliders de reprojeção
+            document.getElementById('reprojQuality').addEventListener('input', function() {
+                document.getElementById('reprojQualityVal').textContent = this.value + 'px';
+            });
+            
+            document.getElementById('satLongitude').addEventListener('input', function() {
+                document.getElementById('satLongitudeVal').textContent = parseFloat(this.value).toFixed(1) + '°';
+            });
         }
 
         // ===== CARREGAR IMAGEM =====
@@ -853,15 +888,217 @@
             goes19: { name: 'GOES-19', url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/SECTOR/ssa/13/latest.jpg' },
             goes16: { name: 'GOES-16', url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/SECTOR/ssa/13/latest.jpg' }
         };
+        
+        const NOAA_FULLDISK = {
+            goes19: { 
+                name: 'GOES-19 Full Disk', 
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg',
+                longitude: -75.2 // GOES-19 está em -75.2°W
+            },
+            goes16: { 
+                name: 'GOES-16 Full Disk', 
+                url: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg',
+                longitude: -75.2 // GOES-16 está em -75.2°W
+            }
+        };
+        
+        let isFullDisk = false;
+        let originalFullDiskImage = null;
 
         function loadNoaaImage(sat) {
             const s = NOAA[sat];
             document.getElementById('imageStatus').innerHTML = '⏳ Baixando ' + s.name + '...';
             
+            // Esconder seção de reprojeção
+            document.getElementById('reprojectionSection').style.display = 'none';
+            isFullDisk = false;
+            
             // Aplicar preset GOES SSA automaticamente
             setPreset('goes_ssa');
             
             loadImage(s.url + '?t=' + Date.now(), s.name);
+        }
+        
+        function loadFullDisk(sat) {
+            const s = NOAA_FULLDISK[sat];
+            document.getElementById('imageStatus').innerHTML = '⏳ Baixando ' + s.name + '...';
+            document.getElementById('satLongitude').value = s.longitude;
+            document.getElementById('satLongitudeVal').textContent = s.longitude + '°';
+            
+            isFullDisk = true;
+            
+            // Mostrar seção de reprojeção
+            document.getElementById('reprojectionSection').style.display = 'block';
+            document.getElementById('reprojStatus').innerHTML = '⏳ Carregando disco...';
+            
+            // Aplicar preset full disk
+            setPreset('goes_full');
+            
+            // Carregar imagem original
+            originalFullDiskImage = new Image();
+            originalFullDiskImage.crossOrigin = 'anonymous';
+            
+            originalFullDiskImage.onload = function() {
+                document.getElementById('imageStatus').innerHTML = `✅ ${s.name} (${this.width}×${this.height})`;
+                document.getElementById('imageStatus').style.color = '#00ff00';
+                document.getElementById('reprojStatus').innerHTML = '✅ Pronto! Clique em "Reprojetar para Plano"';
+                document.getElementById('reprojStatus').style.color = '#00ff00';
+            };
+            
+            originalFullDiskImage.onerror = function() {
+                document.getElementById('imageStatus').innerHTML = '❌ Erro ao carregar';
+                document.getElementById('imageStatus').style.color = '#ff4444';
+            };
+            
+            originalFullDiskImage.src = s.url + '?t=' + Date.now();
+        }
+        
+        // ===== REPROJEÇÃO GEOESTACIONÁRIA → PLATE CARRÉE =====
+        function reprojectFullDisk() {
+            if (!originalFullDiskImage) {
+                alert('Carregue uma imagem Full Disk primeiro!');
+                return;
+            }
+            
+            document.getElementById('reprojStatus').innerHTML = '🔄 Reprojetando...';
+            document.getElementById('btnReproject').disabled = true;
+            
+            // Usar setTimeout para permitir UI update
+            setTimeout(() => {
+                try {
+                    const reprojectedCanvas = geostatToPlateCarree(originalFullDiskImage);
+                    
+                    // Converter canvas para imagem
+                    imageElement = new Image();
+                    imageElement.onload = function() {
+                        imageLoaded = true;
+                        isFullDisk = false; // Agora é uma imagem plana
+                        
+                        document.getElementById('reprojStatus').innerHTML = '✅ Reprojeção concluída!';
+                        document.getElementById('reprojStatus').style.color = '#00ff00';
+                        document.getElementById('btnReproject').disabled = false;
+                        
+                        // Aplicar preset para área visível
+                        setPreset('goes_full');
+                        
+                        createGridFromCorners();
+                        triangulate();
+                        redraw();
+                    };
+                    imageElement.src = reprojectedCanvas.toDataURL('image/png');
+                    
+                } catch (err) {
+                    document.getElementById('reprojStatus').innerHTML = '❌ Erro: ' + err.message;
+                    document.getElementById('reprojStatus').style.color = '#ff4444';
+                    document.getElementById('btnReproject').disabled = false;
+                }
+            }, 50);
+        }
+        
+        function geostatToPlateCarree(srcImg) {
+            const quality = parseInt(document.getElementById('reprojQuality').value) || 600;
+            const satLon = parseFloat(document.getElementById('satLongitude').value) * Math.PI / 180;
+            
+            // Dimensões da imagem de saída (Plate Carrée)
+            const outWidth = quality * 2; // aspecto 2:1 para mapa mundi
+            const outHeight = quality;
+            
+            // Criar canvas de saída
+            const outCanvas = document.createElement('canvas');
+            outCanvas.width = outWidth;
+            outCanvas.height = outHeight;
+            const outCtx = outCanvas.getContext('2d');
+            
+            // Criar canvas temporário para ler pixels da imagem fonte
+            const srcCanvas = document.createElement('canvas');
+            srcCanvas.width = srcImg.naturalWidth;
+            srcCanvas.height = srcImg.naturalHeight;
+            const srcCtx = srcCanvas.getContext('2d');
+            srcCtx.drawImage(srcImg, 0, 0);
+            
+            const srcData = srcCtx.getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+            const outData = outCtx.createImageData(outWidth, outHeight);
+            
+            // Centro e raio do disco na imagem fonte
+            const cx = srcCanvas.width / 2;
+            const cy = srcCanvas.height / 2;
+            const radius = Math.min(cx, cy) * 0.99; // Um pouco menor para evitar bordas
+            
+            // Constantes para GOES (satélite geoestacionário)
+            const EARTH_RADIUS = 6371.0; // km
+            const SAT_HEIGHT = 35786.0; // km acima da superfície
+            const SAT_DIST = EARTH_RADIUS + SAT_HEIGHT; // Distância do centro da Terra
+            
+            // Para cada pixel na imagem de saída (Plate Carrée)
+            for (let y = 0; y < outHeight; y++) {
+                for (let x = 0; x < outWidth; x++) {
+                    // Converter posição para lat/lon
+                    const lon = (x / outWidth) * 2 * Math.PI - Math.PI; // -180 a 180
+                    const lat = (0.5 - y / outHeight) * Math.PI; // 90 a -90
+                    
+                    // Verificar se o ponto é visível do satélite
+                    const lonDiff = lon - satLon;
+                    
+                    // Limite de visibilidade (~81° do ponto sub-satelital)
+                    if (Math.abs(lonDiff) > Math.PI / 2.2 || Math.abs(lat) > Math.PI / 2.2) {
+                        // Fora da visão do satélite - pixel transparente
+                        const idx = (y * outWidth + x) * 4;
+                        outData.data[idx] = 0;
+                        outData.data[idx + 1] = 0;
+                        outData.data[idx + 2] = 0;
+                        outData.data[idx + 3] = 0;
+                        continue;
+                    }
+                    
+                    // Projeção inversa: lat/lon → posição no disco
+                    // Fórmula simplificada para projeção geoestacionária
+                    const cosLat = Math.cos(lat);
+                    const sinLat = Math.sin(lat);
+                    const cosLonDiff = Math.cos(lonDiff);
+                    const sinLonDiff = Math.sin(lonDiff);
+                    
+                    // Verificar se o ponto está no lado visível da Terra
+                    const cosc = sinLat * 0 + cosLat * cosLonDiff;
+                    if (cosc < 0.1) {
+                        const idx = (y * outWidth + x) * 4;
+                        outData.data[idx] = 0;
+                        outData.data[idx + 1] = 0;
+                        outData.data[idx + 2] = 0;
+                        outData.data[idx + 3] = 0;
+                        continue;
+                    }
+                    
+                    // Coordenadas normalizadas no disco (-1 a 1)
+                    const diskX = cosLat * sinLonDiff;
+                    const diskY = -sinLat; // Y invertido
+                    
+                    // Converter para coordenadas de pixel na imagem fonte
+                    const srcX = Math.round(cx + diskX * radius);
+                    const srcY = Math.round(cy + diskY * radius);
+                    
+                    // Verificar limites
+                    if (srcX < 0 || srcX >= srcCanvas.width || srcY < 0 || srcY >= srcCanvas.height) {
+                        const idx = (y * outWidth + x) * 4;
+                        outData.data[idx] = 0;
+                        outData.data[idx + 1] = 0;
+                        outData.data[idx + 2] = 0;
+                        outData.data[idx + 3] = 0;
+                        continue;
+                    }
+                    
+                    // Copiar pixel
+                    const srcIdx = (srcY * srcCanvas.width + srcX) * 4;
+                    const dstIdx = (y * outWidth + x) * 4;
+                    
+                    outData.data[dstIdx] = srcData.data[srcIdx];
+                    outData.data[dstIdx + 1] = srcData.data[srcIdx + 1];
+                    outData.data[dstIdx + 2] = srcData.data[srcIdx + 2];
+                    outData.data[dstIdx + 3] = srcData.data[srcIdx + 3];
+                }
+            }
+            
+            outCtx.putImageData(outData, 0, 0);
+            return outCanvas;
         }
 
         function loadImage(src, name) {
