@@ -708,43 +708,30 @@
             }, 50);
         }
         
-        // Reprojetar de Geoestacionário para Web Mercator (EPSG:3857)
+        // Reprojetar de Geoestacionário para Plate Carrée (EPSG:4326)
+        // Leaflet L.imageOverlay espera imagem em coordenadas geográficas
         function geostatToMercator(srcImg) {
-            const quality = parseInt(document.getElementById('reprojQuality').value) || 600;
+            const quality = parseInt(document.getElementById('reprojQuality').value) || 1500;
             const satLonDeg = parseFloat(document.getElementById('satLongitude').value);
             const satLon = satLonDeg * Math.PI / 180;
+            
+            // Parâmetros do satélite GOES
+            // Altitude: 35,786 km, Raio da Terra: 6,378 km
+            // H = distância do satélite ao centro da Terra em raios terrestres
+            const H = 6.6107; // (35786 + 6378) / 6378
             
             // Área visível do satélite (aproximadamente 81° em cada direção)
             const visibleRange = 81 * Math.PI / 180;
             
-            // Limites em longitude
+            // Limites em longitude e latitude
             const minLon = satLon - visibleRange;
             const maxLon = satLon + visibleRange;
+            const maxLat = visibleRange;
+            const minLat = -visibleRange;
             
-            // Limites em latitude (Mercator não vai além de ~85°)
-            const maxLat = 81 * Math.PI / 180;
-            const minLat = -81 * Math.PI / 180;
-            
-            // Converter lat para Y em Mercator
-            function latToMercatorY(lat) {
-                return Math.log(Math.tan(Math.PI / 4 + lat / 2));
-            }
-            
-            // Converter Y Mercator para lat
-            function mercatorYToLat(y) {
-                return 2 * Math.atan(Math.exp(y)) - Math.PI / 2;
-            }
-            
-            // Limites Y em Mercator
-            const minMercY = latToMercatorY(minLat);
-            const maxMercY = latToMercatorY(maxLat);
-            
-            // Dimensões da imagem de saída
+            // Dimensões da imagem de saída - proporção 1:1 para área igual lat/lon
             const outWidth = quality;
-            // Altura proporcional ao Mercator
-            const mercHeight = maxMercY - minMercY;
-            const mercWidth = maxLon - minLon;
-            const outHeight = Math.round(outWidth * (mercHeight / mercWidth));
+            const outHeight = quality;
             
             // Criar canvas de saída
             const outCanvas = document.createElement('canvas');
@@ -767,29 +754,26 @@
             const cy = srcCanvas.height / 2;
             const radius = Math.min(cx, cy) * 0.98;
             
-            // Para cada pixel na imagem de saída (Web Mercator)
+            // Para cada pixel na imagem de saída (Plate Carrée)
             for (let y = 0; y < outHeight; y++) {
                 for (let x = 0; x < outWidth; x++) {
-                    // Converter posição do pixel para coordenadas Mercator
-                    const mercX = minLon + (x / outWidth) * (maxLon - minLon);
-                    const mercY = maxMercY - (y / outHeight) * (maxMercY - minMercY);
-                    
-                    // Converter Mercator Y para latitude
-                    const lat = mercatorYToLat(mercY);
-                    const lon = mercX;
+                    // Converter posição do pixel para lat/lon
+                    const lon = minLon + (x / outWidth) * (maxLon - minLon);
+                    const lat = maxLat - (y / outHeight) * (maxLat - minLat);
                     
                     // Diferença de longitude em relação ao satélite
                     const lonDiff = lon - satLon;
                     
-                    // Projeção inversa: lat/lon → posição no disco geoestacionário
+                    // Projeção geoestacionária com perspectiva correta
                     const cosLat = Math.cos(lat);
                     const sinLat = Math.sin(lat);
                     const cosLonDiff = Math.cos(lonDiff);
                     const sinLonDiff = Math.sin(lonDiff);
                     
-                    // Verificar se o ponto está no lado visível da Terra
+                    // Verificar se o ponto está visível do satélite
                     const cosc = cosLat * cosLonDiff;
-                    if (cosc < 0.1) {
+                    if (cosc < (1 / H)) {
+                        // Ponto não visível do satélite
                         const idx = (y * outWidth + x) * 4;
                         outData.data[idx] = 0;
                         outData.data[idx + 1] = 0;
@@ -798,9 +782,22 @@
                         continue;
                     }
                     
-                    // Coordenadas normalizadas no disco (-1 a 1)
-                    const diskX = cosLat * sinLonDiff;
-                    const diskY = -sinLat;
+                    // Fator de escala para projeção perspectiva (Near-side Perspective)
+                    const k = (H - 1) / (H - cosc);
+                    
+                    // Coordenadas normalizadas no disco (-1 a 1) com perspectiva
+                    const diskX = k * cosLat * sinLonDiff;
+                    const diskY = -k * sinLat;
+                    
+                    // Verificar se está dentro do disco
+                    if (diskX * diskX + diskY * diskY > 1) {
+                        const idx = (y * outWidth + x) * 4;
+                        outData.data[idx] = 0;
+                        outData.data[idx + 1] = 0;
+                        outData.data[idx + 2] = 0;
+                        outData.data[idx + 3] = 0;
+                        continue;
+                    }
                     
                     // Converter para coordenadas de pixel na imagem fonte
                     const srcX = Math.round(cx + diskX * radius);
