@@ -562,6 +562,13 @@
                    style="width:100%; margin-bottom:8px;" 
                    oninput="updateSatelliteOpacity(this.value)">
             
+            <!-- Toggle Auto-Extração -->
+            <label>🔄 Auto-Extração (5 min):</label>
+            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
+                <button id="btn-autoextract-on" class="toggle-btn active" onclick="toggleAutoExtract(true)">✅ LIGADO</button>
+                <button id="btn-autoextract-off" class="toggle-btn" onclick="toggleAutoExtract(false)">❌ DESLIGADO</button>
+            </div>
+            
             <div style="display:flex; gap:5px; margin-top:5px;">
                 <button onclick="loadSatelliteWithReprojection()" style="flex:1;">🌍 CARREGAR</button>
                 <button class="secondary" onclick="toggleSatelliteLayer()">👁️ On/Off</button>
@@ -607,8 +614,8 @@
     const RAIO_VISUAL_NM = 100;  // Raio do círculo visual no mapa
     const RAIO_VISUAL_GRAUS = RAIO_VISUAL_NM / 60;
     
-    // Raio para busca de dados Open-Meteo (menor para economizar API)
-    const RAIO_NM = 50;  // Raio em milhas náuticas para busca de dados
+    // Raio para busca de dados Open-Meteo (igual ao visual para cobrir todo círculo)
+    const RAIO_NM = 100;  // Raio em milhas náuticas para busca de dados
     const RAIO_GRAUS = RAIO_NM / 60;  // 1 grau = 60 NM
     
     // IMPORTANTE: Idade máxima dos dados em MINUTOS
@@ -701,6 +708,17 @@
             log('info', '⏰ Atualização automática (15 min)...');
             fetchOpenMeteoData();
         }, 15 * 60 * 1000);  // 15 minutos
+        
+        // Verificação automática de nova imagem de satélite a cada 5 minutos
+        setInterval(async () => {
+            if (!isLoadingSatellite && satelliteEnabled && autoExtractEnabled) {
+                const needsUpdate = await shouldLoadSatellite(false);
+                if (needsUpdate) {
+                    log('info', '🛰️ Detectada nova imagem de satélite, atualizando...');
+                    loadSatelliteWithReprojection(true);
+                }
+            }
+        }, 5 * 60 * 1000);  // 5 minutos
     }
     
     // =========================================================================
@@ -711,6 +729,25 @@
     let satelliteRefreshInterval = null;
     let satelliteData = null;
     let currentSatellite = 'goes19';  // Satélite padrão
+    let currentSatelliteTimestamp = null;  // Timestamp da imagem carregada
+    let isLoadingSatellite = false;  // Flag para evitar carregamentos simultâneos
+    let pendingSatelliteLayer = null;  // Camada sendo carregada em background
+    let autoExtractEnabled = true;  // Auto-extração ligada por padrão
+    
+    // Função para ligar/desligar auto-extração
+    function toggleAutoExtract(enabled) {
+        autoExtractEnabled = enabled;
+        
+        // Atualizar botões
+        document.getElementById('btn-autoextract-on').classList.toggle('active', enabled);
+        document.getElementById('btn-autoextract-off').classList.toggle('active', !enabled);
+        
+        if (enabled) {
+            log('success', '✅ Auto-extração de satélite LIGADA (verifica a cada 5 min)');
+        } else {
+            log('warning', '❌ Auto-extração de satélite DESLIGADA');
+        }
+    }
     
     function selectSatellite(satId) {
         currentSatellite = satId;
@@ -853,23 +890,74 @@
         if (container) container.style.display = 'none';
     }
     
+    // Função para verificar timestamp da imagem no servidor
+    async function checkSatelliteTimestamp(satellite, product) {
+        try {
+            const url = getFullDiskUrl(satellite, product);
+            // Fazer HEAD request para pegar Last-Modified
+            const response = await fetch(url, { method: 'HEAD', mode: 'cors' });
+            const lastModified = response.headers.get('Last-Modified');
+            if (lastModified) {
+                return new Date(lastModified);
+            }
+            // Fallback: usar timestamp atual
+            return new Date();
+        } catch (e) {
+            console.warn('Não foi possível verificar timestamp:', e);
+            return null;
+        }
+    }
+    
+    // Função para verificar se precisa atualizar a imagem
+    async function shouldLoadSatellite(forceLoad = false) {
+        if (forceLoad) return true;
+        if (!satelliteLayer) return true;  // Não tem imagem carregada
+        if (!currentSatelliteTimestamp) return true;  // Não sabe o horário
+        
+        const satId = currentSatellite;
+        const product = document.getElementById('satellite-product')?.value || 'GEOCOLOR';
+        
+        try {
+            const serverTimestamp = await checkSatelliteTimestamp(satId, product);
+            if (serverTimestamp && serverTimestamp > currentSatelliteTimestamp) {
+                log('info', `🔄 Nova imagem disponível: ${serverTimestamp.toLocaleTimeString()}`);
+                return true;
+            }
+            return false;
+        } catch (e) {
+            return false;
+        }
+    }
+    
     // FUNÇÃO PRINCIPAL: Carregar satélite com reprojeção real
-    async function loadSatelliteWithReprojection() {
+    async function loadSatelliteWithReprojection(forceLoad = true) {
+        // Verificar se já está carregando
+        if (isLoadingSatellite) {
+            log('warning', '⏳ Já existe um carregamento em andamento...');
+            return;
+        }
+        
+        // Verificar se precisa carregar (a menos que seja forçado)
+        if (!forceLoad) {
+            const needsLoad = await shouldLoadSatellite(false);
+            if (!needsLoad) {
+                log('info', '✓ Imagem de satélite está atualizada');
+                return;
+            }
+        }
+        
         const satId = currentSatellite;
         const product = document.getElementById('satellite-product')?.value || 'GEOCOLOR';
         const quality = document.getElementById('satellite-quality')?.value || 'medium';
         const opacity = (document.getElementById('satellite-opacity')?.value || 75) / 100;
         
+        isLoadingSatellite = true;
         setStatus('satellite-status', 'loading');
         log('info', `🛰️ Iniciando reprojeção REAL: ${satId.toUpperCase()} - ${product}`);
         setReprojectionProgress(5, 'Iniciando...');
         
         try {
-            // Remover camada anterior
-            if (satelliteLayer) {
-                map.removeLayer(satelliteLayer);
-                satelliteLayer = null;
-            }
+            // NÃO remover camada anterior - manter visível enquanto carrega nova
             
             // URL da imagem Full Disk
             const url = getFullDiskUrl(satId, product);
@@ -986,38 +1074,78 @@
             
             ctx.putImageData(outData, 0, 0);
             
-            // Criar overlay
+            // Criar overlay (em memória primeiro)
             const dataUrl = canvas.toDataURL('image/png');
             const leafletBounds = [[bounds.south, bounds.west], [bounds.north, bounds.east]];
             
-            satelliteLayer = L.imageOverlay(dataUrl, leafletBounds, {
+            // Criar nova camada em background
+            const newLayer = L.imageOverlay(dataUrl, leafletBounds, {
                 opacity: opacity,
                 zIndex: 1
-            }).addTo(map);
+            });
+            
+            // Pré-carregar imagem antes de exibir
+            const preloadImg = new Image();
+            preloadImg.src = dataUrl;
+            await new Promise((resolve) => {
+                preloadImg.onload = resolve;
+                preloadImg.onerror = resolve;
+            });
+            
+            // Capturar timestamp da imagem
+            const imageTimestamp = new Date();
+            try {
+                const serverTs = await checkSatelliteTimestamp(satId, product);
+                if (serverTs) currentSatelliteTimestamp = serverTs;
+                else currentSatelliteTimestamp = imageTimestamp;
+            } catch (e) {
+                currentSatelliteTimestamp = imageTimestamp;
+            }
+            
+            // AGORA sim: remover camada antiga e adicionar nova (troca suave)
+            if (satelliteLayer) {
+                map.removeLayer(satelliteLayer);
+            }
+            satelliteLayer = newLayer;
+            satelliteLayer.addTo(map);
             
             setReprojectionProgress(100, 'Concluído!');
             setTimeout(hideReprojectionProgress, 1000);
             
-            // Atualizar info
+            // Atualizar info com timestamp do arquivo
             const infoEl = document.getElementById('satellite-info');
+            const timestampStr = currentSatelliteTimestamp ? 
+                currentSatelliteTimestamp.toLocaleString('pt-BR', { 
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }) : 'N/A';
             if (infoEl) {
-                infoEl.innerHTML = `📡 ${satId.toUpperCase()} ${product}<br>🔄 Reprojeção REAL (${quality})<br>📊 ${pixelsVisible.toLocaleString()} pixels<br>🕐 ${new Date().toLocaleTimeString()}`;
+                infoEl.innerHTML = `📡 ${satId.toUpperCase()} ${product}<br>🔄 Reprojeção REAL (${quality})<br>📊 ${pixelsVisible.toLocaleString()} pixels<br>🕐 Arquivo: ${timestampStr}<br>⏰ Carregado: ${new Date().toLocaleTimeString()}`;
             }
             
             log('success', `✅ Reprojeção concluída: ${satId.toUpperCase()} ${product}`);
+            log('info', `🕐 Horário do arquivo: ${timestampStr}`);
             setStatus('satellite-status', 'active');
+            isLoadingSatellite = false;  // Liberar flag
             
         } catch (error) {
             log('error', `❌ Erro: ${error.message}`);
             console.error('❌ [REPROJECTION] Erro:', error);
             setStatus('satellite-status', 'error');
             hideReprojectionProgress();
+            isLoadingSatellite = false;  // Liberar flag em caso de erro
         }
     }
     
-    // Função legada para compatibilidade
+    // Função legada para compatibilidade - carrega só se necessário ou se não tiver imagem
     async function loadSatelliteLayer() {
-        await loadSatelliteWithReprojection();
+        // Na inicialização, carregar se não tiver imagem
+        if (!satelliteLayer) {
+            await loadSatelliteWithReprojection(true);
+        } else {
+            // Verificar se há imagem mais recente
+            await loadSatelliteWithReprojection(false);
+        }
     }
     
     function updateSatelliteOpacity(value) {
@@ -1465,8 +1593,9 @@
     }
     
     async function fetchGridPoints() {
-        // Grid CIRCULAR usando o mesmo espaçamento do Open-Meteo (0.125°)
-        const step = 0.125;  // Grid nativo do Open-Meteo
+        // Grid CIRCULAR com espaçamento ajustado para o raio de 100NM
+        // Usando 0.25° (~15 NM) para melhor distribuição no círculo maior
+        const step = 0.25;  // Espaçamento maior para cobrir 100 NM sem sobrecarregar
         const raioGraus = RAIO_GRAUS;
         
         let queryLats = [];
