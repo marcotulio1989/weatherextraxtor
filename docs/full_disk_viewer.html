@@ -238,6 +238,7 @@
         </div>
         
         <button id="loadBtn" onclick="loadImage()">🌍 CARREGAR IMAGEM</button>
+        <button id="downloadBtn" onclick="downloadImage()" disabled>💾 BAIXAR IMAGEM</button>
         <button onclick="fitBounds()">📍 Ver Tudo</button>
         <button onclick="zoomShip()">🚢 Ir ao Navio</button>
         <button class="test-btn" onclick="testarReprojecao()">🧪 TESTAR REPROJEÇÃO</button>
@@ -318,6 +319,9 @@
         // =========================================================
         
         const SHIP = { lat: -22.5, lon: -40.5 };
+        
+        // Variável global para armazenar o canvas da imagem reprojetada
+        let currentCanvas = null;
         
         // DEBUG LOG FUNCTIONS
         function debugLog(msg) {
@@ -549,6 +553,9 @@
                 document.getElementById('statusText').textContent = 'Imagem carregada com sucesso';
                 document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
                 
+                // Habilitar botão de download
+                document.getElementById('downloadBtn').disabled = false;
+                
                 setProgress(100);
                 setTimeout(hideLoading, 300);
                 
@@ -571,6 +578,9 @@
                 opacity: document.getElementById('opacity').value / 100,
                 crossOrigin: 'anonymous'
             }).addTo(map);
+            
+            // No modo direto, não temos canvas reprojetado
+            currentCanvas = null;
             
             setProgress(90);
         }
@@ -701,6 +711,9 @@
             
             ctx.putImageData(outData, 0, 0);
             
+            // Armazenar canvas para download
+            currentCanvas = canvas;
+            
             // Criar overlay
             const dataUrl = canvas.toDataURL('image/png');
             console.log('✅ Imagem reprojetada, tamanho:', dataUrl.length);
@@ -821,6 +834,46 @@
                 g: Math.round(srcData.data[i00+1] * w00 + srcData.data[i10+1] * w10 + srcData.data[i01+1] * w01 + srcData.data[i11+1] * w11),
                 b: Math.round(srcData.data[i00+2] * w00 + srcData.data[i10+2] * w10 + srcData.data[i01+2] * w01 + srcData.data[i11+2] * w11)
             };
+        }
+        
+        // =========================================================
+        // DOWNLOAD DA IMAGEM
+        // =========================================================
+        
+        function downloadImage() {
+            if (!currentCanvas) {
+                alert('Nenhuma imagem reprojetada disponível. Use o método de REPROJEÇÃO REAL primeiro.');
+                return;
+            }
+            
+            try {
+                // Gerar nome do arquivo com data/hora e configurações
+                const sat = document.getElementById('satellite').value.toUpperCase();
+                const product = document.getElementById('product').value;
+                const quality = document.getElementById('quality').value;
+                const now = new Date();
+                const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                const filename = `${sat}_${product}_${quality}_${timestamp}.png`;
+                
+                // Converter canvas para blob e fazer download
+                currentCanvas.toBlob((blob) => {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    
+                    console.log('✅ Download iniciado:', filename);
+                    document.getElementById('statusText').textContent = 'Download da imagem: ' + filename;
+                }, 'image/png');
+                
+            } catch (err) {
+                console.error('❌ Erro ao fazer download:', err);
+                alert('Erro ao fazer download: ' + err.message);
+            }
         }
         
         // =========================================================
