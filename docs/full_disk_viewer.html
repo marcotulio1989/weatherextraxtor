@@ -194,9 +194,20 @@
         </div>
         
         <div class="control-group">
-            <label>📷 Tipo de Imagem</label>
-            <select id="imageType">
-                <option value="fd" selected>Full Disk (Disco Completo)</option>
+            <label>📷 Produto</label>
+            <select id="product">
+                <option value="GEOCOLOR" selected>🌍 GeoColor (Visível/IR)</option>
+                <option value="13">🌡️ IR Limpo (Band 13 - 10.3µm)</option>
+                <option value="14">🌡️ IR (Band 14 - 11.2µm)</option>
+                <option value="08">💧 Vapor d'Água Alto (Band 8)</option>
+                <option value="09">💧 Vapor d'Água Médio (Band 9)</option>
+                <option value="10">💧 Vapor d'Água Baixo (Band 10)</option>
+                <option value="02">☀️ Visível (Band 2 - 0.64µm)</option>
+                <option value="AirMass">🌀 Air Mass (RGB)</option>
+                <option value="Sandwich">🥪 Sandwich (IR + Visível)</option>
+                <option value="Dust">🏜️ Dust (Poeira)</option>
+                <option value="DayConvection">⛈️ Convecção Diurna</option>
+                <option value="FireTemperature">🔥 Temperatura de Fogo</option>
             </select>
         </div>
         
@@ -382,7 +393,6 @@
                 
                 // Usar a função loadImage diretamente
                 document.getElementById('satellite').value = 'goes19';
-                document.getElementById('imageType').value = 'fd';
                 document.getElementById('method').value = 'reproject';
                 await loadImage();
                 
@@ -394,15 +404,12 @@
             }
         }
         
-        // URLs das imagens - Apenas Full Disk
-        const IMAGES = {
-            goes19: {
-                fd: 'https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/latest.jpg'
-            },
-            goes16: {
-                fd: 'https://cdn.star.nesdis.noaa.gov/GOES16/ABI/FD/GEOCOLOR/latest.jpg'
-            }
-        };
+        // Função para gerar URL da imagem baseado no satélite e produto
+        function getImageUrl(satellite, product) {
+            const sat = satellite.toUpperCase();
+            // Usar 5424x5424.jpg que é a resolução máxima disponível
+            return `https://cdn.star.nesdis.noaa.gov/${sat}/ABI/FD/${product}/5424x5424.jpg`;
+        }
         
         // Bounds de saída para reprojeção
         // GOES-East está em -75.2° de longitude
@@ -496,7 +503,7 @@
         
         async function loadImage() {
             const sat = document.getElementById('satellite').value;
-            const type = document.getElementById('imageType').value;
+            const product = document.getElementById('product').value;
             const method = document.getElementById('method').value;
             
             const btn = document.getElementById('loadBtn');
@@ -506,14 +513,14 @@
             setProgress(10);
             
             try {
-                let url = IMAGES[sat][type];
-                let bounds = BOUNDS[type];
+                let url = getImageUrl(sat, product);
+                let bounds = BOUNDS.fd;
                 
-                console.log('🛰️ Carregando:', {sat, type, method, url, bounds});
+                console.log('🛰️ Carregando:', {sat, product, method, url, bounds});
                 
                 // Atualizar info
                 document.getElementById('infoSat').textContent = sat.toUpperCase();
-                document.getElementById('infoType').textContent = type.toUpperCase();
+                document.getElementById('infoType').textContent = product;
                 document.getElementById('infoMethod').textContent = method;
                 
                 // Remover overlay anterior
@@ -528,7 +535,7 @@
                 } else {
                     showLoading('Iniciando REPROJEÇÃO...');
                     console.log('🔄 Método REPROJEÇÃO REAL');
-                    await loadWithReprojection(url, bounds, type, sat);
+                    await loadWithReprojection(url, bounds, product, sat);
                 }
                 
                 // Atualizar bounds no painel
@@ -839,8 +846,7 @@
         }
         
         function fitBounds() {
-            const type = document.getElementById('imageType').value;
-            const b = BOUNDS[type];
+            const b = BOUNDS.fd;
             map.fitBounds([[b.south, b.west], [b.north, b.east]]);
         }
         
