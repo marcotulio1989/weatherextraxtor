@@ -617,6 +617,11 @@
                 📅 Aguardando...
             </div>
             
+            <!-- Info de próxima atualização -->
+            <div id="dmw-next-update" style="font-size:10px; color:#ff9900; margin-bottom:8px; display:none;">
+                ⏰ Próxima atualização: --:05
+            </div>
+            
             <!-- Legenda de Intensidade -->
             <div style="background:#111; padding:8px; border-radius:4px; font-size:10px;">
                 <div style="color:#00ffcc; margin-bottom:5px; font-weight:bold;">📊 Intensidade do Vento:</div>
@@ -799,6 +804,8 @@
     let dmwLayer = null;
     let dmwData = null;
     let dmwMarkers = [];
+    let dmwAutoRefreshInterval = null;
+    let lastDMWHour = -1;  // Para controlar atualização por hora
     
     function toggleDMW(enabled) {
         dmwEnabled = enabled;
@@ -814,11 +821,73 @@
             log('success', '✅ DMW LIGADO - Carregando ventos...');
             statusEl.className = 'status-indicator loading';
             loadDMWWinds();
+            
+            // Iniciar verificação automática a cada minuto
+            startDMWAutoRefresh();
         } else {
             log('info', '❌ DMW DESLIGADO');
             statusEl.className = 'status-indicator';
             clearDMWLayer();
+            
+            // Parar verificação automática
+            stopDMWAutoRefresh();
         }
+    }
+    
+    function startDMWAutoRefresh() {
+        // Verificar a cada minuto se está no minuto 5
+        if (dmwAutoRefreshInterval) {
+            clearInterval(dmwAutoRefreshInterval);
+        }
+        
+        // Mostrar próxima atualização
+        updateNextDMWTime();
+        document.getElementById('dmw-next-update').style.display = 'block';
+        
+        dmwAutoRefreshInterval = setInterval(() => {
+            if (!dmwEnabled) return;
+            
+            const now = new Date();
+            const minute = now.getMinutes();
+            const hour = now.getHours();
+            
+            // Atualizar info de próxima atualização
+            updateNextDMWTime();
+            
+            // Atualizar no minuto 5 de cada hora (12:05, 13:05, etc)
+            // E apenas se ainda não atualizou nessa hora
+            if (minute === 5 && hour !== lastDMWHour) {
+                lastDMWHour = hour;
+                log('info', `🔄 DMW: Atualização automática (${hour}:05)`);
+                loadDMWWinds();
+            }
+        }, 60 * 1000);  // Verificar a cada 1 minuto
+        
+        log('info', '⏰ DMW: Auto-refresh ativado (atualiza em XX:05)');
+    }
+    
+    function updateNextDMWTime() {
+        const now = new Date();
+        let nextHour = now.getHours();
+        
+        // Se já passou do minuto 5, próxima é na próxima hora
+        if (now.getMinutes() >= 5) {
+            nextHour = (nextHour + 1) % 24;
+        }
+        
+        const nextUpdateEl = document.getElementById('dmw-next-update');
+        if (nextUpdateEl) {
+            nextUpdateEl.textContent = `⏰ Próxima atualização: ${String(nextHour).padStart(2, '0')}:05`;
+        }
+    }
+    
+    function stopDMWAutoRefresh() {
+        if (dmwAutoRefreshInterval) {
+            clearInterval(dmwAutoRefreshInterval);
+            dmwAutoRefreshInterval = null;
+        }
+        lastDMWHour = -1;
+        document.getElementById('dmw-next-update').style.display = 'none';
     }
     
     function clearDMWLayer() {
