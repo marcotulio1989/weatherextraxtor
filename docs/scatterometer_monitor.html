@@ -472,14 +472,15 @@
         }
         
         /* Células de Vento com cores por intensidade */
-        .forecast-cell.wind-calm { background: #228b22; color: #fff; }
-        .forecast-cell.wind-light { background: #90ee90; color: #000; }
-        .forecast-cell.wind-moderate { background: #ffff00; color: #000; }
-        .forecast-cell.wind-fresh { background: #ffa500; color: #000; }
-        .forecast-cell.wind-strong { background: #ff6600; color: #fff; }
-        .forecast-cell.wind-gale { background: #ff3300; color: #fff; }
-        .forecast-cell.wind-storm { background: #cc0000; color: #fff; }
-        .forecast-cell.wind-violent { background: #800080; color: #fff; }
+        /* Escala: Verde < 20kn, Amarelo 25-35kn, Vermelho > 35kn */
+        .forecast-cell.wind-calm { background: #006600; color: #fff; }     /* 0-10 kn: Verde escuro */
+        .forecast-cell.wind-light { background: #00aa00; color: #fff; }    /* 10-15 kn: Verde médio */
+        .forecast-cell.wind-moderate { background: #00dd00; color: #000; } /* 15-20 kn: Verde claro */
+        .forecast-cell.wind-fresh { background: #aadd00; color: #000; }    /* 20-25 kn: Verde-amarelo */
+        .forecast-cell.wind-strong { background: #ffdd00; color: #000; }   /* 25-30 kn: Amarelo */
+        .forecast-cell.wind-gale { background: #ff9900; color: #000; }     /* 30-35 kn: Laranja */
+        .forecast-cell.wind-storm { background: #ff3300; color: #fff; }    /* 35-45 kn: Vermelho */
+        .forecast-cell.wind-violent { background: #cc00cc; color: #fff; }  /* > 45 kn: Roxo */
         
         /* Células de Direção */
         .forecast-cell.direction {
@@ -555,6 +556,13 @@
         #map {
             margin-top: 210px;
             height: calc(100vh - 210px) !important;
+        }
+        
+        /* Canvas Layer para gradiente L2 */
+        .leaflet-canvas-layer {
+            position: absolute;
+            pointer-events: none;
+            z-index: 250;
         }
         
         /* Info Icon com Tooltip */
@@ -864,13 +872,28 @@
                     <button id="btn-l2-off" class="toggle-btn active" onclick="toggleL2(false)" style="flex:1;">❌ OFF</button>
                 </div>
                 
-                <select id="l2-variable" style="width:100%; margin-bottom:6px; padding:5px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; font-size:11px;" onchange="updateL2Display()">
+                <!-- Modo de visualização: Área ou Marcadores -->
+                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                    <button id="btn-l2-area" class="toggle-btn active" onclick="toggleL2DisplayMode('area')" style="flex:1; font-size:10px;">🎨 Área</button>
+                    <button id="btn-l2-markers" class="toggle-btn" onclick="toggleL2DisplayMode('markers')" style="flex:1; font-size:10px;">⭕ Pontos</button>
+                </div>
+                
+                <select id="l2-variable" style="width:100%; margin-bottom:6px; padding:5px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; font-size:11px;" onchange="updateL2Display(); createL2Legend(this.value);">
                     <option value="CAPE" selected>⚡ CAPE</option>
                     <option value="LI">🌡️ LI</option>
                     <option value="TPW">💧 TPW</option>
                     <option value="HT">☁️ Altura</option>
                     <option value="Phase">🧊 Fase</option>
                 </select>
+                
+                <!-- Controle de Opacidade -->
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <label style="font-size:10px; color:#888; width:60px;">Opacidade:</label>
+                    <input type="range" id="l2-opacity" min="10" max="100" value="70" 
+                           style="flex:1; height:4px; cursor:pointer;"
+                           oninput="updateL2Opacity(this.value)">
+                    <span id="l2-opacity-value" style="font-size:10px; color:#00d4ff; width:35px;">70%</span>
+                </div>
                 
                 <button onclick="loadL2Data()" style="width:100%; margin-bottom:6px;">🔄 CARREGAR</button>
                 
@@ -1209,13 +1232,26 @@
             const lonMax = REPROJECTION_BOUNDS.east;   // -30
             
             try {
-                // Tentar API do servidor
-                const apiUrl = `/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`;
-                const response = await fetch(apiUrl);
-                if (response.ok) {
-                    dmwData = await response.json();
-                    usingApi = true;
-                    log('info', '📡 Usando API do servidor para DMW');
+                // Tentar múltiplas URLs da API
+                const apiUrls = [
+                    `/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`,
+                    `http://localhost:8080/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`,
+                    `${window.location.protocol}//${window.location.hostname}:8080/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`
+                ];
+                
+                for (const apiUrl of apiUrls) {
+                    try {
+                        log('info', `🌬️ DMW: Tentando API...`);
+                        const response = await fetch(apiUrl, { timeout: 30000 });
+                        if (response.ok) {
+                            dmwData = await response.json();
+                            usingApi = true;
+                            log('success', '✅ DMW: Conectado à API');
+                            break;
+                        }
+                    } catch (apiErr) {
+                        // Continuar para próxima URL
+                    }
                 }
             } catch (apiErr) {
                 console.log('API não disponível, tentando arquivo JSON...');
@@ -1350,6 +1386,20 @@
     let l2Layer = null;
     let l2Data = null;
     let l2Markers = [];
+    let l2CanvasLayer = null;
+    let l2DisplayMode = 'area'; // 'area' ou 'markers'
+    let l2Opacity = 70; // Opacidade do canvas L2 (0-100)
+    
+    // Função para atualizar opacidade do canvas L2
+    function updateL2Opacity(value) {
+        l2Opacity = parseInt(value);
+        document.getElementById('l2-opacity-value').textContent = l2Opacity + '%';
+        
+        // Redesenhar o canvas com a nova opacidade
+        if (l2CanvasLayer && l2DisplayMode === 'area') {
+            l2CanvasLayer.draw();
+        }
+    }
     
     function toggleL2(enabled) {
         l2Enabled = enabled;
@@ -1379,6 +1429,10 @@
             map.removeLayer(l2Layer);
             l2Layer = null;
         }
+        if (l2CanvasLayer) {
+            map.removeLayer(l2CanvasLayer);
+            l2CanvasLayer = null;
+        }
         l2Markers = [];
     }
     
@@ -1396,18 +1450,30 @@
             let response;
             let usedApi = false;
             
-            try {
-                response = await fetch(`/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`);
-                if (response.ok) {
-                    usedApi = true;
-                    log('info', '📡 L2: Usando API (extração em tempo real)');
+            // Tentar múltiplas URLs da API
+            const apiUrls = [
+                `/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`,
+                `http://localhost:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`,
+                `${window.location.protocol}//${window.location.hostname}:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`
+            ];
+            
+            for (const apiUrl of apiUrls) {
+                try {
+                    log('info', `📡 L2: Tentando ${apiUrl.split('?')[0]}...`);
+                    response = await fetch(apiUrl, { timeout: 30000 });
+                    if (response.ok) {
+                        usedApi = true;
+                        log('success', '✅ L2: Conectado à API');
+                        break;
+                    }
+                } catch (apiErr) {
+                    log('warning', `⚠️ L2: Falha ao conectar API: ${apiErr.message}`);
                 }
-            } catch (apiErr) {
-                log('warning', '⚠️ L2: API não disponível, usando cache JSON');
             }
             
             // Fallback para arquivo JSON estático
             if (!usedApi) {
+                log('warning', '⚠️ L2: API não disponível, usando cache JSON');
                 response = await fetch('goes_l2_latest.json?' + Date.now());
             }
             
@@ -1441,12 +1507,29 @@
     }
     
     function updateL2Display() {
-        if (!l2Data || !l2Layer) return;
+        if (!l2Data) return;
+        
+        // Criar legenda
+        const selectedVar = document.getElementById('l2-variable').value;
+        createL2Legend(selectedVar);
+        
+        // Se modo área, usar canvas layer
+        if (l2DisplayMode === 'area') {
+            if (l2Layer) {
+                l2Layer.clearLayers();
+            }
+            l2Markers = [];
+            updateL2CanvasLayer();
+            updateL2ShipData();
+            return;
+        }
+        
+        // Modo marcadores
+        if (!l2Layer) return;
         
         l2Layer.clearLayers();
         l2Markers = [];
         
-        const selectedVar = document.getElementById('l2-variable').value;
         const shipData = document.getElementById('l2-ship-data');
         
         // Encontrar qual produto tem a variável
@@ -1538,32 +1621,208 @@
         log('info', `📊 L2: ${l2Markers.length} pontos de ${selectedVar}`);
     }
     
+    // Atualizar dados do navio (usado por ambos os modos)
+    function updateL2ShipData() {
+        if (!l2Data) return;
+        
+        const shipData = document.getElementById('l2-ship-data');
+        const selectedVar = document.getElementById('l2-variable').value;
+        
+        // Encontrar qual produto tem a variável
+        let productKey = null;
+        if (selectedVar === 'CAPE' || selectedVar === 'LI' || selectedVar === 'KI' || selectedVar === 'TT' || selectedVar === 'SI') {
+            productKey = 'DSIF';
+        } else if (selectedVar === 'TPW') {
+            productKey = 'TPWF';
+        } else if (selectedVar === 'HT') {
+            productKey = 'ACHAF';
+        } else if (selectedVar === 'Phase') {
+            productKey = 'ACTPF';
+        }
+        
+        if (!productKey || !l2Data.products[productKey] || !l2Data.products[productKey].data) {
+            return;
+        }
+        
+        const productData = l2Data.products[productKey].data;
+        
+        // Encontrar dados no ponto do navio (mais próximo)
+        let closestToShip = null;
+        let minDist = Infinity;
+        
+        for (const point of productData) {
+            const dist = Math.sqrt(Math.pow(point.lat - CONFIG.shipLat, 2) + Math.pow(point.lon - CONFIG.shipLon, 2));
+            if (dist < minDist) {
+                minDist = dist;
+                closestToShip = point;
+            }
+        }
+        
+        if (closestToShip && minDist < 0.5) {
+            shipData.style.display = 'block';
+            
+            // DSIF
+            if (l2Data.products.DSIF && l2Data.products.DSIF.data) {
+                const dsif = l2Data.products.DSIF.data.find(p => 
+                    Math.abs(p.lat - closestToShip.lat) < 0.1 && Math.abs(p.lon - closestToShip.lon) < 0.1
+                );
+                if (dsif) {
+                    document.getElementById('l2-ship-cape').textContent = dsif.CAPE ? dsif.CAPE.toFixed(0) + ' J/kg' : '--';
+                    document.getElementById('l2-ship-li').textContent = dsif.LI ? dsif.LI.toFixed(1) + ' K' : '--';
+                }
+            }
+            
+            // TPW
+            if (l2Data.products.TPWF && l2Data.products.TPWF.data) {
+                const tpw = l2Data.products.TPWF.data.find(p => 
+                    Math.abs(p.lat - closestToShip.lat) < 0.1 && Math.abs(p.lon - closestToShip.lon) < 0.1
+                );
+                if (tpw) {
+                    document.getElementById('l2-ship-tpw').textContent = tpw.TPW ? tpw.TPW.toFixed(1) + ' mm' : '--';
+                }
+            }
+            
+            // Cloud Height
+            if (l2Data.products.ACHAF && l2Data.products.ACHAF.data) {
+                const ht = l2Data.products.ACHAF.data.find(p => 
+                    Math.abs(p.lat - closestToShip.lat) < 0.1 && Math.abs(p.lon - closestToShip.lon) < 0.1
+                );
+                if (ht && ht.HT) {
+                    document.getElementById('l2-ship-ht').textContent = (ht.HT / 1000).toFixed(1) + ' km';
+                } else {
+                    document.getElementById('l2-ship-ht').textContent = '☀️ Céu limpo';
+                }
+            }
+        }
+    }
+    
+    // =========================================================================
+    // SISTEMA DE CORES COM GRADIENTE GRANULAR
+    // =========================================================================
+    
+    // Interpola entre duas cores hex
+    function interpolateColor(color1, color2, factor) {
+        const hex = (c) => parseInt(c, 16);
+        const r1 = hex(color1.slice(1, 3)), g1 = hex(color1.slice(3, 5)), b1 = hex(color1.slice(5, 7));
+        const r2 = hex(color2.slice(1, 3)), g2 = hex(color2.slice(3, 5)), b2 = hex(color2.slice(5, 7));
+        const r = Math.round(r1 + (r2 - r1) * factor);
+        const g = Math.round(g1 + (g2 - g1) * factor);
+        const b = Math.round(b1 + (b2 - b1) * factor);
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+    
+    // Paleta de cores expandida para CAPE
+    const CAPE_COLORS = [
+        { value: 0, color: '#004400' },      // Verde muito escuro
+        { value: 50, color: '#006600' },     // Verde escuro
+        { value: 100, color: '#008800' },    // Verde médio-escuro
+        { value: 150, color: '#00aa00' },    // Verde médio
+        { value: 200, color: '#00cc00' },    // Verde
+        { value: 300, color: '#00ff00' },    // Verde claro
+        { value: 400, color: '#66ff00' },    // Verde-amarelo claro
+        { value: 500, color: '#99ff00' },    // Amarelo-verde
+        { value: 600, color: '#ccff00' },    // Amarelo esverdeado
+        { value: 700, color: '#e6e600' },    // Amarelo escuro
+        { value: 800, color: '#ffff00' },    // Amarelo
+        { value: 900, color: '#ffdd00' },    // Amarelo-laranja claro
+        { value: 1000, color: '#ffcc00' },   // Laranja claro
+        { value: 1200, color: '#ffaa00' },   // Laranja médio-claro
+        { value: 1400, color: '#ff9900' },   // Laranja
+        { value: 1600, color: '#ff7700' },   // Laranja escuro
+        { value: 1800, color: '#ff5500' },   // Laranja-vermelho
+        { value: 2000, color: '#ff3300' },   // Vermelho-laranja
+        { value: 2500, color: '#ff0000' },   // Vermelho
+        { value: 3000, color: '#cc0000' },   // Vermelho escuro
+        { value: 4000, color: '#990000' },   // Vermelho muito escuro
+        { value: 5000, color: '#660033' }    // Roxo escuro
+    ];
+    
+    // Paleta de cores para LI (Lifted Index) - valores negativos = instável
+    const LI_COLORS = [
+        { value: 6, color: '#004400' },      // Muito estável - verde muito escuro
+        { value: 4, color: '#006600' },      // Muito estável - verde escuro
+        { value: 2, color: '#00aa00' },      // Estável - verde médio
+        { value: 1, color: '#00ff00' },      // Estável - verde claro
+        { value: 0, color: '#88ff00' },      // Marginalmente estável - verde-amarelo
+        { value: -1, color: '#ccff00' },     // Marginalmente instável - amarelo-verde
+        { value: -2, color: '#ffff00' },     // Levemente instável - amarelo
+        { value: -3, color: '#ffcc00' },     // Instável - laranja claro
+        { value: -4, color: '#ff9900' },     // Moderadamente instável - laranja
+        { value: -5, color: '#ff6600' },     // Muito instável - laranja escuro
+        { value: -6, color: '#ff3300' },     // Muito instável - vermelho-laranja
+        { value: -8, color: '#ff0000' },     // Extremamente instável - vermelho
+        { value: -10, color: '#cc0000' }     // Extremamente instável - vermelho escuro
+    ];
+    
+    // Paleta de cores para TPW (água precipitável)
+    const TPW_COLORS = [
+        { value: 0, color: '#001144' },      // Muito seco - azul muito escuro
+        { value: 10, color: '#002288' },     // Seco - azul escuro
+        { value: 20, color: '#0044cc' },     // Seco - azul médio
+        { value: 30, color: '#0088ff' },     // Normal - azul claro
+        { value: 40, color: '#00ccff' },     // Normal - ciano
+        { value: 50, color: '#00ffaa' },     // Úmido - verde-ciano
+        { value: 60, color: '#88ff00' },     // Úmido - verde-amarelo
+        { value: 70, color: '#ffff00' },     // Muito úmido - amarelo
+        { value: 80, color: '#ff9900' },     // Muito úmido - laranja
+        { value: 90, color: '#ff0000' },     // Extremamente úmido - vermelho
+        { value: 100, color: '#990066' }     // Saturado - roxo
+    ];
+    
+    // Paleta de cores para altura de nuvem
+    const HT_COLORS = [
+        { value: 0, color: '#004400' },      // Sem nuvem - verde muito escuro
+        { value: 1000, color: '#00aa00' },   // Baixa - verde médio
+        { value: 2000, color: '#00ff00' },   // Baixa - verde claro
+        { value: 3000, color: '#88ff00' },   // Média-baixa - verde-amarelo
+        { value: 4000, color: '#ccff00' },   // Média - amarelo-verde
+        { value: 5000, color: '#ffff00' },   // Média - amarelo
+        { value: 6000, color: '#ffcc00' },   // Média-alta - laranja claro
+        { value: 8000, color: '#ff9900' },   // Alta - laranja
+        { value: 10000, color: '#ff5500' },  // Alta - laranja escuro
+        { value: 12000, color: '#ff0000' },  // Muito alta - vermelho
+        { value: 14000, color: '#cc0066' },  // Muito alta - magenta escuro
+        { value: 16000, color: '#9900cc' }   // Extrema - roxo
+    ];
+    
+    // Função para obter cor do gradiente
+    function getColorFromGradient(value, colorStops) {
+        // Encontrar os dois pontos entre os quais o valor está
+        let lower = colorStops[0];
+        let upper = colorStops[colorStops.length - 1];
+        
+        for (let i = 0; i < colorStops.length - 1; i++) {
+            if (value >= colorStops[i].value && value <= colorStops[i + 1].value) {
+                lower = colorStops[i];
+                upper = colorStops[i + 1];
+                break;
+            } else if (value < colorStops[i].value) {
+                return colorStops[i].color;
+            }
+        }
+        
+        if (value >= upper.value) return upper.color;
+        if (value <= lower.value) return lower.color;
+        
+        // Interpolar
+        const factor = (value - lower.value) / (upper.value - lower.value);
+        return interpolateColor(lower.color, upper.color, factor);
+    }
+    
     function getL2Color(variable, value) {
         switch(variable) {
             case 'CAPE':
-                if (value < 500) return '#00ff00';
-                if (value < 1000) return '#ffff00';
-                if (value < 2000) return '#ff9900';
-                return '#ff0000';
+                return getColorFromGradient(value, CAPE_COLORS);
             
             case 'LI':
-                // LI negativo = instável
-                if (value > 0) return '#00ff00';     // Estável
-                if (value > -2) return '#ffff00';   // Marginalmente instável
-                if (value > -4) return '#ff9900';   // Moderadamente instável
-                return '#ff0000';                    // Muito instável
+                // LI usa escala invertida (valores altos primeiro)
+                return getColorFromGradient(value, LI_COLORS.slice().sort((a, b) => b.value - a.value));
             
             case 'TPW':
-                if (value < 30) return '#00ccff';
-                if (value < 50) return '#00ff88';
-                if (value < 70) return '#ffff00';
-                return '#ff0000';
+                return getColorFromGradient(value, TPW_COLORS);
             
             case 'HT':
-                if (value < 3000) return '#00ff00';   // Baixas
-                if (value < 6000) return '#ffff00';   // Médias
-                if (value < 10000) return '#ff9900';  // Altas
-                return '#ff0000';                      // Muito altas
+                return getColorFromGradient(value, HT_COLORS);
             
             case 'Phase':
                 const phases = ['#00aaff', '#00ff00', '#00ffcc', '#ffff00', '#ff00ff', '#888888'];
@@ -1644,6 +1903,327 @@
 
         return L.marker([lat, lon], { icon: icon })
             .bindPopup(popupContent);
+    }
+
+    // =========================================================================
+    // RENDERIZAÇÃO DE ÁREA UNIFICADA COM GRADIENTE (Canvas Overlay)
+    // =========================================================================
+    
+    // Extensão do Leaflet para Canvas Layer
+    L.CanvasLayer = L.Layer.extend({
+        initialize: function(options) {
+            L.setOptions(this, options);
+            this._canvas = null;
+            this._ctx = null;
+        },
+        
+        onAdd: function(map) {
+            this._map = map;
+            
+            // Criar canvas
+            this._canvas = L.DomUtil.create('canvas', 'leaflet-canvas-layer');
+            const size = map.getSize();
+            this._canvas.width = size.x;
+            this._canvas.height = size.y;
+            this._canvas.style.position = 'absolute';
+            this._canvas.style.top = '0';
+            this._canvas.style.left = '0';
+            this._canvas.style.pointerEvents = 'none';
+            this._canvas.style.zIndex = '250';
+            
+            this._ctx = this._canvas.getContext('2d');
+            
+            map.getPanes().overlayPane.appendChild(this._canvas);
+            
+            map.on('moveend', this._reset, this);
+            map.on('zoomend', this._reset, this);
+            map.on('resize', this._resize, this);
+            
+            this._reset();
+        },
+        
+        onRemove: function(map) {
+            L.DomUtil.remove(this._canvas);
+            map.off('moveend', this._reset, this);
+            map.off('zoomend', this._reset, this);
+            map.off('resize', this._resize, this);
+        },
+        
+        _resize: function() {
+            const size = this._map.getSize();
+            this._canvas.width = size.x;
+            this._canvas.height = size.y;
+            this._reset();
+        },
+        
+        _reset: function() {
+            const topLeft = this._map.containerPointToLayerPoint([0, 0]);
+            L.DomUtil.setPosition(this._canvas, topLeft);
+            this.draw();
+        },
+        
+        draw: function() {
+            if (this.options.drawCallback) {
+                this.options.drawCallback(this._canvas, this._ctx, this._map);
+            }
+        },
+        
+        getCanvas: function() {
+            return this._canvas;
+        },
+        
+        getContext: function() {
+            return this._ctx;
+        }
+    });
+    
+    // Interpolação IDW (Inverse Distance Weighting)
+    function idwInterpolation(x, y, points, variable, power = 2) {
+        let numerator = 0;
+        let denominator = 0;
+        
+        for (const point of points) {
+            const value = point[variable];
+            if (value === undefined || value === null) continue;
+            
+            const dx = x - point.lon;
+            const dy = y - point.lat;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist < 0.0001) {
+                return value; // Ponto exato
+            }
+            
+            const weight = 1 / Math.pow(dist, power);
+            numerator += weight * value;
+            denominator += weight;
+        }
+        
+        return denominator > 0 ? numerator / denominator : null;
+    }
+    
+    // Desenhar área com gradiente usando IDW
+    function drawL2GradientArea(canvas, ctx, map) {
+        if (!l2Data || !l2Enabled) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        
+        const selectedVar = document.getElementById('l2-variable').value;
+        
+        // Encontrar produto correto
+        let productKey = null;
+        if (selectedVar === 'CAPE' || selectedVar === 'LI' || selectedVar === 'KI' || selectedVar === 'TT' || selectedVar === 'SI') {
+            productKey = 'DSIF';
+        } else if (selectedVar === 'TPW') {
+            productKey = 'TPWF';
+        } else if (selectedVar === 'HT') {
+            productKey = 'ACHAF';
+        } else if (selectedVar === 'Phase') {
+            productKey = 'ACTPF';
+        }
+        
+        if (!productKey || !l2Data.products[productKey] || !l2Data.products[productKey].data) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        
+        const points = l2Data.products[productKey].data;
+        if (points.length === 0) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        
+        // Limpar canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Definir bounds baseado no círculo de interesse
+        const centerLat = CONFIG.shipLat;
+        const centerLon = CONFIG.shipLon;
+        const radiusDeg = RAIO_VISUAL_GRAUS;
+        
+        // Resolução do grid para interpolação (quanto menor, mais suave)
+        const resolution = 4; // pixels por célula
+        
+        // Criar imagem de dados
+        const imageData = ctx.createImageData(canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // Para cada pixel do canvas
+        for (let py = 0; py < canvas.height; py += resolution) {
+            for (let px = 0; px < canvas.width; px += resolution) {
+                // Converter pixel para lat/lon
+                const point = map.containerPointToLatLng([px, py]);
+                const lat = point.lat;
+                const lon = point.lng;
+                
+                // Verificar se está dentro do círculo de interesse
+                const distFromCenter = Math.sqrt(
+                    Math.pow(lat - centerLat, 2) + 
+                    Math.pow(lon - centerLon, 2)
+                );
+                
+                if (distFromCenter > radiusDeg * 1.1) continue; // Fora do círculo
+                
+                // Interpolar valor neste ponto
+                const value = idwInterpolation(lon, lat, points, selectedVar, 2);
+                
+                if (value === null) continue;
+                
+                // Obter cor do gradiente
+                const color = getL2Color(selectedVar, value);
+                
+                // Extrair RGB da cor
+                let r, g, b;
+                if (color.startsWith('rgb')) {
+                    const match = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+                    if (match) {
+                        r = parseInt(match[1]);
+                        g = parseInt(match[2]);
+                        b = parseInt(match[3]);
+                    }
+                } else if (color.startsWith('#')) {
+                    r = parseInt(color.slice(1, 3), 16);
+                    g = parseInt(color.slice(3, 5), 16);
+                    b = parseInt(color.slice(5, 7), 16);
+                }
+                
+                if (r === undefined) continue;
+                
+                // Calcular opacidade baseada no slider e distância do centro (fade nas bordas)
+                const baseAlpha = Math.round(l2Opacity * 2.55); // Converter 0-100 para 0-255
+                let alpha = baseAlpha;
+                if (distFromCenter > radiusDeg * 0.8) {
+                    const fadeFactor = (radiusDeg * 1.1 - distFromCenter) / (radiusDeg * 0.3);
+                    alpha = Math.max(0, Math.min(baseAlpha, baseAlpha * fadeFactor));
+                }
+                
+                // Preencher bloco de pixels
+                for (let dy = 0; dy < resolution && py + dy < canvas.height; dy++) {
+                    for (let dx = 0; dx < resolution && px + dx < canvas.width; dx++) {
+                        const idx = ((py + dy) * canvas.width + (px + dx)) * 4;
+                        data[idx] = r;
+                        data[idx + 1] = g;
+                        data[idx + 2] = b;
+                        data[idx + 3] = alpha;
+                    }
+                }
+            }
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Desenhar borda do círculo
+        const centerPoint = map.latLngToContainerPoint([centerLat, centerLon]);
+        const edgePoint = map.latLngToContainerPoint([centerLat + radiusDeg, centerLon]);
+        const radiusPixels = Math.abs(edgePoint.y - centerPoint.y);
+        
+        ctx.beginPath();
+        ctx.arc(centerPoint.x, centerPoint.y, radiusPixels, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+    
+    // Criar ou atualizar canvas layer
+    function updateL2CanvasLayer() {
+        if (!l2Enabled || l2DisplayMode !== 'area') {
+            if (l2CanvasLayer) {
+                map.removeLayer(l2CanvasLayer);
+                l2CanvasLayer = null;
+            }
+            return;
+        }
+        
+        if (!l2CanvasLayer) {
+            l2CanvasLayer = new L.CanvasLayer({
+                drawCallback: drawL2GradientArea
+            });
+            l2CanvasLayer.addTo(map);
+        } else {
+            l2CanvasLayer.draw();
+        }
+    }
+    
+    // Alternar modo de exibição
+    function toggleL2DisplayMode(mode) {
+        l2DisplayMode = mode;
+        
+        // Atualizar botões
+        document.getElementById('btn-l2-area').classList.toggle('active', mode === 'area');
+        document.getElementById('btn-l2-markers').classList.toggle('active', mode === 'markers');
+        
+        if (mode === 'area') {
+            // Limpar marcadores
+            if (l2Layer) {
+                l2Layer.clearLayers();
+            }
+            l2Markers = [];
+            updateL2CanvasLayer();
+            log('info', '🎨 L2: Modo área com gradiente');
+        } else {
+            // Remover canvas
+            if (l2CanvasLayer) {
+                map.removeLayer(l2CanvasLayer);
+                l2CanvasLayer = null;
+            }
+            updateL2Display();
+            log('info', '⭕ L2: Modo marcadores');
+        }
+    }
+    
+    // Criar legenda dinâmica para a variável selecionada
+    function createL2Legend(variable) {
+        const legendDiv = document.getElementById('l2-legend-cape');
+        if (!legendDiv) return;
+        
+        let colorStops, title, unit;
+        
+        switch(variable) {
+            case 'CAPE':
+                colorStops = CAPE_COLORS;
+                title = '⚡ CAPE';
+                unit = 'J/kg';
+                break;
+            case 'LI':
+                colorStops = LI_COLORS;
+                title = '🌡️ Lifted Index';
+                unit = 'K';
+                break;
+            case 'TPW':
+                colorStops = TPW_COLORS;
+                title = '💧 TPW';
+                unit = 'mm';
+                break;
+            case 'HT':
+                colorStops = HT_COLORS;
+                title = '☁️ Altura';
+                unit = 'm';
+                break;
+            default:
+                legendDiv.style.display = 'none';
+                return;
+        }
+        
+        // Criar gradiente CSS
+        const gradientColors = colorStops.map((stop, i) => {
+            const percent = (i / (colorStops.length - 1)) * 100;
+            return `${stop.color} ${percent}%`;
+        }).join(', ');
+        
+        legendDiv.innerHTML = `
+            <div style="background:#111; padding:8px; border-radius:4px; margin-top:8px; border:1px solid #333;">
+                <div style="font-size:10px; color:#888; margin-bottom:4px;">${title} (${unit})</div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="font-size:9px; color:#666;">${colorStops[0].value}</span>
+                    <div style="flex:1; height:12px; background: linear-gradient(to right, ${gradientColors}); border-radius:2px;"></div>
+                    <span style="font-size:9px; color:#666;">${colorStops[colorStops.length-1].value}</span>
+                </div>
+            </div>
+        `;
+        legendDiv.style.display = 'block';
     }
 
     // Função para ligar/desligar auto-extração
@@ -2526,15 +3106,16 @@
     }
     
     // Função para obter classe de cor baseada na velocidade do vento (em kn)
+    // Escala ajustada: amarelo > 25kn, vermelho > 35kn
     function getWindColorClass(speed) {
-        if (speed < 5) return 'wind-calm';
-        if (speed < 10) return 'wind-light';
-        if (speed < 15) return 'wind-moderate';
-        if (speed < 20) return 'wind-fresh';
-        if (speed < 25) return 'wind-strong';
-        if (speed < 35) return 'wind-gale';
-        if (speed < 50) return 'wind-storm';
-        return 'wind-violent';
+        if (speed < 10) return 'wind-calm';       // Verde escuro: 0-10 kn
+        if (speed < 15) return 'wind-light';      // Verde claro: 10-15 kn
+        if (speed < 20) return 'wind-moderate';   // Verde-amarelo: 15-20 kn
+        if (speed < 25) return 'wind-fresh';      // Amarelo esverdeado: 20-25 kn
+        if (speed < 30) return 'wind-strong';     // Amarelo: 25-30 kn
+        if (speed < 35) return 'wind-gale';       // Laranja: 30-35 kn
+        if (speed < 45) return 'wind-storm';      // Vermelho: 35-45 kn
+        return 'wind-violent';                    // Roxo: > 45 kn
     }
     
     // Função para obter seta de direção
@@ -3254,12 +3835,26 @@
     function fetchAllSources() {
         log('info', `⏱️ Limite de idade: ${MAX_DATA_AGE_MINUTES} minutos`);
         log('info', '🌐 Buscando dados em TEMPO REAL...');
+        
+        // Atualizar dados de vento Open-Meteo
         fetchOpenMeteoData();
-        // NOTA: Dados de escaterômetro satelital (NOAA ASCAT, NASA CYGNSS, Copernicus)
-        // têm atraso mínimo de 2-6 horas no processamento.
-        // Apenas Open-Meteo fornece dados com < 60 min de atraso.
-        // NDBC Bóias não cobrem costa brasileira (Bacia de Campos)
-        log('info', '✅ Fonte: Open-Meteo (tempo real)');
+        
+        // Atualizar imagem de satélite se habilitado
+        if (satelliteEnabled) {
+            loadSatelliteLayer();
+        }
+        
+        // Atualizar dados DMW (ventos derivados de movimento) se habilitado
+        if (dmwEnabled) {
+            loadDMWWinds();
+        }
+        
+        // Atualizar dados L2 (CAPE, LI, TPW) se habilitado
+        if (l2Enabled) {
+            loadL2Data();
+        }
+        
+        log('info', '✅ Fontes atualizadas: Open-Meteo, Satélite, DMW, L2');
     }
     
     function clearData() {
