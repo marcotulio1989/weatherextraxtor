@@ -522,6 +522,14 @@
                 <div class="label">Rajada (kn)</div>
             </div>
         </div>
+        <!-- Pesos dos modelos -->
+        <div class="forecast-weights" id="forecast-weights" style="font-size:10px; color:#888; display:flex; gap:10px; flex-wrap:wrap;">
+            <span style="color:#4488ff;">GFS: <span id="fw-gfs">--</span></span>
+            <span style="color:#ff8844;">ECMWF: <span id="fw-ecmwf">--</span></span>
+            <span style="color:#44ff88;">ICON: <span id="fw-icon">--</span></span>
+            <span style="color:#ff44ff;">MeteoFR: <span id="fw-meteofr">--</span></span>
+            <span style="color:#ffff44;">JMA: <span id="fw-jma">--</span></span>
+        </div>
         <div class="forecast-status" id="forecast-status">
             ⏰ Próxima atualização: --:--
         </div>
@@ -2595,41 +2603,95 @@
         const interval = forecastPeriod === 24 ? 1 : (forecastPeriod === 48 ? 3 : 6);
         const hourIndex = forecastHour;  // Index direto para dados hourly (0, 1, 2, ...)
         
-        let validModels = 0;
+        // =====================================================================
+        // MÉDIA PONDERADA DINÂMICA - MESMO MÉTODO DO PAINEL PRINCIPAL
+        // =====================================================================
+        // Passo 1: Identificar quais modelos têm dados para este horário
+        let availableModels = [];
+        let totalWeight = 0;
+        
+        MODELS.forEach(model => {
+            const data = allForecastData[model];
+            if (data && data.speeds && data.speeds[hourIndex] !== null && data.speeds[hourIndex] !== undefined) {
+                availableModels.push(model);
+                totalWeight += modelWeights[model];
+            }
+        });
+        
+        if (availableModels.length === 0) {
+            document.getElementById('forecast-speed').textContent = '--';
+            document.getElementById('forecast-dir').textContent = '--';
+            document.getElementById('forecast-gust').textContent = '--';
+            return;
+        }
+        
+        // Passo 2: Renormalizar pesos para os modelos disponíveis (soma = 1)
+        let normalizedWeights = {};
+        availableModels.forEach(model => {
+            normalizedWeights[model] = modelWeights[model] / totalWeight;
+        });
+        
+        // Passo 3: Calcular média ponderada
         let weightedSpeed = 0;
         let weightedGust = 0;
         let weightedDirX = 0;
         let weightedDirY = 0;
         
-        MODELS.forEach(model => {
+        availableModels.forEach(model => {
             const data = allForecastData[model];
-            const weight = modelWeights[model];
+            const weight = normalizedWeights[model];
             
-            if (data && data.speeds && data.speeds[hourIndex] !== null && data.speeds[hourIndex] !== undefined) {
-                const speed = data.speeds[hourIndex];
-                const dir = data.directions[hourIndex];
-                const gust = data.gusts ? data.gusts[hourIndex] : speed * 1.3;
-                
-                weightedSpeed += speed * weight;
-                weightedGust += gust * weight;
-                const rad = dir * Math.PI / 180;
-                weightedDirX += Math.cos(rad) * weight;
-                weightedDirY += Math.sin(rad) * weight;
-                validModels++;
+            const speed = data.speeds[hourIndex];
+            const dir = data.directions[hourIndex];
+            const gust = data.gusts ? data.gusts[hourIndex] : speed * 1.3;
+            
+            weightedSpeed += speed * weight;
+            weightedGust += gust * weight;
+            
+            // Direção: usar componentes vetoriais para média correta
+            const rad = dir * Math.PI / 180;
+            weightedDirX += Math.cos(rad) * weight;
+            weightedDirY += Math.sin(rad) * weight;
+        });
+        
+        // Calcular direção resultante
+        let avgDir = Math.atan2(weightedDirY, weightedDirX) * 180 / Math.PI;
+        if (avgDir < 0) avgDir += 360;
+        
+        // Atualizar display
+        document.getElementById('forecast-speed').textContent = weightedSpeed.toFixed(1);
+        document.getElementById('forecast-dir').textContent = avgDir.toFixed(0) + '°';
+        document.getElementById('forecast-gust').textContent = weightedGust.toFixed(1);
+        
+        // Atualizar pesos na interface
+        const uiMap = {
+            'gfs_seamless': 'gfs',
+            'ecmwf_ifs025': 'ecmwf',
+            'icon_seamless': 'icon',
+            'meteofrance_seamless': 'meteofr',
+            'jma_seamless': 'jma'
+        };
+        
+        MODELS.forEach(model => {
+            const uiKey = uiMap[model];
+            const el = document.getElementById(`fw-${uiKey}`);
+            if (el) {
+                if (normalizedWeights[model] !== undefined) {
+                    el.textContent = (normalizedWeights[model] * 100).toFixed(0) + '%';
+                    el.style.fontWeight = 'bold';
+                } else {
+                    el.textContent = '--';
+                    el.style.fontWeight = 'normal';
+                }
             }
         });
         
-        if (validModels > 0) {
-            let avgDir = Math.atan2(weightedDirY, weightedDirX) * 180 / Math.PI;
-            if (avgDir < 0) avgDir += 360;
-            
-            document.getElementById('forecast-speed').textContent = weightedSpeed.toFixed(1);
-            document.getElementById('forecast-dir').textContent = avgDir.toFixed(0) + '°';
-            document.getElementById('forecast-gust').textContent = weightedGust.toFixed(1);
-        } else {
-            document.getElementById('forecast-speed').textContent = '--';
-            document.getElementById('forecast-dir').textContent = '--';
-            document.getElementById('forecast-gust').textContent = '--';
+        // Log para debug (apenas quando muda de hora)
+        if (hourIndex === 0) {
+            const weightsStr = availableModels.map(m => 
+                `${MODEL_NAMES[m]}:${(normalizedWeights[m]*100).toFixed(0)}%`
+            ).join(' | ');
+            log('info', `📊 Previsão h+${forecastHour}: ${weightedSpeed.toFixed(1)}kn ${avgDir.toFixed(0)}° [${weightsStr}]`);
         }
     }
     
