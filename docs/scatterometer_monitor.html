@@ -327,15 +327,15 @@
             color: #00aaff;
         }
         
-        /* Forecast Tabs - Tabela Horizontal Style */
+        /* Forecast Tabs - Tabela Horizontal GIGANTE para visualização de 10m */
         .forecast-tabs-container {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(180deg, #1a1a2a 0%, #0f0f1a 100%);
-            border-bottom: 2px solid #00ffcc;
-            padding: 4px 10px 8px 10px;
+            background: #000;
+            border-bottom: 4px solid #00ffcc;
+            padding: 5px 5px 10px 5px;
             z-index: 2000;
         }
         
@@ -344,30 +344,31 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+            padding: 0 5px;
         }
         
         .forecast-title {
             color: #00ffcc;
-            font-size: 12px;
+            font-size: 18px;
             font-weight: bold;
             white-space: nowrap;
         }
         
         .forecast-period-tabs {
             display: flex;
-            gap: 4px;
+            gap: 8px;
         }
         
         .forecast-period-btn {
-            padding: 4px 10px;
+            padding: 8px 20px;
             background: #333;
-            border: 1px solid #555;
+            border: 2px solid #555;
             color: #888;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 16px;
             font-weight: bold;
-            border-radius: 3px;
+            border-radius: 5px;
             transition: all 0.2s;
         }
         
@@ -383,20 +384,21 @@
         }
         
         .forecast-status {
-            font-size: 9px;
+            font-size: 14px;
             color: #666;
             white-space: nowrap;
         }
         
-        /* Tabela de Forecast */
+        /* Tabela de Forecast - FULL WIDTH */
         .forecast-grid-container {
             overflow-x: auto;
             scrollbar-width: thin;
             scrollbar-color: #444 #1a1a1a;
+            width: 100%;
         }
         
         .forecast-grid-container::-webkit-scrollbar {
-            height: 6px;
+            height: 8px;
         }
         
         .forecast-grid-container::-webkit-scrollbar-track {
@@ -405,64 +407,68 @@
         
         .forecast-grid-container::-webkit-scrollbar-thumb {
             background: #444;
-            border-radius: 3px;
+            border-radius: 4px;
         }
         
         .forecast-grid {
             display: grid;
             grid-template-rows: auto auto auto auto;
-            gap: 1px;
-            min-width: max-content;
+            gap: 2px;
+            width: 100%;
         }
         
         .forecast-row {
             display: flex;
             align-items: center;
+            width: 100%;
         }
         
         .forecast-row-label {
-            width: 70px;
+            width: 90px;
             flex-shrink: 0;
-            font-size: 10px;
-            color: #888;
-            padding-right: 8px;
+            font-size: 16px;
+            color: #ffcc00;
+            padding-right: 10px;
             text-align: right;
+            font-weight: bold;
         }
         
         .forecast-row-data {
             display: flex;
-            gap: 1px;
+            flex: 1;
+            gap: 2px;
         }
         
         .forecast-cell {
-            min-width: 32px;
-            height: 22px;
+            flex: 1;
+            min-width: 40px;
+            height: 36px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 11px;
+            font-size: 22px;
             font-weight: bold;
-            border-radius: 2px;
+            border-radius: 3px;
             cursor: pointer;
             transition: transform 0.1s;
         }
         
         .forecast-cell:hover {
-            transform: scale(1.1);
+            transform: scale(1.05);
             z-index: 10;
         }
         
         .forecast-cell.selected {
-            outline: 2px solid #fff;
-            outline-offset: -1px;
+            outline: 3px solid #fff;
+            outline-offset: -2px;
         }
         
         /* Células de Horário */
         .forecast-cell.hour {
             background: #2a2a3a;
-            color: #aaa;
-            font-weight: normal;
-            font-size: 10px;
+            color: #88ccff;
+            font-weight: bold;
+            font-size: 18px;
         }
         
         /* Células de Vento com cores por intensidade */
@@ -477,21 +483,21 @@
         
         /* Células de Direção */
         .forecast-cell.direction {
-            background: #2a2a4a;
+            background: #1a2a4a;
             color: #88ccff;
-            font-size: 14px;
+            font-size: 26px;
         }
         
         /* Info do ponto selecionado */
         .forecast-selected-info {
             display: none;
             align-items: center;
-            gap: 15px;
-            margin-top: 6px;
-            padding: 4px 10px;
-            background: rgba(0,100,100,0.2);
-            border-radius: 3px;
-            font-size: 11px;
+            gap: 25px;
+            margin-top: 8px;
+            padding: 8px 15px;
+            background: rgba(0,100,100,0.3);
+            border-radius: 4px;
+            font-size: 18px;
         }
         
         .forecast-selected-info.visible {
@@ -501,31 +507,32 @@
         .forecast-selected-info .item {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
         }
         
         .forecast-selected-info .item .val {
             color: #00ffcc;
             font-weight: bold;
+            font-size: 22px;
         }
         
         .forecast-weights {
             margin-left: auto;
             display: flex;
-            gap: 10px;
-            font-size: 9px;
+            gap: 15px;
+            font-size: 14px;
         }
         
         /* Botão toggle info */
         .forecast-toggle-info {
             background: transparent;
-            border: 1px solid #444;
+            border: 2px solid #444;
             color: #888;
-            padding: 2px 8px;
-            font-size: 9px;
-            border-radius: 3px;
+            padding: 6px 15px;
+            font-size: 14px;
+            border-radius: 4px;
             cursor: pointer;
-            margin-left: 10px;
+            margin-left: 15px;
         }
         
         .forecast-toggle-info:hover {
@@ -539,15 +546,15 @@
             color: #00ffcc;
         }
         
-        /* Ajustar layout para dar espaço para o header */
+        /* Ajustar layout para dar espaço para o header GRANDE */
         .sidebar {
-            margin-top: 130px;
-            height: calc(100vh - 130px);
+            margin-top: 210px;
+            height: calc(100vh - 210px);
         }
         
         #map {
-            margin-top: 130px;
-            height: calc(100vh - 130px) !important;
+            margin-top: 210px;
+            height: calc(100vh - 210px) !important;
         }
         
         /* Info Icon com Tooltip */
