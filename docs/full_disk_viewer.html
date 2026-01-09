@@ -353,8 +353,6 @@
             </select>
         </div>
         
-        <button onclick="syncImageWithDMW()" style="background: #ff9800; margin-top: 5px;">🔄 SINCRONIZAR IMAGEM + DMW</button>
-        
         <button class="test-btn" onclick="testarReprojecao()">🧪 TESTAR</button>
         <button onclick="toggleDebug()">📋 DEBUG</button>
     </div>
@@ -438,7 +436,6 @@
                 <span class="info-value" id="infoE">-</span>
             </div>
             <hr style="border-color: #444; margin: 10px 0;">
-            <h4 style="color: #00bcd4; margin: 5px 0;">⏰ Horários</h4>
             <div class="info-row">
                 <span class="info-label">📷 Imagem:</span>
                 <span class="info-value" id="infoImageTime" style="color: #4CAF50;">-</span>
@@ -446,10 +443,6 @@
             <div class="info-row">
                 <span class="info-label">🌬️ DMW:</span>
                 <span class="info-value" id="infoDMWTime" style="color: #ff9800;">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">🔄 Sync:</span>
-                <span class="info-value" id="infoSyncStatus" style="color: #f44336;">❌ Não</span>
             </div>
         </div>
         
@@ -711,9 +704,6 @@
                 
                 // Buscar horário real da imagem do SLIDER
                 await fetchImageTimestamp(sat);
-                
-                // Verificar sincronização
-                checkSyncStatus();
                 
                 // Habilitar botão de download
                 document.getElementById('downloadBtn').disabled = false;
@@ -1211,9 +1201,6 @@
                 document.getElementById('infoDMWTime').textContent = 
                     dmwData.scan_time || 'N/A';
                 
-                // Verificar sincronização
-                checkSyncStatus();
-                
                 setProgress(100);
                 setTimeout(hideLoading, 300);
                 
@@ -1271,155 +1258,6 @@
             
             // Fallback: mostrar que não sabe o horário exato
             document.getElementById('infoImageTime').textContent = '~Recente (NOAA)';
-        }
-        
-        function checkSyncStatus() {
-            const dmwTimeEl = document.getElementById('infoDMWTime').textContent;
-            const imgTimeEl = document.getElementById('infoImageTime').textContent;
-            const syncEl = document.getElementById('infoSyncStatus');
-            
-            if (dmwTimeEl === '-' || imgTimeEl === '-') {
-                syncEl.textContent = '⏳ Aguardando';
-                syncEl.style.color = '#888';
-                return;
-            }
-            
-            // Extrair horas para comparar
-            const dmwMatch = dmwTimeEl.match(/(\d{2}):(\d{2})/);
-            const imgMatch = imgTimeEl.match(/(\d{2}):(\d{2})/);
-            
-            if (dmwMatch && imgMatch) {
-                const dmwHour = parseInt(dmwMatch[1]);
-                const imgHour = parseInt(imgMatch[1]);
-                
-                if (dmwHour === imgHour) {
-                    syncEl.textContent = '✅ Sincronizado';
-                    syncEl.style.color = '#4CAF50';
-                } else {
-                    const diff = Math.abs(dmwHour - imgHour);
-                    syncEl.textContent = `⚠️ ${diff}h diferença`;
-                    syncEl.style.color = '#ff9800';
-                }
-            } else {
-                syncEl.textContent = '❓ Verificar';
-                syncEl.style.color = '#888';
-            }
-        }
-        
-        async function syncImageWithDMW() {
-            showLoading('Sincronizando imagem com DMW...');
-            setProgress(10);
-            
-            try {
-                // 1. Primeiro buscar o horário do DMW disponível
-                const dmwResponse = await fetch('dmw_latest.json');
-                if (!dmwResponse.ok) throw new Error('DMW não encontrado');
-                
-                const dmwData = await dmwResponse.json();
-                dmwScanTime = dmwData.scan_time_iso || dmwData.scan_time;
-                
-                console.log('📅 Horário DMW:', dmwData.scan_time);
-                
-                setProgress(30);
-                
-                // 2. Carregar imagem do SLIDER usando o mesmo horário
-                // O SLIDER usa imagens armazenadas em cache do RAMMB/CIRA
-                // Vamos usar a API do SLIDER para pegar a imagem mais próxima
-                
-                const satellite = document.getElementById('satellite').value;
-                const satNum = satellite.replace('goes', '');
-                
-                // Construir URL do SLIDER para o horário específico
-                // https://rammb-slider.cira.colostate.edu/
-                const region = 'full_disk';
-                const product = 'geocolor';
-                
-                // Extrair data/hora do scan_time_iso (2026-01-09T14:00:20Z)
-                let targetTime = new Date(dmwScanTime);
-                const year = targetTime.getUTCFullYear();
-                const month = String(targetTime.getUTCMonth() + 1).padStart(2, '0');
-                const day = String(targetTime.getUTCDate()).padStart(2, '0');
-                const hour = String(targetTime.getUTCHours()).padStart(2, '0');
-                const minute = String(Math.floor(targetTime.getUTCMinutes() / 10) * 10).padStart(2, '0');
-                
-                const dateStr = `${year}${month}${day}`;
-                const timeStr = `${hour}${minute}`;
-                
-                console.log(`🛰️ Buscando imagem GOES-${satNum} para ${dateStr} ${timeStr}`);
-                
-                // URL do SLIDER para imagem específica
-                // Formato: https://rammb-slider.cira.colostate.edu/data/imagery/YYYYMMDD/goes-XX--full_disk--geocolor/YYYYMMDD_HHMM_goes-XX--full_disk--geocolor--00.jpg
-                const sliderUrl = `https://rammb-slider.cira.colostate.edu/data/imagery/${dateStr}/goes-${satNum}--${region}--${product}/${dateStr}_${timeStr}_goes-${satNum}--${region}--${product}--00.jpg`;
-                
-                console.log('📷 URL Imagem:', sliderUrl);
-                
-                // Salvar horário da imagem
-                const imageTimeStr = `${year}-${month}-${day} ${hour}:${minute} UTC`;
-                imageScanTime = imageTimeStr;
-                
-                setProgress(50);
-                
-                // 3. Tentar carregar a imagem
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = () => reject(new Error('Imagem não disponível no SLIDER'));
-                    img.src = sliderUrl;
-                });
-                
-                console.log('✅ Imagem carregada:', img.width, 'x', img.height);
-                
-                setProgress(70);
-                
-                // 4. Aplicar a imagem no mapa
-                // Bounds aproximados para Full Disk GOES-East
-                const fullDiskBounds = [[-81, -156.3], [81, 6.3]];
-                
-                if (overlay) {
-                    map.removeLayer(overlay);
-                }
-                
-                const opacity = document.getElementById('opacity').value / 100;
-                overlay = L.imageOverlay(sliderUrl, fullDiskBounds, {
-                    opacity: opacity,
-                    interactive: false
-                }).addTo(map);
-                
-                // Atualizar painel de horários
-                document.getElementById('infoImageTime').textContent = imageTimeStr;
-                document.getElementById('infoDMWTime').textContent = dmwData.scan_time;
-                document.getElementById('infoSyncStatus').textContent = '✅ Sincronizado';
-                document.getElementById('infoSyncStatus').style.color = '#4CAF50';
-                
-                setProgress(90);
-                
-                // 5. Carregar ventos DMW
-                if (!dmwEnabled) {
-                    toggleDMWWinds();
-                } else {
-                    await loadDMWWinds();
-                }
-                
-                setProgress(100);
-                setTimeout(hideLoading, 300);
-                
-                document.getElementById('statusText').textContent = 
-                    `✅ Sincronizado: Imagem + DMW | ${dmwData.scan_time}`;
-                
-                // Habilitar download
-                document.getElementById('downloadBtn').disabled = false;
-                
-            } catch (err) {
-                console.error('❌ Erro sync:', err);
-                document.getElementById('statusText').textContent = 'Erro: ' + err.message;
-                hideLoading();
-                
-                // Fallback: tentar carregar imagem normal
-                alert('Não foi possível sincronizar. O SLIDER pode não ter a imagem para este horário.\n\nTentando carregar imagem mais recente...');
-                loadImage();
-            }
         }
         
         function getWindColor(speedKt) {
