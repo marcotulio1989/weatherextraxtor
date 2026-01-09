@@ -930,11 +930,12 @@
             let dmwData = null;
             let usingApi = false;
             
-            // Calcular bounding box ao redor do navio
-            const latMin = CONFIG.shipLat - 15;
-            const latMax = CONFIG.shipLat + 15;
-            const lonMin = CONFIG.shipLon - 20;
-            const lonMax = CONFIG.shipLon + 20;
+            // Usar os mesmos bounds da imagem de satélite reprojetada
+            // para garantir que os vetores fiquem dentro da área visível
+            const latMin = REPROJECTION_BOUNDS.south;  // -30
+            const latMax = REPROJECTION_BOUNDS.north;  // 0
+            const lonMin = REPROJECTION_BOUNDS.west;   // -60
+            const lonMax = REPROJECTION_BOUNDS.east;   // -30
             
             try {
                 // Tentar API do servidor
@@ -970,14 +971,17 @@
             const winds = [];
             const allWinds = dmwData.winds || [];
             
-            for (let i = 0; i < allWinds.length; i++) {
+            // Limitar quantidade de vetores para não poluir o mapa
+            // Subsample: mostrar no máximo ~200 vetores
+            const maxVectors = 200;
+            const step = allWinds.length > maxVectors ? Math.ceil(allWinds.length / maxVectors) : 1;
+            
+            for (let i = 0; i < allWinds.length; i += step) {
                 const w = allWinds[i];
                 
-                // Se usando arquivo JSON estático, filtrar por área ao redor do navio
-                if (!usingApi) {
-                    if (w.lat < latMin || w.lat > latMax) continue;
-                    if (w.lon < lonMin || w.lon > lonMax) continue;
-                }
+                // Sempre filtrar por área (bounds da imagem de satélite)
+                if (w.lat < latMin || w.lat > latMax) continue;
+                if (w.lon < lonMin || w.lon > lonMax) continue;
                 
                 // Filtrar por nível de pressão (se não foi filtrado pela API)
                 if (!usingApi && w.pressure_hpa !== undefined) {
@@ -1002,7 +1006,7 @@
                               `🛰️ GOES: ${new Date(scanTime).toLocaleString('pt-BR')}`;
             
             statusEl.className = 'status-indicator active';
-            log('success', `✅ DMW: ${winds.length} vetores na área do navio`);
+            log('success', `✅ DMW: ${winds.length} vetores na área`);
             
         } catch (err) {
             console.error('❌ Erro DMW:', err);
