@@ -2611,11 +2611,10 @@
             gustCell.onclick = function() { selectForecastHour(parseInt(this.dataset.hour), this); };
             gustsContainer.appendChild(gustCell);
             
-            // Célula de Direção
+            // Célula de Direção (valor numérico em graus)
             const dirCell = document.createElement('div');
             dirCell.className = 'forecast-cell direction';
-            dirCell.textContent = hourData.dir !== null ? getDirectionArrow(hourData.dir) : '?';
-            dirCell.title = hourData.dir !== null ? hourData.dir.toFixed(0) + '°' : '';
+            dirCell.textContent = hourData.dir !== null ? Math.round(hourData.dir) + '°' : '--';
             dirCell.dataset.hour = h;
             dirCell.onclick = function() { selectForecastHour(parseInt(this.dataset.hour), this); };
             dirsContainer.appendChild(dirCell);
