@@ -1105,6 +1105,20 @@
             setProgress(10);
             
             try {
+                // Verificar se há imagem carregada
+                if (!overlay) {
+                    throw new Error('Carregue uma imagem primeiro');
+                }
+                
+                // Obter bounds da imagem carregada
+                const imageBounds = overlay.getBounds();
+                const latMin = imageBounds.getSouth();
+                const latMax = imageBounds.getNorth();
+                const lonMin = imageBounds.getWest();
+                const lonMax = imageBounds.getEast();
+                
+                console.log(`📍 Filtrando DMW para área: lat ${latMin.toFixed(1)} a ${latMax.toFixed(1)}, lon ${lonMin.toFixed(1)} a ${lonMax.toFixed(1)}`);
+                
                 // Níveis de pressão para filtrar
                 const levelConfig = {
                     'low': { min: 700, max: 1100, name: 'Baixo Nível (<3km)' },
@@ -1143,6 +1157,10 @@
                 
                 for (let i = 0; i < allWinds.length; i++) {
                     const w = allWinds[i];
+                    
+                    // Filtrar por área da imagem
+                    if (w.lat < latMin || w.lat > latMax) continue;
+                    if (w.lon < lonMin || w.lon > lonMax) continue;
                     
                     // Filtrar por nível de pressão
                     if (w.pressure_hpa < levelInfo.min || w.pressure_hpa > levelInfo.max) continue;
