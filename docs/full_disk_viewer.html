@@ -1105,13 +1105,18 @@
             setProgress(10);
             
             try {
-                // Buscar dados do servidor
-                const bounds = map.getBounds();
-                const url = `/api/dmw?satellite=${satellite}&level=${level}` +
-                           `&lat_min=${bounds.getSouth()}&lat_max=${bounds.getNorth()}` +
-                           `&lon_min=${bounds.getWest()}&lon_max=${bounds.getEast()}`;
+                // Determinar URL base do servidor
+                // Se estiver no GitHub Pages, precisamos de um servidor local
+                const isGitHubPages = window.location.hostname.includes('github.io');
+                
+                // Buscar todos os dados sem limitar por lat/lon
+                const url = `/api/dmw?satellite=${satellite}&level=${level}`;
                 
                 console.log('🌬️ Buscando DMW:', url);
+                
+                if (isGitHubPages) {
+                    throw new Error('Servidor local necessário. Execute: python server.py');
+                }
                 
                 const response = await fetch(url);
                 
@@ -1162,11 +1167,19 @@
                 
             } catch (err) {
                 console.error('❌ Erro DMW:', err);
-                document.getElementById('statusText').textContent = 'Erro ao carregar ventos: ' + err.message;
-                hideLoading();
                 
-                // Mostrar mensagem de fallback
-                document.getElementById('windInfo').textContent = 'Erro ao carregar dados';
+                // Mensagem mais informativa
+                let errorMsg = err.message;
+                if (err.message.includes('404') || err.message.includes('servidor local')) {
+                    errorMsg = '⚠️ Para dados DMW, execute o servidor local: python server.py';
+                    document.getElementById('windInfo').innerHTML = 
+                        '<span style="color:orange">Servidor local necessário</span>';
+                } else {
+                    document.getElementById('windInfo').textContent = 'Erro ao carregar dados';
+                }
+                
+                document.getElementById('statusText').textContent = errorMsg;
+                hideLoading();
             }
         }
         
