@@ -723,38 +723,39 @@
             </div>
         </div>
         
-        <!-- ESTATÍSTICAS DE VENTO -->
-        <div class="section">
-            <div class="section-title">
-                <span class="status-indicator" id="wind-status"></span>
-                DADOS DE VENTO
-            </div>
-            
-            <!-- Média Multi-Modelo com Pesos Dinâmicos -->
-            <div style="background:#1a2a1a; border:1px solid #00aa00; border-radius:4px; padding:10px; margin-bottom:10px;">
-                <div style="font-size:10px; color:#00ff00; margin-bottom:5px;">🌍 MÉDIA PONDERADA (5 MODELOS)</div>
-                <div style="display:flex; gap:10px; align-items:center;">
-                    <div style="text-align:center;">
-                        <div style="font-size:24px; font-weight:bold; color:#00ffcc;" id="avg-model-speed">--</div>
-                        <div style="font-size:9px; color:#888;">Velocidade (kn)</div>
+        <!-- ESTATÍSTICAS DE VENTO (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>📊 DADOS DE VENTO</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="section">
+                <!-- Média Multi-Modelo com Pesos Dinâmicos -->
+                <div style="background:#1a2a1a; border:1px solid #00aa00; border-radius:4px; padding:10px; margin-bottom:10px;">
+                    <div style="font-size:10px; color:#00ff00; margin-bottom:5px;">🌍 MÉDIA PONDERADA (5 MODELOS)</div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="text-align:center;">
+                            <div style="font-size:24px; font-weight:bold; color:#00ffcc;" id="avg-model-speed">--</div>
+                            <div style="font-size:9px; color:#888;">Velocidade (kn)</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:24px; font-weight:bold; color:#00ffcc;" id="avg-model-dir">--</div>
+                            <div style="font-size:9px; color:#888;">Direção (°)</div>
+                        </div>
                     </div>
-                    <div style="text-align:center;">
-                        <div style="font-size:24px; font-weight:bold; color:#00ffcc;" id="avg-model-dir">--</div>
-                        <div style="font-size:9px; color:#888;">Direção (°)</div>
-                    </div>
-                </div>
-                
-                <!-- Valores individuais dos modelos -->
-                <div style="margin-top:8px; padding-top:8px; border-top:1px solid #333; font-size:9px;">
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px;">
-                        <div><span style="color:#4488ff;">GFS:</span> <span id="gfs-value">--</span> <span id="gfs-weight" style="color:#ffaa00;"></span></div>
-                        <div><span style="color:#ff8844;">ECMWF:</span> <span id="ecmwf-value">--</span> <span id="ecmwf-weight" style="color:#ffaa00;"></span></div>
-                        <div><span style="color:#44ff88;">ICON:</span> <span id="icon-value">--</span> <span id="icon-weight" style="color:#ffaa00;"></span></div>
-                        <div><span style="color:#ff44ff;">MeteoFR:</span> <span id="meteofr-value">--</span> <span id="meteofr-weight" style="color:#ffaa00;"></span></div>
-                        <div><span style="color:#ffff44;">JMA:</span> <span id="jma-value">--</span> <span id="jma-weight" style="color:#ffaa00;"></span></div>
-                    </div>
-                    <div style="margin-top:5px; font-size:9px; color:#666;" id="weight-reason">
-                        Pesos iguais (sem histórico)
+                    
+                    <!-- Valores individuais dos modelos -->
+                    <div style="margin-top:8px; padding-top:8px; border-top:1px solid #333; font-size:9px;">
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px;">
+                            <div><span style="color:#4488ff;">GFS:</span> <span id="gfs-value">--</span> <span id="gfs-weight" style="color:#ffaa00;"></span></div>
+                            <div><span style="color:#ff8844;">ECMWF:</span> <span id="ecmwf-value">--</span> <span id="ecmwf-weight" style="color:#ffaa00;"></span></div>
+                            <div><span style="color:#44ff88;">ICON:</span> <span id="icon-value">--</span> <span id="icon-weight" style="color:#ffaa00;"></span></div>
+                            <div><span style="color:#ff44ff;">MeteoFR:</span> <span id="meteofr-value">--</span> <span id="meteofr-weight" style="color:#ffaa00;"></span></div>
+                            <div><span style="color:#ffff44;">JMA:</span> <span id="jma-value">--</span> <span id="jma-weight" style="color:#ffaa00;"></span></div>
+                        </div>
+                        <div style="margin-top:5px; font-size:9px; color:#666;" id="weight-reason">
+                            Pesos iguais (sem histórico)
+                        </div>
                     </div>
                 </div>
             </div>
@@ -914,12 +915,11 @@
             <div class="log-area" id="log-area" style="height:100px;">
                 <div class="log-entry info">Sistema iniciado...</div>
             </div>
-        </div>
-        
-        <!-- Ações -->
-        <div style="margin-top: 10px; display:flex; gap:5px;">
-            <button onclick="fetchAllSources()" style="flex:1;">🔄 ATUALIZAR</button>
-            <button class="secondary" onclick="clearData()">🗑️</button>
+            <!-- Ações -->
+            <div style="margin-top: 10px; display:flex; gap:5px;">
+                <button onclick="fetchAllSources()" style="flex:1;">🔄 ATUALIZAR</button>
+                <button class="secondary" onclick="clearData()">🗑️</button>
+            </div>
         </div>
         
     </div>
