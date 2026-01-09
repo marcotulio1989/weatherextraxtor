@@ -270,6 +270,12 @@
             margin-top: 5px;
         }
         
+        /* Estilos para setas de vento DMW */
+        .dmw-wind-arrow {
+            background: transparent !important;
+            border: none !important;
+        }
+        
         .source-info a {
             color: #00aaff;
         }
@@ -920,17 +926,42 @@
             
             const levelInfo = levelConfig[level] || levelConfig['low'];
             
-            // Buscar arquivo JSON pré-processado
-            const jsonUrl = 'dmw_latest.json';
+            // Tentar usar API do servidor primeiro, depois fallback para arquivo JSON
+            let dmwData = null;
+            let usingApi = false;
             
-            const response = await fetch(jsonUrl);
+            // Calcular bounding box ao redor do navio
+            const latMin = CONFIG.shipLat - 15;
+            const latMax = CONFIG.shipLat + 15;
+            const lonMin = CONFIG.shipLon - 20;
+            const lonMax = CONFIG.shipLon + 20;
             
-            if (!response.ok) {
-                throw new Error(`Dados DMW não encontrados (${response.status})`);
+            try {
+                // Tentar API do servidor
+                const apiUrl = `/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`;
+                const response = await fetch(apiUrl);
+                if (response.ok) {
+                    dmwData = await response.json();
+                    usingApi = true;
+                    log('info', '📡 Usando API do servidor para DMW');
+                }
+            } catch (apiErr) {
+                console.log('API não disponível, tentando arquivo JSON...');
             }
             
-            dmwData = await response.json();
-            log('success', `✅ DMW carregado: ${dmwData.count} vetores totais`);
+            // Fallback para arquivo JSON estático
+            if (!dmwData) {
+                const jsonUrl = 'dmw_latest.json';
+                const response = await fetch(jsonUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`Dados DMW não encontrados (${response.status})`);
+                }
+                
+                dmwData = await response.json();
+            }
+            
+            log('success', `✅ DMW carregado: ${dmwData.count || (dmwData.winds ? dmwData.winds.length : 0)} vetores totais`);
             
             // Limpar camada anterior
             clearDMWLayer();
@@ -939,21 +970,19 @@
             const winds = [];
             const allWinds = dmwData.winds || [];
             
-            // Obter bounds da área de interesse (ao redor do navio)
-            const latMin = CONFIG.shipLat - 15;
-            const latMax = CONFIG.shipLat + 15;
-            const lonMin = CONFIG.shipLon - 20;
-            const lonMax = CONFIG.shipLon + 20;
-            
             for (let i = 0; i < allWinds.length; i++) {
                 const w = allWinds[i];
                 
-                // Filtrar por área ao redor do navio
-                if (w.lat < latMin || w.lat > latMax) continue;
-                if (w.lon < lonMin || w.lon > lonMax) continue;
+                // Se usando arquivo JSON estático, filtrar por área ao redor do navio
+                if (!usingApi) {
+                    if (w.lat < latMin || w.lat > latMax) continue;
+                    if (w.lon < lonMin || w.lon > lonMax) continue;
+                }
                 
-                // Filtrar por nível de pressão
-                if (w.pressure_hpa < levelInfo.min || w.pressure_hpa > levelInfo.max) continue;
+                // Filtrar por nível de pressão (se não foi filtrado pela API)
+                if (!usingApi && w.pressure_hpa !== undefined) {
+                    if (w.pressure_hpa < levelInfo.min || w.pressure_hpa > levelInfo.max) continue;
+                }
                 
                 winds.push(w);
                 
@@ -992,42 +1021,41 @@
     }
     
     function createDMWArrow(lat, lon, direction, speed, color) {
-        // Tamanho da seta baseado na velocidade
-        const arrowLength = Math.min(0.3 + speed * 0.01, 0.8);
+        // Tamanho da seta baseado na velocidade (20-32 px)
+        const size = Math.min(20 + speed * 0.3, 32);
         
-        // Converter direção meteorológica (de onde vem) para direção vetorial (para onde vai)
-        const dirRad = (direction + 180) * Math.PI / 180;
+        // DIREÇÃO: Valor indica DE ONDE o vento vem (convenção meteorológica)
+        // Seta aponta PARA ONDE o vento vai (rotação +180°)
+        const arrowRotation = (direction + 180) % 360;
         
-        // Calcular ponto final da seta
-        const endLat = lat + arrowLength * Math.cos(dirRad);
-        const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
-        
-        // Criar linha
-        const line = L.polyline([[lat, lon], [endLat, endLon]], {
-            color: color,
-            weight: 2,
-            opacity: 0.9
-        });
-        
-        // Adicionar ponta da seta
-        const arrowHead = L.circleMarker([endLat, endLon], {
-            radius: 3,
-            color: color,
-            fillColor: color,
-            fillOpacity: 1
+        // Criar HTML da seta usando SVG (formato de seta real)
+        const arrowHtml = `
+            <div style="transform: rotate(${arrowRotation}deg); width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" width="${size - 4}" height="${size - 4}">
+                    <path fill="${color}" stroke="#000" stroke-width="0.5" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                </svg>
+            </div>
+            <div style="text-align:center; font-size:9px; font-weight:bold; color:${color}; text-shadow: 1px 1px 2px black; margin-top:-2px;">
+                ${speed.toFixed(0)}
+            </div>
+        `;
+
+        const icon = L.divIcon({
+            className: 'dmw-wind-arrow',
+            html: arrowHtml,
+            iconSize: [size, size + 12],
+            iconAnchor: [size/2, (size + 12)/2]
         });
         
         // Popup com informações
-        const popup = `<b>Vento DMW (GOES)</b><br>
-                       Velocidade: ${speed.toFixed(1)} kt<br>
-                       Direção: ${direction.toFixed(0)}°<br>
-                       Pressão: ${speed > 0 ? 'N/A' : ''} hPa`;
-        
-        line.bindPopup(popup);
-        arrowHead.bindPopup(popup);
-        
-        // Grupo com linha e ponta
-        return L.layerGroup([line, arrowHead]);
+        const popup = `<b>🌬️ Vento DMW (GOES)</b><br>
+                       <b>Velocidade:</b> ${speed.toFixed(1)} kt<br>
+                       <b>Direção:</b> ${direction.toFixed(0)}° (de onde vem)<br>
+                       <b>Lat:</b> ${lat.toFixed(3)}°<br>
+                       <b>Lon:</b> ${lon.toFixed(3)}°`;
+
+        return L.marker([lat, lon], { icon: icon })
+            .bindPopup(popup);
     }
 
     // Função para ligar/desligar auto-extração
