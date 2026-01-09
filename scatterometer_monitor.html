@@ -2887,7 +2887,8 @@
     function calculateDynamicWeights() {
         if (forecastHistory.length < 2) {
             MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
-            document.getElementById('weight-reason').textContent = 'Pesos iguais (histórico insuficiente)';
+            const weightReasonEl = document.getElementById('weight-reason');
+            if (weightReasonEl) weightReasonEl.textContent = 'Pesos iguais (histórico insuficiente)';
             return;
         }
         
@@ -2948,8 +2949,11 @@
             }
         });
         
-        document.getElementById('weight-reason').innerHTML = 
-            `⚖️ ${comparisons} comparações | Melhor: <span style="color:#00ff00;">${MODEL_NAMES[bestModel]}</span>`;
+        const weightReasonEl = document.getElementById('weight-reason');
+        if (weightReasonEl) {
+            weightReasonEl.innerHTML = 
+                `⚖️ ${comparisons} comparações | Melhor: <span style="color:#00ff00;">${MODEL_NAMES[bestModel]}</span>`;
+        }
         
         log('info', `⚖️ Pesos: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelWeights[m]*100).toFixed(0) + '%').join(' | ')}`);
     }
@@ -3089,6 +3093,11 @@
         const windsContainer = document.getElementById('forecast-winds');
         const gustsContainer = document.getElementById('forecast-gusts');
         const dirsContainer = document.getElementById('forecast-dirs');
+        
+        if (!hoursContainer || !windsContainer || !gustsContainer || !dirsContainer) {
+            console.warn('[buildForecastTimeline] Containers não encontrados');
+            return;
+        }
         
         hoursContainer.innerHTML = '';
         windsContainer.innerHTML = '';
@@ -3275,8 +3284,11 @@
             // Atualizar status
             const now = new Date();
             const nextUpdate = new Date(now.getTime() + 15 * 60 * 1000);
-            document.getElementById('forecast-status').textContent = 
-                `⏰ ${nextUpdate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}`;
+            const forecastStatusEl = document.getElementById('forecast-status');
+            if (forecastStatusEl) {
+                forecastStatusEl.textContent = 
+                    `⏰ ${nextUpdate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}`;
+            }
             
             log('success', `✅ Previsão ${forecastPeriod}h carregada`);
             
@@ -3306,9 +3318,12 @@
         });
         
         if (availableModels.length === 0) {
-            document.getElementById('forecast-speed').textContent = '--';
-            document.getElementById('forecast-dir').textContent = '--';
-            document.getElementById('forecast-gust').textContent = '--';
+            const fSpeed = document.getElementById('forecast-speed');
+            const fDir = document.getElementById('forecast-dir');
+            const fGust = document.getElementById('forecast-gust');
+            if (fSpeed) fSpeed.textContent = '--';
+            if (fDir) fDir.textContent = '--';
+            if (fGust) fGust.textContent = '--';
             return;
         }
         
@@ -3361,10 +3376,15 @@
         });
         
         // Atualizar display
-        document.getElementById('forecast-datetime').textContent = dateTimeStr;
-        document.getElementById('forecast-speed').textContent = weightedSpeed.toFixed(1);
-        document.getElementById('forecast-dir').textContent = avgDir.toFixed(0) + '°';
-        document.getElementById('forecast-gust').textContent = weightedGust.toFixed(1);
+        const fDatetime = document.getElementById('forecast-datetime');
+        const fSpeed = document.getElementById('forecast-speed');
+        const fDir = document.getElementById('forecast-dir');
+        const fGust = document.getElementById('forecast-gust');
+        
+        if (fDatetime) fDatetime.textContent = dateTimeStr;
+        if (fSpeed) fSpeed.textContent = weightedSpeed.toFixed(1);
+        if (fDir) fDir.textContent = avgDir.toFixed(0) + '°';
+        if (fGust) fGust.textContent = weightedGust.toFixed(1);
         
         // Atualizar pesos na interface
         const uiMap = {
@@ -3461,8 +3481,10 @@
             let avgDir = Math.atan2(weightedDirY, weightedDirX) * 180 / Math.PI;
             if (avgDir < 0) avgDir += 360;
             
-            document.getElementById('avg-model-speed').textContent = weightedSpeed.toFixed(1);
-            document.getElementById('avg-model-dir').textContent = avgDir.toFixed(0) + '°';
+            const avgSpeedEl = document.getElementById('avg-model-speed');
+            const avgDirEl = document.getElementById('avg-model-dir');
+            if (avgSpeedEl) avgSpeedEl.textContent = weightedSpeed.toFixed(1);
+            if (avgDirEl) avgDirEl.textContent = avgDir.toFixed(0) + '°';
             
             log('info', `🌍 Média Ponderada (${validModels} modelos): ${weightedSpeed.toFixed(1)} kn de ${avgDir.toFixed(0)}°`);
         }
@@ -3475,11 +3497,19 @@
         );
         MODELS.forEach(m => modelData[m] = { speed: null, direction: null });
         allForecastData = {};
-        document.getElementById('avg-model-speed').textContent = '--';
-        document.getElementById('avg-model-dir').textContent = '--';
-        document.getElementById('forecast-speed').textContent = '--';
-        document.getElementById('forecast-dir').textContent = '--';
-        document.getElementById('forecast-gust').textContent = '--';
+        
+        const avgSpeedEl = document.getElementById('avg-model-speed');
+        const avgDirEl = document.getElementById('avg-model-dir');
+        const forecastSpeedEl = document.getElementById('forecast-speed');
+        const forecastDirEl = document.getElementById('forecast-dir');
+        const forecastGustEl = document.getElementById('forecast-gust');
+        
+        if (avgSpeedEl) avgSpeedEl.textContent = '--';
+        if (avgDirEl) avgDirEl.textContent = '--';
+        if (forecastSpeedEl) forecastSpeedEl.textContent = '--';
+        if (forecastDirEl) forecastDirEl.textContent = '--';
+        if (forecastGustEl) forecastGustEl.textContent = '--';
+        
         updateWindDisplay();
         setStatus('openmeteo-status', '');
         log('info', '🗑️ Dados de modelos removidos');
