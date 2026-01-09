@@ -255,8 +255,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             
             print(f"📊 L2: Extraindo dados ({satellite}/{products_str})")
             
-            # Gerar grade de pontos
-            grid_points = generate_grid_points(center_lat, center_lon, radius_nm=radius_nm, step_nm=25)
+            # Gerar grade de pontos - step menor = mais pontos
+            grid_points = generate_grid_points(center_lat, center_lon, radius_nm=radius_nm, step_nm=15)
             
             extractor = GOESL2Extractor(satellite=satellite)
             data = extractor.extract_all_products(grid_points, products=products)
