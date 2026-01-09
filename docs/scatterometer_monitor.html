@@ -280,31 +280,34 @@
             color: #00aaff;
         }
         
-        /* Forecast Tabs */
+        /* Forecast Tabs - Full Width Header */
         .forecast-tabs-container {
             position: fixed;
             top: 0;
-            left: 380px;
+            left: 0;
             right: 0;
-            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
-            border-bottom: 2px solid #00ffcc;
-            padding: 10px 20px;
-            z-index: 1000;
+            background: linear-gradient(180deg, #0a1628 0%, #0f0f1a 100%);
+            border-bottom: 3px solid #00ffcc;
+            padding: 8px 15px;
+            z-index: 2000;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 6px;
         }
         
-        .forecast-header {
+        /* Linha 1: Título + Período + Status */
+        .forecast-row-1 {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 15px;
         }
         
         .forecast-title {
             color: #00ffcc;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: bold;
+            white-space: nowrap;
         }
         
         .forecast-period-tabs {
@@ -313,12 +316,12 @@
         }
         
         .forecast-period-btn {
-            padding: 6px 16px;
+            padding: 5px 14px;
             background: #333;
             border: 1px solid #555;
             color: #888;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             border-radius: 4px;
             transition: all 0.3s;
@@ -335,21 +338,28 @@
             color: #000;
         }
         
-        .forecast-timeline {
+        .forecast-status {
+            font-size: 10px;
+            color: #666;
+            white-space: nowrap;
+        }
+        
+        /* Linha 2: Timeline de Horários */
+        .forecast-row-2 {
             display: flex;
-            gap: 4px;
+            gap: 3px;
             overflow-x: auto;
-            padding-bottom: 5px;
+            padding-bottom: 4px;
         }
         
         .forecast-hour-btn {
-            min-width: 50px;
-            padding: 5px 8px;
-            background: #222;
-            border: 1px solid #444;
-            color: #888;
+            min-width: 55px;
+            padding: 6px 6px;
+            background: #1a1a2a;
+            border: 1px solid #333;
+            color: #666;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 9px;
             text-align: center;
             border-radius: 3px;
             transition: all 0.2s;
@@ -357,54 +367,92 @@
         }
         
         .forecast-hour-btn:hover {
-            background: #333;
-            color: #fff;
+            background: #252540;
+            color: #aaa;
+            border-color: #555;
         }
         
         .forecast-hour-btn.active {
-            background: #0088ff;
+            background: #0066cc;
             border-color: #00aaff;
             color: #fff;
         }
         
-        .forecast-info {
-            display: flex;
-            gap: 20px;
-            align-items: center;
+        .forecast-hour-btn .hour-label {
             font-size: 11px;
+            font-weight: bold;
+        }
+        
+        .forecast-hour-btn .hour-time {
+            font-size: 8px;
             color: #888;
         }
         
-        .forecast-wind-display {
+        /* Linha 3: Dados de Vento */
+        .forecast-row-3 {
             display: flex;
-            gap: 15px;
             align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(90deg, rgba(0,100,80,0.3) 0%, rgba(0,50,100,0.3) 100%);
+            border-radius: 4px;
+            padding: 8px 15px;
         }
         
-        .forecast-wind-value {
-            text-align: center;
+        .forecast-data-group {
+            display: flex;
+            align-items: center;
+            gap: 25px;
         }
         
-        .forecast-wind-value .value {
+        .forecast-data-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .forecast-data-item .icon {
+            font-size: 16px;
+        }
+        
+        .forecast-data-item .info {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .forecast-data-item .label {
+            font-size: 9px;
+            color: #888;
+            text-transform: uppercase;
+        }
+        
+        .forecast-data-item .value {
             font-size: 18px;
             font-weight: bold;
             color: #00ffcc;
         }
         
-        .forecast-wind-value .label {
-            font-size: 9px;
-            color: #666;
-        }
-        
-        .forecast-status {
+        .forecast-weights {
+            display: flex;
+            gap: 12px;
             font-size: 10px;
-            color: #666;
+            flex-wrap: wrap;
         }
         
-        /* Ajustar mapa para dar espaço para a aba */
+        .forecast-weights span {
+            display: flex;
+            gap: 3px;
+        }
+        
+        /* Ajustar layout para dar espaço para o header */
+        .sidebar {
+            margin-top: 130px;
+            height: calc(100vh - 130px);
+        }
+        
         #map {
-            margin-top: 100px;
-            height: calc(100vh - 100px) !important;
+            margin-top: 130px;
+            height: calc(100vh - 130px) !important;
         }
         
         /* Info Icon com Tooltip */
@@ -494,44 +542,63 @@
 </head>
 <body>
 
-<!-- ABA DE PREVISÃO NO TOPO -->
+<!-- ABA DE PREVISÃO NO TOPO - FULL WIDTH -->
 <div class="forecast-tabs-container" id="forecast-container">
-    <div class="forecast-header">
-        <div class="forecast-title">🌊 PREVISÃO DE VENTO (Média Ponderada Multi-Modelo)</div>
+    <!-- LINHA 1: Título + Período + Status -->
+    <div class="forecast-row-1">
+        <div class="forecast-title">🌊 PREVISÃO DE VENTO (Média Ponderada 5 Modelos)</div>
         <div class="forecast-period-tabs">
-            <button class="forecast-period-btn active" onclick="selectForecastPeriod(24)">24h (1h)</button>
-            <button class="forecast-period-btn" onclick="selectForecastPeriod(48)">48h (3h)</button>
-            <button class="forecast-period-btn" onclick="selectForecastPeriod(72)">72h (6h)</button>
+            <button class="forecast-period-btn active" onclick="selectForecastPeriod(24)">24h (1em1h)</button>
+            <button class="forecast-period-btn" onclick="selectForecastPeriod(48)">48h (3em3h)</button>
+            <button class="forecast-period-btn" onclick="selectForecastPeriod(72)">72h (6em6h)</button>
         </div>
+        <div class="forecast-status" id="forecast-status">⏰ Atualiza: 15min</div>
     </div>
-    <div class="forecast-timeline" id="forecast-timeline">
+    
+    <!-- LINHA 2: Timeline de Horários -->
+    <div class="forecast-row-2" id="forecast-timeline">
         <!-- Horas serão preenchidas via JavaScript -->
     </div>
-    <div class="forecast-info">
-        <div class="forecast-wind-display">
-            <div class="forecast-wind-value">
-                <div class="value" id="forecast-speed">--</div>
-                <div class="label">Velocidade (kn)</div>
+    
+    <!-- LINHA 3: Velocidade + Direção + Rajada + Pesos -->
+    <div class="forecast-row-3">
+        <div class="forecast-data-group">
+            <div class="forecast-data-item">
+                <span class="icon">🕐</span>
+                <div class="info">
+                    <span class="label">Horário</span>
+                    <span class="value" id="forecast-datetime">--:--</span>
+                </div>
             </div>
-            <div class="forecast-wind-value">
-                <div class="value" id="forecast-dir">--</div>
-                <div class="label">Direção (°)</div>
+            <div class="forecast-data-item">
+                <span class="icon">💨</span>
+                <div class="info">
+                    <span class="label">Velocidade</span>
+                    <span class="value"><span id="forecast-speed">--</span> kn</span>
+                </div>
             </div>
-            <div class="forecast-wind-value">
-                <div class="value" id="forecast-gust">--</div>
-                <div class="label">Rajada (kn)</div>
+            <div class="forecast-data-item">
+                <span class="icon">🧭</span>
+                <div class="info">
+                    <span class="label">Direção</span>
+                    <span class="value" id="forecast-dir">--°</span>
+                </div>
+            </div>
+            <div class="forecast-data-item">
+                <span class="icon">⚡</span>
+                <div class="info">
+                    <span class="label">Rajada</span>
+                    <span class="value"><span id="forecast-gust">--</span> kn</span>
+                </div>
             </div>
         </div>
         <!-- Pesos dos modelos -->
-        <div class="forecast-weights" id="forecast-weights" style="font-size:10px; color:#888; display:flex; gap:10px; flex-wrap:wrap;">
-            <span style="color:#4488ff;">GFS: <span id="fw-gfs">--</span></span>
-            <span style="color:#ff8844;">ECMWF: <span id="fw-ecmwf">--</span></span>
-            <span style="color:#44ff88;">ICON: <span id="fw-icon">--</span></span>
-            <span style="color:#ff44ff;">MeteoFR: <span id="fw-meteofr">--</span></span>
-            <span style="color:#ffff44;">JMA: <span id="fw-jma">--</span></span>
-        </div>
-        <div class="forecast-status" id="forecast-status">
-            ⏰ Próxima atualização: --:--
+        <div class="forecast-weights" id="forecast-weights">
+            <span style="color:#4488ff;">GFS:<span id="fw-gfs">--</span></span>
+            <span style="color:#ff8844;">ECMWF:<span id="fw-ecmwf">--</span></span>
+            <span style="color:#44ff88;">ICON:<span id="fw-icon">--</span></span>
+            <span style="color:#ff44ff;">MétéoFR:<span id="fw-meteofr">--</span></span>
+            <span style="color:#ffff44;">JMA:<span id="fw-jma">--</span></span>
         </div>
     </div>
 </div>
@@ -2520,21 +2587,25 @@
                              h < 24 ? '+' + h + 'h' : 
                              '+' + Math.floor(h/24) + 'd' + (h%24 ? (h%24) + 'h' : '');
             const timeLabel = forecastTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            const dateLabel = forecastTime.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
             
-            btn.innerHTML = `<div>${dayLabel}</div><div style="font-size:9px;color:#666;">${timeLabel}</div>`;
-            btn.onclick = () => selectForecastHour(h);
+            btn.innerHTML = `<div class="hour-label">${dayLabel}</div><div class="hour-time">${timeLabel}<br>${dateLabel}</div>`;
+            btn.dataset.hour = h;
+            btn.onclick = function() { selectForecastHour(parseInt(this.dataset.hour), this); };
             container.appendChild(btn);
         }
     }
     
-    function selectForecastHour(hour) {
+    function selectForecastHour(hour, btnElement) {
         forecastHour = hour;
         
         // Atualizar botões
         document.querySelectorAll('.forecast-hour-btn').forEach(btn => {
             btn.classList.remove('active');
         });
-        event.target.classList.add('active');
+        if (btnElement) {
+            btnElement.classList.add('active');
+        }
         
         // Atualizar display com dados do horário selecionado
         updateForecastDisplay();
@@ -2658,7 +2729,16 @@
         let avgDir = Math.atan2(weightedDirY, weightedDirX) * 180 / Math.PI;
         if (avgDir < 0) avgDir += 360;
         
+        // Calcular horário da previsão
+        const now = new Date();
+        const forecastTime = new Date(now.getTime() + forecastHour * 60 * 60 * 1000);
+        const dateTimeStr = forecastTime.toLocaleString('pt-BR', { 
+            day: '2-digit', month: '2-digit', 
+            hour: '2-digit', minute: '2-digit' 
+        });
+        
         // Atualizar display
+        document.getElementById('forecast-datetime').textContent = dateTimeStr;
         document.getElementById('forecast-speed').textContent = weightedSpeed.toFixed(1);
         document.getElementById('forecast-dir').textContent = avgDir.toFixed(0) + '°';
         document.getElementById('forecast-gust').textContent = weightedGust.toFixed(1);
