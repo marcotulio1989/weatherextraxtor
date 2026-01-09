@@ -1241,10 +1241,13 @@
                 
                 for (const apiUrl of apiUrls) {
                     try {
+                        console.log(`[DMW] Tentando: ${apiUrl}`);
                         log('info', `🌬️ DMW: Tentando API...`);
-                        const response = await fetch(apiUrl, { timeout: 30000 });
+                        const response = await fetch(apiUrl);
+                        console.log(`[DMW] Response status: ${response.status}`);
                         if (response.ok) {
                             dmwData = await response.json();
+                            console.log(`[DMW] Dados recebidos: ${dmwData.count || (dmwData.winds ? dmwData.winds.length : 0)} ventos`);
                             usingApi = true;
                             log('success', '✅ DMW: Conectado à API');
                             break;
@@ -2069,6 +2072,11 @@
                 const value = idwInterpolation(lon, lat, points, selectedVar, 2);
                 
                 if (value === null) continue;
+                
+                // Debug: log alguns valores para verificar interpolação
+                if (Math.random() < 0.001) {
+                    console.log(`[L2 Canvas] ${selectedVar} em (${lat.toFixed(2)}, ${lon.toFixed(2)}): valor=${value.toFixed(1)}`);
+                }
                 
                 // Obter cor do gradiente
                 const color = getL2Color(selectedVar, value);
@@ -3020,6 +3028,7 @@
     async function fetchOpenMeteoData() {
         setStatus('openmeteo-status', 'loading');
         log('info', '🌐 Buscando 5 modelos (Open-Meteo)...');
+        console.log('[OpenMeteo] Iniciando busca de dados de vento...');
         
         try {
             if (forecastHistory.length === 0) loadForecastHistory();
@@ -3033,24 +3042,32 @@
             
             // Usar endpoint /forecast com parâmetro models para todos
             // Isso garante dados 'current' disponíveis para todos os modelos
+            let successCount = 0;
             const promises = MODELS.map(async model => {
                 try {
                     // Endpoint unificado com parâmetro models
                     const url = `https://api.open-meteo.com/v1/forecast?latitude=${CONFIG.shipLat}&longitude=${CONFIG.shipLon}&current=wind_speed_10m,wind_direction_10m&models=${model}&wind_speed_unit=kn`;
+                    console.log(`[OpenMeteo] Buscando ${model}: ${url}`);
                     
                     const response = await fetch(url);
                     const data = await response.json();
+                    console.log(`[OpenMeteo] ${model} resposta:`, data);
                     
                     if (data.current && data.current.wind_speed_10m !== undefined) {
                         modelData[model] = {
                             speed: data.current.wind_speed_10m,
                             direction: data.current.wind_direction_10m
                         };
+                        successCount++;
                         log('info', `  ✓ ${MODEL_NAMES[model]}: ${data.current.wind_speed_10m.toFixed(1)} kn`);
+                    } else if (data.error) {
+                        log('warning', `  ✗ ${MODEL_NAMES[model]}: ${data.reason || data.error}`);
+                        console.error(`[OpenMeteo] ${model} erro:`, data);
                     } else {
                         log('warning', `  ✗ ${MODEL_NAMES[model]}: sem dados current`);
                     }
                 } catch (e) {
+                    console.error(`[OpenMeteo] ${model} exceção:`, e);
                     log('warning', `  ✗ ${MODEL_NAMES[model]}: ${e.message}`);
                 }
             });
