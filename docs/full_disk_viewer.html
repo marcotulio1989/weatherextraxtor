@@ -437,6 +437,20 @@
                 <span class="info-label">Lon Leste:</span>
                 <span class="info-value" id="infoE">-</span>
             </div>
+            <hr style="border-color: #444; margin: 10px 0;">
+            <h4 style="color: #00bcd4; margin: 5px 0;">⏰ Horários</h4>
+            <div class="info-row">
+                <span class="info-label">📷 Imagem:</span>
+                <span class="info-value" id="infoImageTime" style="color: #4CAF50;">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">🌬️ DMW:</span>
+                <span class="info-value" id="infoDMWTime" style="color: #ff9800;">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">🔄 Sync:</span>
+                <span class="info-value" id="infoSyncStatus" style="color: #f44336;">❌ Não</span>
+            </div>
         </div>
         
         <div class="loading hidden" id="loading">
@@ -694,6 +708,14 @@
                 document.getElementById('infoStatus').className = 'info-value ok';
                 document.getElementById('statusText').textContent = 'Imagem carregada com sucesso';
                 document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
+                
+                // Atualizar horário da imagem (usando horário atual como aproximação)
+                const now = new Date();
+                document.getElementById('infoImageTime').textContent = 
+                    now.toISOString().slice(0, 16).replace('T', ' ') + ' UTC*';
+                
+                // Verificar sincronização
+                checkSyncStatus();
                 
                 // Habilitar botão de download
                 document.getElementById('downloadBtn').disabled = false;
@@ -1187,6 +1209,13 @@
                 document.getElementById('windInfo').textContent = 
                     `${winds.length} vetores | ${levelInfo.name}`;
                 
+                // Atualizar horário do DMW no painel
+                document.getElementById('infoDMWTime').textContent = 
+                    dmwData.scan_time || 'N/A';
+                
+                // Verificar sincronização
+                checkSyncStatus();
+                
                 setProgress(100);
                 setTimeout(hideLoading, 300);
                 
@@ -1201,8 +1230,42 @@
             }
         }
         
-        // Variável global para armazenar o horário do DMW
+        // Variáveis globais para armazenar horários
         let dmwScanTime = null;
+        let imageScanTime = null;
+        
+        function checkSyncStatus() {
+            const dmwTimeEl = document.getElementById('infoDMWTime').textContent;
+            const imgTimeEl = document.getElementById('infoImageTime').textContent;
+            const syncEl = document.getElementById('infoSyncStatus');
+            
+            if (dmwTimeEl === '-' || imgTimeEl === '-') {
+                syncEl.textContent = '⏳ Aguardando';
+                syncEl.style.color = '#888';
+                return;
+            }
+            
+            // Extrair horas para comparar
+            const dmwMatch = dmwTimeEl.match(/(\d{2}):(\d{2})/);
+            const imgMatch = imgTimeEl.match(/(\d{2}):(\d{2})/);
+            
+            if (dmwMatch && imgMatch) {
+                const dmwHour = parseInt(dmwMatch[1]);
+                const imgHour = parseInt(imgMatch[1]);
+                
+                if (dmwHour === imgHour) {
+                    syncEl.textContent = '✅ Sincronizado';
+                    syncEl.style.color = '#4CAF50';
+                } else {
+                    const diff = Math.abs(dmwHour - imgHour);
+                    syncEl.textContent = `⚠️ ${diff}h diferença`;
+                    syncEl.style.color = '#ff9800';
+                }
+            } else {
+                syncEl.textContent = '❓ Verificar';
+                syncEl.style.color = '#888';
+            }
+        }
         
         async function syncImageWithDMW() {
             showLoading('Sincronizando imagem com DMW...');
@@ -1251,6 +1314,10 @@
                 
                 console.log('📷 URL Imagem:', sliderUrl);
                 
+                // Salvar horário da imagem
+                const imageTimeStr = `${year}-${month}-${day} ${hour}:${minute} UTC`;
+                imageScanTime = imageTimeStr;
+                
                 setProgress(50);
                 
                 // 3. Tentar carregar a imagem
@@ -1280,6 +1347,12 @@
                     opacity: opacity,
                     interactive: false
                 }).addTo(map);
+                
+                // Atualizar painel de horários
+                document.getElementById('infoImageTime').textContent = imageTimeStr;
+                document.getElementById('infoDMWTime').textContent = dmwData.scan_time;
+                document.getElementById('infoSyncStatus').textContent = '✅ Sincronizado';
+                document.getElementById('infoSyncStatus').style.color = '#4CAF50';
                 
                 setProgress(90);
                 
