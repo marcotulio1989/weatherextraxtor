@@ -271,6 +271,36 @@
         .wind-arrow-head {
             transition: transform 0.3s ease;
         }
+        
+        /* Auto-refresh Indicator */
+        .auto-refresh-indicator {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            z-index: 1000;
+            border: 1px solid #333;
+            color: #00d4ff;
+        }
+        .auto-refresh-indicator .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .auto-refresh-indicator .pulse {
+            width: 8px;
+            height: 8px;
+            background: #2ecc71;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
     </style>
 </head>
 <body>
@@ -355,6 +385,14 @@
         
         <button class="test-btn" onclick="testarReprojecao()">🧪 TESTAR</button>
         <button onclick="toggleDebug()">📋 DEBUG</button>
+    </div>
+    
+    <!-- Auto-refresh Indicator -->
+    <div class="auto-refresh-indicator" id="autoRefreshIndicator">
+        <div class="status">
+            <div class="pulse"></div>
+            <span id="nextUpdateTime">⏰ Próxima atualização: --:05</span>
+        </div>
     </div>
     
     <!-- Wind Legend -->
@@ -1070,6 +1108,10 @@
         let dmwMarkers = [];
         let dmwData = null;
         
+        // Auto-refresh control
+        let autoRefreshInterval = null;
+        let lastUpdateHour = -1;
+        
         function toggleDMWWinds() {
             const btn = document.getElementById('toggleDMW');
             dmwEnabled = !dmwEnabled;
@@ -1279,11 +1321,74 @@
         }
         
         // =========================================================
+        // AUTO-REFRESH SYSTEM
+        // =========================================================
+        
+        function startAutoRefresh() {
+            // Atualizar a cada minuto
+            autoRefreshInterval = setInterval(() => {
+                const now = new Date();
+                const minute = now.getMinutes();
+                const hour = now.getHours();
+                
+                // Atualizar indicador de próxima atualização
+                updateNextUpdateTime();
+                
+                // Atualizar no minuto 5 de cada hora (12:05, 13:05, etc)
+                // E apenas se ainda não atualizou nessa hora
+                if (minute === 5 && hour !== lastUpdateHour) {
+                    lastUpdateHour = hour;
+                    console.log(`🔄 Auto-refresh: Atualização automática (${String(hour).padStart(2, '0')}:05)`);
+                    
+                    // Carregar imagem primeiro
+                    loadImage().then(() => {
+                        // Depois carregar DMW se estiver ativado
+                        if (dmwEnabled) {
+                            setTimeout(() => {
+                                console.log('🌬️ Auto-refresh: Carregando DMW após imagem');
+                                loadDMWWinds();
+                            }, 2000); // Esperar 2s para garantir que a imagem carregou
+                        }
+                    }).catch(err => {
+                        console.error('❌ Erro no auto-refresh:', err);
+                    });
+                }
+            }, 60 * 1000);  // Verificar a cada 1 minuto
+            
+            console.log('⏰ Auto-refresh ativado (atualiza em XX:05)');
+            updateNextUpdateTime();
+        }
+        
+        function updateNextUpdateTime() {
+            const now = new Date();
+            let nextHour = now.getHours();
+            
+            // Se já passou do minuto 5, próxima é na próxima hora
+            if (now.getMinutes() >= 5) {
+                nextHour = (nextHour + 1) % 24;
+            }
+            
+            const nextUpdateEl = document.getElementById('nextUpdateTime');
+            if (nextUpdateEl) {
+                nextUpdateEl.textContent = `⏰ Próxima atualização: ${String(nextHour).padStart(2, '0')}:05`;
+            }
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            lastUpdateHour = -1;
+        }
+        
+        // =========================================================
         // INIT
         // =========================================================
         
         init();
         setupDMWAutoReload();
+        startAutoRefresh();
     </script>
 </body>
 </html>
