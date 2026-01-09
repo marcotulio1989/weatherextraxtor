@@ -1450,34 +1450,47 @@
             infoEl.textContent = '📡 Carregando dados L2...';
             
             // Tentar API primeiro (extração em tempo real)
-            let response;
+            let response = null;
             let usedApi = false;
             
             // Tentar múltiplas URLs da API
             const apiUrls = [
-                `/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`,
-                `http://localhost:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`,
-                `${window.location.protocol}//${window.location.hostname}:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`
+                `/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=15&products=DSIF,ACHAF,ACTPF,TPWF`,
+                `http://localhost:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=15&products=DSIF,ACHAF,ACTPF,TPWF`,
+                `${window.location.protocol}//${window.location.hostname}:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=15&products=DSIF,ACHAF,ACTPF,TPWF`
             ];
             
             for (const apiUrl of apiUrls) {
                 try {
-                    log('info', `📡 L2: Tentando ${apiUrl.split('?')[0]}...`);
-                    response = await fetch(apiUrl, { timeout: 30000 });
+                    console.log(`[L2] Tentando: ${apiUrl.split('?')[0]}...`);
+                    log('info', `📡 L2: Tentando API...`);
+                    response = await fetch(apiUrl);
+                    console.log(`[L2] Response status: ${response.status}`);
                     if (response.ok) {
                         usedApi = true;
                         log('success', '✅ L2: Conectado à API');
                         break;
+                    } else {
+                        response = null; // Reset se não foi ok
                     }
                 } catch (apiErr) {
+                    console.log(`[L2] Erro na API: ${apiErr.message}`);
                     log('warning', `⚠️ L2: Falha ao conectar API: ${apiErr.message}`);
+                    response = null;
                 }
             }
             
             // Fallback para arquivo JSON estático
-            if (!usedApi) {
+            if (!response || !usedApi) {
+                console.log('[L2] Usando fallback JSON: goes_l2_latest.json');
                 log('warning', '⚠️ L2: API não disponível, usando cache JSON');
-                response = await fetch('goes_l2_latest.json?' + Date.now());
+                try {
+                    response = await fetch('goes_l2_latest.json?' + Date.now());
+                    console.log(`[L2] Fallback response: ${response.status}`);
+                } catch (fallbackErr) {
+                    console.error('[L2] Erro no fallback:', fallbackErr);
+                    throw new Error('Dados L2 não disponíveis');
+                }
             }
             
             if (!response || !response.ok) {
@@ -1485,6 +1498,7 @@
             }
             
             l2Data = await response.json();
+            console.log('[L2] Dados carregados:', l2Data.products ? Object.keys(l2Data.products) : 'sem produtos');
             
             // Limpar camada anterior
             clearL2Layer();
@@ -3480,6 +3494,8 @@
             'jma_seamless': 'jma'
         };
         
+        console.log('[updateModelAverage] modelData:', JSON.stringify(modelData));
+        
         let validModels = 0;
         let weightedSpeed = 0;
         let weightedDirX = 0;
@@ -3489,6 +3505,8 @@
             const uiKey = uiMap[model];
             const data = modelData[model];
             const weight = modelWeights[model];
+            
+            console.log(`[updateModelAverage] ${model}: speed=${data?.speed}, dir=${data?.direction}`);
             
             // Atualizar UI
             const valEl = document.getElementById(`${uiKey}-value`);
