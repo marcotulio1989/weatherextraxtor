@@ -435,15 +435,6 @@
                 <span class="info-label">Lon Leste:</span>
                 <span class="info-value" id="infoE">-</span>
             </div>
-            <hr style="border-color: #444; margin: 10px 0;">
-            <div class="info-row">
-                <span class="info-label">📷 Imagem:</span>
-                <span class="info-value" id="infoImageTime" style="color: #4CAF50;">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">🌬️ DMW:</span>
-                <span class="info-value" id="infoDMWTime" style="color: #ff9800;">-</span>
-            </div>
         </div>
         
         <div class="loading hidden" id="loading">
@@ -701,9 +692,6 @@
                 document.getElementById('infoStatus').className = 'info-value ok';
                 document.getElementById('statusText').textContent = 'Imagem carregada com sucesso';
                 document.getElementById('timestamp').textContent = new Date().toLocaleTimeString();
-                
-                // Buscar horário real da imagem do SLIDER
-                await fetchImageTimestamp(sat);
                 
                 // Habilitar botão de download
                 document.getElementById('downloadBtn').disabled = false;
@@ -1197,10 +1185,6 @@
                 document.getElementById('windInfo').textContent = 
                     `${winds.length} vetores | ${levelInfo.name}`;
                 
-                // Atualizar horário do DMW no painel
-                document.getElementById('infoDMWTime').textContent = 
-                    dmwData.scan_time || 'N/A';
-                
                 setProgress(100);
                 setTimeout(hideLoading, 300);
                 
@@ -1213,51 +1197,6 @@
                 document.getElementById('statusText').textContent = 'Erro: ' + err.message;
                 hideLoading();
             }
-        }
-        
-        // Variáveis globais para armazenar horários
-        let dmwScanTime = null;
-        let imageScanTime = null;
-        
-        // Buscar horário real da imagem do GOES via SLIDER API
-        async function fetchImageTimestamp(satellite) {
-            try {
-                const satNum = satellite.replace('goes', '');
-                
-                // SLIDER API retorna a lista de timestamps disponíveis
-                // https://rammb-slider.cira.colostate.edu/data/json/goes-16/full_disk/geocolor/latest_times.json
-                const sliderUrl = `https://rammb-slider.cira.colostate.edu/data/json/goes-${satNum}/full_disk/geocolor/latest_times.json`;
-                
-                console.log('🕐 Buscando timestamp real:', sliderUrl);
-                
-                const response = await fetch(sliderUrl);
-                if (response.ok) {
-                    const data = await response.json();
-                    // data.timestamps_int contém array de timestamps como números: [20260109141020, ...]
-                    if (data.timestamps_int && data.timestamps_int.length > 0) {
-                        const latestTimestamp = data.timestamps_int[0].toString();
-                        // Formato: 20260109141020 -> 2026-01-09 14:10:20 UTC
-                        const year = latestTimestamp.slice(0, 4);
-                        const month = latestTimestamp.slice(4, 6);
-                        const day = latestTimestamp.slice(6, 8);
-                        const hour = latestTimestamp.slice(8, 10);
-                        const minute = latestTimestamp.slice(10, 12);
-                        const second = latestTimestamp.slice(12, 14);
-                        
-                        const imageTime = `${year}-${month}-${day} ${hour}:${minute}:${second} UTC`;
-                        imageScanTime = imageTime;
-                        
-                        document.getElementById('infoImageTime').textContent = imageTime;
-                        console.log('✅ Horário real da imagem:', imageTime);
-                        return;
-                    }
-                }
-            } catch (err) {
-                console.warn('⚠️ Não foi possível buscar timestamp:', err);
-            }
-            
-            // Fallback: mostrar que não sabe o horário exato
-            document.getElementById('infoImageTime').textContent = '~Recente (NOAA)';
         }
         
         function getWindColor(speedKt) {
