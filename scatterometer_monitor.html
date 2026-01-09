@@ -680,20 +680,6 @@
                     <div class="stat-label">IDADE</div>
                 </div>
             </div>
-            
-            <div class="legend">
-                <div class="legend-item"><div class="legend-color" style="background:#00ff00"></div> &lt;10 kn</div>
-                <div class="legend-item"><div class="legend-color" style="background:#88ff00"></div> 10-15 kn</div>
-                <div class="legend-item"><div class="legend-color" style="background:#ffff00"></div> 15-20 kn</div>
-                <div class="legend-item"><div class="legend-color" style="background:#ff9900"></div> 20-25 kn</div>
-                <div class="legend-item"><div class="legend-color" style="background:#ff0000"></div> 25-30 kn</div>
-                <div class="legend-item"><div class="legend-color" style="background:#ff00ff"></div> &gt;30 kn</div>
-            </div>
-            <div style="margin-top:10px; font-size:10px; color:#888; border-top:1px solid #333; padding-top:8px;">
-                <div>◆ = Dado de Escaterômetro (satélite)</div>
-                <div style="margin-top:4px;">Escaterômetros: ícone maior com borda</div>
-                <div>Open-Meteo: ícone menor (modelo)</div>
-            </div>
         </div>
         
         <!-- FONTES DE DADOS -->
@@ -706,59 +692,8 @@
                 OPEN-METEO (Modelo)
             </div>
             <p class="source-info">✅ GRATUITO - Dados de fundo, atualiza a cada 15 min</p>
-            <p class="source-info">Ícones menores - Modelo numérico (não satélite)</p>
             <button onclick="fetchOpenMeteoData()">🔄 Atualizar Open-Meteo</button>
             <button class="secondary" onclick="clearOpenMeteoData()">🗑️ Limpar</button>
-        </div>
-        
-        <h2>� TEMPO REAL (< 60 min)</h2>
-        
-        <!-- Aviso sobre escaterômetros -->
-        <div class="section" style="border-left: 3px solid #ff6600; background: #1a1000;">
-            <div class="section-title" style="color: #ff9900;">
-                ⚠️ Sobre Escaterômetros
-            </div>
-            <p class="source-info" style="color: #ff9900;">Dados de satélite (ASCAT, CYGNSS) têm atraso de 2-6h.</p>
-            <p class="source-info">Para dados em tempo real usamos:</p>
-            <p class="source-info">• <strong>Open-Meteo</strong> - Modelos meteorológicos (acima)</p>
-            <p class="source-info">⚠️ Escaterômetros removidos (atraso > 60min)</p>
-        </div>
-        
-        <!-- Escaterômetros - DESABILITADO (atraso > 60min) -->
-        <!-- 
-        <div class="section" style="border-left: 3px solid #333; opacity: 0.5;">
-            <div class="section-title">
-                <span class="status-indicator" id="cmems-status"></span>
-                COPERNICUS MARINE (CMEMS) - ATRASO 2-6h
-            </div>
-            <p class="source-info">Desabilitado: dados de satélite têm atraso > 60 min</p>
-        </div>
-        -->
-        
-        <!-- NASA Earthdata - DESABILITADO (atraso > 60min) -->
-        <!--
-        <div class="section" style="border-left: 3px solid #333; opacity: 0.5;">
-            <div class="section-title">
-                <span class="status-indicator" id="nasa-status"></span>
-                NASA EARTHDATA (CYGNSS) - ATRASO 2-6h
-            </div>
-            <p class="source-info">Desabilitado: dados de satélite têm atraso > 60 min</p>
-        </div>
-        -->
-        
-        <!-- Camadas do Mapa -->
-        <h2>�️ CAMADAS</h2>
-        <div class="section">
-            <div class="checkbox-group">
-                <label class="checkbox-item">
-                    <input type="checkbox" id="layer-arrows" checked onchange="toggleLayer('arrows')">
-                    Setas de Vento
-                </label>
-                <label class="checkbox-item">
-                    <input type="checkbox" id="layer-grid" onchange="toggleLayer('grid')">
-                    Grade de Coordenadas
-                </label>
-            </div>
         </div>
         
         <!-- Satélite em Tempo Real -->
