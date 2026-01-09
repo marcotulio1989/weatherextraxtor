@@ -1389,6 +1389,14 @@
         init();
         setupDMWAutoReload();
         startAutoRefresh();
+        
+        // Carregar imagem automaticamente na primeira vez
+        console.log('🚀 Carregando imagem inicial...');
+        loadImage().then(() => {
+            console.log('✅ Imagem inicial carregada com sucesso');
+        }).catch(err => {
+            console.error('⚠️ Erro ao carregar imagem inicial (aguardar auto-refresh):', err.message);
+        });
     </script>
 </body>
 </html>
