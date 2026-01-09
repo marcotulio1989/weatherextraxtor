@@ -1261,8 +1261,8 @@
                 if (w.lat < latMin || w.lat > latMax) continue;
                 if (w.lon < lonMin || w.lon > lonMax) continue;
                 
-                // Filtrar por nível de pressão (se não foi filtrado pela API)
-                if (!usingApi && w.pressure_hpa !== undefined) {
+                // Filtrar por nível de pressão
+                if (w.pressure_hpa !== undefined) {
                     if (w.pressure_hpa < levelInfo.min || w.pressure_hpa > levelInfo.max) continue;
                 }
                 
@@ -3436,13 +3436,13 @@
             
             console.log(`[updateModelAverage] ${model}: speed=${data?.speed}, dir=${data?.direction}`);
             
-            // Atualizar UI
+            // Atualizar UI (se elementos existirem)
             const valEl = document.getElementById(`${uiKey}-value`);
             const weightEl = document.getElementById(`${uiKey}-weight`);
             
             if (data && data.speed !== null) {
-                valEl.textContent = `${data.speed.toFixed(1)} kn / ${data.direction.toFixed(0)}°`;
-                weightEl.textContent = `(${(weight * 100).toFixed(0)}%)`;
+                if (valEl) valEl.textContent = `${data.speed.toFixed(1)} kn / ${data.direction.toFixed(0)}°`;
+                if (weightEl) weightEl.textContent = `(${(weight * 100).toFixed(0)}%)`;
                 
                 // Acumular para média ponderada
                 weightedSpeed += data.speed * weight;
@@ -3451,8 +3451,8 @@
                 weightedDirY += Math.sin(rad) * weight;
                 validModels++;
             } else {
-                valEl.textContent = '--';
-                weightEl.textContent = '';
+                if (valEl) valEl.textContent = '--';
+                if (weightEl) weightEl.textContent = '';
             }
         });
         
