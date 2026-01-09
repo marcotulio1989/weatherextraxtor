@@ -1062,12 +1062,17 @@
             iconAnchor: [size/2, (size + 12)/2]
         });
         
+        // Quality flag descrição
+        const qfDesc = qualityFlag === 0 ? '✅ Ótimo' : 
+                       qualityFlag === 1 ? '⚠️ Degradado' : 
+                       qualityFlag >= 2 ? '❌ Ruim' : '❓ N/A';
+        
         // Popup com informações completas
         const popup = `<b>🌬️ Vento DMW (GOES)</b><br>
                        <b>Velocidade:</b> ${speed.toFixed(1)} kt (${(speed * 0.514444).toFixed(1)} m/s)<br>
                        <b>Direção:</b> ${direction.toFixed(0)}° (de onde vem)<br>
                        <b>Pressão:</b> ${pressure.toFixed(0)} hPa<br>
-                       <b>Quality Flag:</b> ${qualityFlag}<br>
+                       <b>Qualidade:</b> ${qfDesc} (DQF=${qualityFlag})<br>
                        <hr style="margin:4px 0;border-color:#444;">
                        <b>Lat:</b> ${lat.toFixed(3)}°<br>
                        <b>Lon:</b> ${lon.toFixed(3)}°`;
