@@ -2627,6 +2627,8 @@
     
     // Calcular dados de uma hora específica (média ponderada)
     function calculateHourData(hourOffset) {
+        // hourOffset é o offset em horas (0, 1, 2, 3... ou 0, 3, 6... dependendo do período)
+        // Os dados da API vêm em intervalos de 1 hora, então usamos hourOffset diretamente
         const hourIndex = hourOffset;
         
         let availableModels = [];
@@ -2660,7 +2662,14 @@
             
             const speed = data.speeds[hourIndex];
             const dir = data.directions[hourIndex];
-            const gust = data.gusts ? data.gusts[hourIndex] : speed * 1.3;
+            // Verificar se gust existe E tem valor válido para esta hora
+            let gust = null;
+            if (data.gusts && data.gusts[hourIndex] !== null && data.gusts[hourIndex] !== undefined) {
+                gust = data.gusts[hourIndex];
+            } else {
+                // Fallback: estimar rajada como 30% maior que velocidade
+                gust = speed * 1.3;
+            }
             
             weightedSpeed += speed * weight;
             weightedGust += gust * weight;
@@ -2799,7 +2808,14 @@
             
             const speed = data.speeds[hourIndex];
             const dir = data.directions[hourIndex];
-            const gust = data.gusts ? data.gusts[hourIndex] : speed * 1.3;
+            // Verificar se gust existe E tem valor válido para esta hora
+            let gust = null;
+            if (data.gusts && data.gusts[hourIndex] !== null && data.gusts[hourIndex] !== undefined) {
+                gust = data.gusts[hourIndex];
+            } else {
+                // Fallback: estimar rajada como 30% maior que velocidade
+                gust = speed * 1.3;
+            }
             
             weightedSpeed += speed * weight;
             weightedGust += gust * weight;
