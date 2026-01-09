@@ -171,7 +171,9 @@ class DMWExtractor:
             # Verificar se cache é recente (menos de 15 minutos)
             with open(cache_meta, 'r') as f:
                 meta = json.load(f)
-            cache_time = datetime.fromisoformat(meta['download_time'])
+            cache_time = datetime.fromisoformat(meta['download_time'].replace('Z', '+00:00'))
+            if cache_time.tzinfo is None:
+                cache_time = cache_time.replace(tzinfo=timezone.utc)
             if (datetime.now(timezone.utc) - cache_time).total_seconds() < 900:
                 print(f"📦 Usando cache: {cache_file}")
                 return cache_file

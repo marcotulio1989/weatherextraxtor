@@ -1105,10 +1105,6 @@
             setProgress(10);
             
             try {
-                // Buscar dados DMW do GOES via NOAA THREDDS (tem CORS!)
-                // URL base do THREDDS catalog para dados GOES em tempo real
-                const satNum = satellite.replace('goes', '');
-                
                 // Níveis de pressão para filtrar
                 const levelConfig = {
                     'low': { min: 700, max: 1100, name: 'Baixo Nível (<3km)' },
@@ -1119,160 +1115,52 @@
                 
                 const levelInfo = levelConfig[level] || levelConfig['low'];
                 
-                console.log(`🛰️ Buscando DMW GOES-${satNum}: ${levelInfo.name}`);
+                console.log(`🛰️ Buscando DMW: ${levelInfo.name}`);
                 
-                // NOAA Unidata THREDDS - Dados GOES em tempo real com suporte JSON
-                // https://thredds.ucar.edu/thredds/catalog/satellite/goes/east/products/
-                const threddsBase = 'https://thredds.ucar.edu/thredds/ncss/grid/satellite/goes';
-                const region = satNum === '18' ? 'west' : 'east';
+                // Buscar arquivo JSON pré-processado
+                // Este arquivo é gerado pelo dmw_extractor.py
+                const jsonUrl = 'dmw_latest.json';
                 
-                // Tentar buscar do catálogo THREDDS
-                // Usando endpoint alternativo que retorna JSON
-                const catalogUrl = `https://thredds.ucar.edu/thredds/catalog/satellite/goes/${region}/products/CloudAndMoistureImagery/FullDisk/catalog.json`;
+                console.log('📥 Carregando dados DMW:', jsonUrl);
                 
-                console.log('📡 Verificando catálogo THREDDS...');
+                const response = await fetch(jsonUrl);
                 
-                // Como THREDDS pode não ter dados DMW diretamente acessíveis,
-                // vamos usar o AWS S3 public bucket com um proxy CORS
-                // O corsproxy.io é um serviço gratuito de proxy CORS
-                
-                const bucket = `noaa-goes${satNum}`;
-                const now = new Date();
-                const year = now.getUTCFullYear();
-                const doy = getDayOfYear(now);
-                const hour = now.getUTCHours().toString().padStart(2, '0');
-                
-                // Listar arquivos DMW disponíveis via S3 REST API
-                const s3ListUrl = `https://${bucket}.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-DMWF/${year}/${doy}/${hour}/&max-keys=10`;
-                
-                console.log('🔍 Buscando arquivos S3:', s3ListUrl);
-                setProgress(20);
-                
-                // Tentar buscar lista de arquivos (S3 tem CORS para listagem)
-                let dmwFileKey = null;
-                
-                try {
-                    const listResp = await fetch(s3ListUrl);
-                    if (listResp.ok) {
-                        const xmlText = await listResp.text();
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-                        const keys = xmlDoc.getElementsByTagName('Key');
-                        
-                        if (keys.length > 0) {
-                            // Pegar o arquivo mais recente
-                            dmwFileKey = keys[keys.length - 1].textContent;
-                            console.log('📁 Arquivo DMW encontrado:', dmwFileKey);
-                        }
-                    }
-                } catch (e) {
-                    console.log('⚠️ Erro ao listar S3:', e);
+                if (!response.ok) {
+                    throw new Error(`Dados DMW não encontrados (${response.status})`);
                 }
                 
-                // Se não encontrou na hora atual, tentar hora anterior
-                if (!dmwFileKey) {
-                    const prevHour = (parseInt(hour) - 1 + 24) % 24;
-                    const prevHourStr = prevHour.toString().padStart(2, '0');
-                    const prevDoy = prevHour === 23 ? doy - 1 : doy;
-                    
-                    const s3PrevUrl = `https://${bucket}.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-DMWF/${year}/${prevDoy}/${prevHourStr}/&max-keys=10`;
-                    
-                    try {
-                        const listResp = await fetch(s3PrevUrl);
-                        if (listResp.ok) {
-                            const xmlText = await listResp.text();
-                            const parser = new DOMParser();
-                            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-                            const keys = xmlDoc.getElementsByTagName('Key');
-                            
-                            if (keys.length > 0) {
-                                dmwFileKey = keys[keys.length - 1].textContent;
-                                console.log('📁 Arquivo DMW (hora anterior):', dmwFileKey);
-                            }
-                        }
-                    } catch (e) {
-                        console.log('⚠️ Erro ao listar S3 (hora anterior):', e);
-                    }
-                }
+                const dmwData = await response.json();
+                console.log('✅ DMW data:', dmwData);
                 
-                setProgress(40);
-                
-                if (!dmwFileKey) {
-                    throw new Error('Nenhum arquivo DMW disponível no momento');
-                }
-                
-                // Baixar arquivo NetCDF via proxy CORS
-                // Usando corsproxy.io que é gratuito e confiável
-                const ncUrl = `https://${bucket}.s3.amazonaws.com/${dmwFileKey}`;
-                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ncUrl)}`;
-                
-                console.log('📥 Baixando NetCDF via proxy:', ncUrl);
-                
-                const ncResp = await fetch(proxyUrl);
-                if (!ncResp.ok) {
-                    throw new Error(`Erro ao baixar arquivo: ${ncResp.status}`);
-                }
-                
-                const ncBuffer = await ncResp.arrayBuffer();
-                console.log(`✅ Arquivo baixado: ${(ncBuffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
-                
-                setProgress(60);
-                
-                // Processar NetCDF usando netcdfjs
-                // Carregar biblioteca se não estiver disponível
-                if (typeof NetCDF === 'undefined') {
-                    console.log('📦 Carregando biblioteca NetCDF...');
-                    await loadScript('https://cdn.jsdelivr.net/npm/netcdfjs@2.0.2/dist/netcdfjs.min.js');
-                }
-                
-                const nc = new NetCDF(ncBuffer);
-                console.log('📊 Variáveis NetCDF:', nc.variables);
-                
-                // Extrair dados de vento
-                const lat = nc.getDataVariable('lat');
-                const lon = nc.getDataVariable('lon');
-                const windSpeed = nc.getDataVariable('wind_speed');
-                const windDir = nc.getDataVariable('wind_direction');
-                const pressure = nc.getDataVariable('pressure');
-                
-                setProgress(80);
+                setProgress(50);
                 
                 // Limpar camada anterior
                 clearDMWLayer();
                 dmwLayer = L.layerGroup().addTo(map);
                 
                 const winds = [];
-                const step = Math.max(1, Math.floor(lat.length / 500)); // Limitar a ~500 pontos
+                const allWinds = dmwData.winds || [];
                 
-                for (let i = 0; i < lat.length; i += step) {
-                    const p = pressure[i];
+                for (let i = 0; i < allWinds.length; i++) {
+                    const w = allWinds[i];
                     
                     // Filtrar por nível de pressão
-                    if (p < levelInfo.min || p > levelInfo.max) continue;
+                    if (w.pressure_hpa < levelInfo.min || w.pressure_hpa > levelInfo.max) continue;
                     
-                    const speed = windSpeed[i];
-                    const dir = windDir[i];
-                    
-                    if (isNaN(speed) || isNaN(dir) || speed <= 0) continue;
-                    
-                    // Converter m/s para knots
-                    const speedKt = speed * 1.94384;
-                    
-                    winds.push({
-                        lat: lat[i],
-                        lon: lon[i],
-                        speed_kt: speedKt,
-                        direction: dir,
-                        pressure: p
-                    });
+                    winds.push(w);
                     
                     // Cor baseada na velocidade
-                    const color = getWindColor(speedKt);
+                    const color = getWindColor(w.speed_kt);
                     
                     // Criar seta de vento
-                    const arrow = createWindArrow(lat[i], lon[i], dir, speedKt, color);
+                    const arrow = createWindArrow(w.lat, w.lon, w.direction, w.speed_kt, color);
                     arrow.addTo(dmwLayer);
                     dmwMarkers.push(arrow);
+                    
+                    // Progress
+                    if (i % 50 === 0) {
+                        setProgress(50 + (i / allWinds.length) * 45);
+                    }
                 }
                 
                 // Atualizar info
@@ -1283,7 +1171,7 @@
                 setTimeout(hideLoading, 300);
                 
                 document.getElementById('statusText').textContent = 
-                    `Ventos DMW GOES-${satNum}: ${winds.length} vetores`;
+                    `Ventos DMW GOES: ${winds.length} vetores | ${dmwData.scan_time || 'N/A'}`;
                 
             } catch (err) {
                 console.error('❌ Erro DMW:', err);
@@ -1291,23 +1179,6 @@
                 document.getElementById('statusText').textContent = 'Erro: ' + err.message;
                 hideLoading();
             }
-        }
-        
-        function getDayOfYear(date) {
-            const start = new Date(date.getFullYear(), 0, 0);
-            const diff = date - start;
-            const oneDay = 1000 * 60 * 60 * 24;
-            return Math.floor(diff / oneDay).toString().padStart(3, '0');
-        }
-        
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
         }
         
         function getWindColor(speedKt) {
