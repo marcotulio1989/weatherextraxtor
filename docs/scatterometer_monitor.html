@@ -1222,8 +1222,6 @@
             
             // Tentar usar API do servidor primeiro, depois fallback para arquivo JSON
             let dmwData = null;
-            let usingApi = false;
-            
             // Usar os mesmos bounds da imagem de satélite reprojetada
             // para garantir que os vetores fiquem dentro da área visível
             const latMin = REPROJECTION_BOUNDS.south;  // -30
@@ -1231,46 +1229,16 @@
             const lonMin = REPROJECTION_BOUNDS.west;   // -60
             const lonMax = REPROJECTION_BOUNDS.east;   // -30
             
-            try {
-                // Tentar múltiplas URLs da API
-                const apiUrls = [
-                    `/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`,
-                    `http://localhost:8080/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`,
-                    `${window.location.protocol}//${window.location.hostname}:8080/api/dmw?satellite=goes19&level=${level}&lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`
-                ];
-                
-                for (const apiUrl of apiUrls) {
-                    try {
-                        console.log(`[DMW] Tentando: ${apiUrl}`);
-                        log('info', `🌬️ DMW: Tentando API...`);
-                        const response = await fetch(apiUrl);
-                        console.log(`[DMW] Response status: ${response.status}`);
-                        if (response.ok) {
-                            dmwData = await response.json();
-                            console.log(`[DMW] Dados recebidos: ${dmwData.count || (dmwData.winds ? dmwData.winds.length : 0)} ventos`);
-                            usingApi = true;
-                            log('success', '✅ DMW: Conectado à API');
-                            break;
-                        }
-                    } catch (apiErr) {
-                        // Continuar para próxima URL
-                    }
-                }
-            } catch (apiErr) {
-                console.log('API não disponível, tentando arquivo JSON...');
-            }
+            // Carregar dados DMW do arquivo JSON (gerado pelo dmw_extractor.py)
+            console.log('[DMW] Carregando dmw_latest.json...');
+            log('info', '🌬️ DMW: Carregando dados...');
             
-            // Fallback para arquivo JSON estático
-            if (!dmwData) {
-                const jsonUrl = 'dmw_latest.json';
-                const response = await fetch(jsonUrl);
-                
-                if (!response.ok) {
-                    throw new Error(`Dados DMW não encontrados (${response.status})`);
-                }
-                
-                dmwData = await response.json();
+            const response = await fetch('dmw_latest.json?' + Date.now());
+            if (!response.ok) {
+                throw new Error(`Dados DMW não encontrados (${response.status})`);
             }
+            dmwData = await response.json();
+            console.log(`[DMW] Dados carregados: ${dmwData.count || (dmwData.winds ? dmwData.winds.length : 0)} ventos`);
             
             log('success', `✅ DMW carregado: ${dmwData.count || (dmwData.winds ? dmwData.winds.length : 0)} vetores totais`);
             
@@ -1449,52 +1417,13 @@
             statusEl.className = 'status-indicator loading';
             infoEl.textContent = '📡 Carregando dados L2...';
             
-            // Tentar API primeiro (extração em tempo real)
-            let response = null;
-            let usedApi = false;
+            // Carregar dados L2 do arquivo JSON (gerado pelo goes_l2_extractor.py)
+            console.log('[L2] Carregando goes_l2_latest.json...');
+            log('info', '📡 L2: Carregando dados...');
             
-            // Tentar múltiplas URLs da API
-            const apiUrls = [
-                `/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=15&products=DSIF,ACHAF,ACTPF,TPWF`,
-                `http://localhost:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=15&products=DSIF,ACHAF,ACTPF,TPWF`,
-                `${window.location.protocol}//${window.location.hostname}:8080/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=15&products=DSIF,ACHAF,ACTPF,TPWF`
-            ];
-            
-            for (const apiUrl of apiUrls) {
-                try {
-                    console.log(`[L2] Tentando: ${apiUrl.split('?')[0]}...`);
-                    log('info', `📡 L2: Tentando API...`);
-                    response = await fetch(apiUrl);
-                    console.log(`[L2] Response status: ${response.status}`);
-                    if (response.ok) {
-                        usedApi = true;
-                        log('success', '✅ L2: Conectado à API');
-                        break;
-                    } else {
-                        response = null; // Reset se não foi ok
-                    }
-                } catch (apiErr) {
-                    console.log(`[L2] Erro na API: ${apiErr.message}`);
-                    log('warning', `⚠️ L2: Falha ao conectar API: ${apiErr.message}`);
-                    response = null;
-                }
-            }
-            
-            // Fallback para arquivo JSON estático
-            if (!response || !usedApi) {
-                console.log('[L2] Usando fallback JSON: goes_l2_latest.json');
-                log('warning', '⚠️ L2: API não disponível, usando cache JSON');
-                try {
-                    response = await fetch('goes_l2_latest.json?' + Date.now());
-                    console.log(`[L2] Fallback response: ${response.status}`);
-                } catch (fallbackErr) {
-                    console.error('[L2] Erro no fallback:', fallbackErr);
-                    throw new Error('Dados L2 não disponíveis');
-                }
-            }
-            
-            if (!response || !response.ok) {
-                throw new Error('Dados L2 não disponíveis');
+            const response = await fetch('goes_l2_latest.json?' + Date.now());
+            if (!response.ok) {
+                throw new Error(`Dados L2 não encontrados (${response.status})`);
             }
             
             l2Data = await response.json();
@@ -1509,8 +1438,7 @@
             
             // Atualizar info
             const timestamp = new Date(l2Data.timestamp);
-            const source = usedApi ? '(API)' : '(cache)';
-            infoEl.innerHTML = `📅 ${timestamp.toLocaleString('pt-BR')} ${source}<br>🛰️ ${l2Data.satellite_name || 'GOES-19'}`;
+            infoEl.innerHTML = `📅 ${timestamp.toLocaleString('pt-BR')}<br>🛰️ ${l2Data.satellite_name || 'GOES-19'}`;
             
             statusEl.className = 'status-indicator active';
             log('success', `✅ L2: Dados carregados`);

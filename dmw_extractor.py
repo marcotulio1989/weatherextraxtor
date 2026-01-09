@@ -379,8 +379,8 @@ if __name__ == "__main__":
     print("GOES-R DERIVED MOTION WINDS (DMW) EXTRACTOR")
     print("=" * 70)
     
-    # Testar listagem
-    extractor = DMWExtractor(satellite="goes16")
+    # Testar listagem - usar GOES-19 (East) como padrão
+    extractor = DMWExtractor(satellite="goes19")
     
     print("\n📋 Arquivos disponíveis:")
     files = extractor.list_available_files(hours_back=2)
@@ -412,5 +412,11 @@ if __name__ == "__main__":
             print(f"\n   Exemplo: {sample['lat']:.2f}°, {sample['lon']:.2f}°")
             print(f"            Vel: {sample['speed_kt']:.1f} kt, Dir: {sample['direction']:.0f}°")
             print(f"            Pressão: {sample['pressure_hpa']:.0f} hPa")
+        
+        # Salvar em JSON para a página HTML
+        json_output = "/workspaces/weatherextraxtor/docs/dmw_latest.json"
+        with open(json_output, 'w') as f:
+            json.dump(winds, f, indent=2)
+        print(f"\n💾 Dados salvos em: {json_output}")
     else:
         print("❌ Nenhum arquivo encontrado")
