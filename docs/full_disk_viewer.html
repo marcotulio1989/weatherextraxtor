@@ -1099,133 +1099,215 @@
             if (!dmwEnabled) return;
             
             const level = document.getElementById('windLevel').value;
+            const satellite = document.getElementById('satellite').value;
             
-            showLoading('Carregando dados de vento...');
+            showLoading('Carregando ventos DMW do GOES...');
             setProgress(10);
             
             try {
-                // Usar Open-Meteo API - funciona direto no navegador, sem servidor!
-                // Gerar grid de pontos para buscar ventos
-                const bounds = map.getBounds();
-                const latMin = Math.max(bounds.getSouth(), -60);
-                const latMax = Math.min(bounds.getNorth(), 60);
-                const lonMin = bounds.getWest();
-                const lonMax = bounds.getEast();
+                // Buscar dados DMW do GOES via NOAA THREDDS (tem CORS!)
+                // URL base do THREDDS catalog para dados GOES em tempo real
+                const satNum = satellite.replace('goes', '');
                 
-                // Criar grid espaçado (a cada 2 graus para não sobrecarregar)
-                const step = 2;
-                const lats = [];
-                const lons = [];
+                // Níveis de pressão para filtrar
+                const levelConfig = {
+                    'low': { min: 700, max: 1100, name: 'Baixo Nível (<3km)' },
+                    'mid': { min: 400, max: 700, name: 'Nível Médio (3-7km)' },
+                    'high': { min: 100, max: 400, name: 'Alto Nível (>7km)' },
+                    'all': { min: 100, max: 1100, name: 'Todos os Níveis' }
+                };
                 
-                for (let lat = latMin; lat <= latMax; lat += step) {
-                    for (let lon = lonMin; lon <= lonMax; lon += step) {
-                        lats.push(lat.toFixed(2));
-                        lons.push(lon.toFixed(2));
+                const levelInfo = levelConfig[level] || levelConfig['low'];
+                
+                console.log(`🛰️ Buscando DMW GOES-${satNum}: ${levelInfo.name}`);
+                
+                // NOAA Unidata THREDDS - Dados GOES em tempo real com suporte JSON
+                // https://thredds.ucar.edu/thredds/catalog/satellite/goes/east/products/
+                const threddsBase = 'https://thredds.ucar.edu/thredds/ncss/grid/satellite/goes';
+                const region = satNum === '18' ? 'west' : 'east';
+                
+                // Tentar buscar do catálogo THREDDS
+                // Usando endpoint alternativo que retorna JSON
+                const catalogUrl = `https://thredds.ucar.edu/thredds/catalog/satellite/goes/${region}/products/CloudAndMoistureImagery/FullDisk/catalog.json`;
+                
+                console.log('📡 Verificando catálogo THREDDS...');
+                
+                // Como THREDDS pode não ter dados DMW diretamente acessíveis,
+                // vamos usar o AWS S3 public bucket com um proxy CORS
+                // O corsproxy.io é um serviço gratuito de proxy CORS
+                
+                const bucket = `noaa-goes${satNum}`;
+                const now = new Date();
+                const year = now.getUTCFullYear();
+                const doy = getDayOfYear(now);
+                const hour = now.getUTCHours().toString().padStart(2, '0');
+                
+                // Listar arquivos DMW disponíveis via S3 REST API
+                const s3ListUrl = `https://${bucket}.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-DMWF/${year}/${doy}/${hour}/&max-keys=10`;
+                
+                console.log('🔍 Buscando arquivos S3:', s3ListUrl);
+                setProgress(20);
+                
+                // Tentar buscar lista de arquivos (S3 tem CORS para listagem)
+                let dmwFileKey = null;
+                
+                try {
+                    const listResp = await fetch(s3ListUrl);
+                    if (listResp.ok) {
+                        const xmlText = await listResp.text();
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                        const keys = xmlDoc.getElementsByTagName('Key');
+                        
+                        if (keys.length > 0) {
+                            // Pegar o arquivo mais recente
+                            dmwFileKey = keys[keys.length - 1].textContent;
+                            console.log('📁 Arquivo DMW encontrado:', dmwFileKey);
+                        }
+                    }
+                } catch (e) {
+                    console.log('⚠️ Erro ao listar S3:', e);
+                }
+                
+                // Se não encontrou na hora atual, tentar hora anterior
+                if (!dmwFileKey) {
+                    const prevHour = (parseInt(hour) - 1 + 24) % 24;
+                    const prevHourStr = prevHour.toString().padStart(2, '0');
+                    const prevDoy = prevHour === 23 ? doy - 1 : doy;
+                    
+                    const s3PrevUrl = `https://${bucket}.s3.amazonaws.com/?list-type=2&prefix=ABI-L2-DMWF/${year}/${prevDoy}/${prevHourStr}/&max-keys=10`;
+                    
+                    try {
+                        const listResp = await fetch(s3PrevUrl);
+                        if (listResp.ok) {
+                            const xmlText = await listResp.text();
+                            const parser = new DOMParser();
+                            const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
+                            const keys = xmlDoc.getElementsByTagName('Key');
+                            
+                            if (keys.length > 0) {
+                                dmwFileKey = keys[keys.length - 1].textContent;
+                                console.log('📁 Arquivo DMW (hora anterior):', dmwFileKey);
+                            }
+                        }
+                    } catch (e) {
+                        console.log('⚠️ Erro ao listar S3 (hora anterior):', e);
                     }
                 }
                 
-                // Limitar a 100 pontos por request
-                const maxPoints = 100;
-                const totalPoints = Math.min(lats.length, maxPoints);
-                const selectedLats = lats.slice(0, totalPoints);
-                const selectedLons = lons.slice(0, totalPoints);
+                setProgress(40);
                 
-                // Altura baseada no nível selecionado
-                let windVar = 'wind_speed_10m,wind_direction_10m';
-                let levelName = 'Superfície (10m)';
-                
-                if (level === 'low') {
-                    windVar = 'wind_speed_80m,wind_direction_80m';
-                    levelName = 'Baixo Nível (80m)';
-                } else if (level === 'mid') {
-                    windVar = 'wind_speed_180m,wind_direction_180m';
-                    levelName = 'Nível Médio (180m)';
-                } else if (level === 'high') {
-                    windVar = 'wind_speed_180m,wind_direction_180m';
-                    levelName = 'Alto Nível (180m)';
+                if (!dmwFileKey) {
+                    throw new Error('Nenhum arquivo DMW disponível no momento');
                 }
                 
-                console.log(`🌬️ Buscando ventos Open-Meteo: ${totalPoints} pontos`);
+                // Baixar arquivo NetCDF via proxy CORS
+                // Usando corsproxy.io que é gratuito e confiável
+                const ncUrl = `https://${bucket}.s3.amazonaws.com/${dmwFileKey}`;
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(ncUrl)}`;
                 
-                const url = `https://api.open-meteo.com/v1/forecast?` +
-                    `latitude=${selectedLats.join(',')}&longitude=${selectedLons.join(',')}` +
-                    `&current=${windVar}&timezone=auto`;
+                console.log('📥 Baixando NetCDF via proxy:', ncUrl);
                 
-                console.log('🌬️ URL:', url);
-                
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                const ncResp = await fetch(proxyUrl);
+                if (!ncResp.ok) {
+                    throw new Error(`Erro ao baixar arquivo: ${ncResp.status}`);
                 }
                 
-                const data = await response.json();
-                console.log('✅ Open-Meteo data:', data);
+                const ncBuffer = await ncResp.arrayBuffer();
+                console.log(`✅ Arquivo baixado: ${(ncBuffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
                 
-                setProgress(50);
+                setProgress(60);
                 
-                // Processar resposta (pode ser array ou objeto único)
-                const results = Array.isArray(data) ? data : [data];
+                // Processar NetCDF usando netcdfjs
+                // Carregar biblioteca se não estiver disponível
+                if (typeof NetCDF === 'undefined') {
+                    console.log('📦 Carregando biblioteca NetCDF...');
+                    await loadScript('https://cdn.jsdelivr.net/npm/netcdfjs@2.0.2/dist/netcdfjs.min.js');
+                }
+                
+                const nc = new NetCDF(ncBuffer);
+                console.log('📊 Variáveis NetCDF:', nc.variables);
+                
+                // Extrair dados de vento
+                const lat = nc.getDataVariable('lat');
+                const lon = nc.getDataVariable('lon');
+                const windSpeed = nc.getDataVariable('wind_speed');
+                const windDir = nc.getDataVariable('wind_direction');
+                const pressure = nc.getDataVariable('pressure');
+                
+                setProgress(80);
                 
                 // Limpar camada anterior
                 clearDMWLayer();
-                
-                // Criar grupo de camadas para ventos
                 dmwLayer = L.layerGroup().addTo(map);
                 
                 const winds = [];
+                const step = Math.max(1, Math.floor(lat.length / 500)); // Limitar a ~500 pontos
                 
-                for (let i = 0; i < results.length; i++) {
-                    const r = results[i];
-                    if (!r.current) continue;
+                for (let i = 0; i < lat.length; i += step) {
+                    const p = pressure[i];
                     
-                    const lat = r.latitude;
-                    const lon = r.longitude;
-                    const speed = r.current.wind_speed_80m || r.current.wind_speed_180m || r.current.wind_speed_10m || 0;
-                    const dir = r.current.wind_direction_80m || r.current.wind_direction_180m || r.current.wind_direction_10m || 0;
+                    // Filtrar por nível de pressão
+                    if (p < levelInfo.min || p > levelInfo.max) continue;
                     
-                    if (speed === 0) continue;
+                    const speed = windSpeed[i];
+                    const dir = windDir[i];
                     
-                    // Converter km/h para knots
-                    const speedKt = speed * 0.539957;
+                    if (isNaN(speed) || isNaN(dir) || speed <= 0) continue;
+                    
+                    // Converter m/s para knots
+                    const speedKt = speed * 1.94384;
                     
                     winds.push({
-                        lat: lat,
-                        lon: lon,
+                        lat: lat[i],
+                        lon: lon[i],
                         speed_kt: speedKt,
-                        direction: dir
+                        direction: dir,
+                        pressure: p
                     });
                     
                     // Cor baseada na velocidade
                     const color = getWindColor(speedKt);
                     
                     // Criar seta de vento
-                    const arrow = createWindArrow(lat, lon, dir, speedKt, color);
+                    const arrow = createWindArrow(lat[i], lon[i], dir, speedKt, color);
                     arrow.addTo(dmwLayer);
                     dmwMarkers.push(arrow);
-                    
-                    // Progress
-                    if (i % 10 === 0) {
-                        setProgress(50 + (i / results.length) * 45);
-                    }
                 }
                 
                 // Atualizar info
                 document.getElementById('windInfo').textContent = 
-                    `${winds.length} vetores | ${levelName}`;
+                    `${winds.length} vetores | ${levelInfo.name}`;
                 
                 setProgress(100);
                 setTimeout(hideLoading, 300);
                 
                 document.getElementById('statusText').textContent = 
-                    `Ventos: ${winds.length} vetores carregados (Open-Meteo)`;
+                    `Ventos DMW GOES-${satNum}: ${winds.length} vetores`;
                 
             } catch (err) {
-                console.error('❌ Erro ventos:', err);
+                console.error('❌ Erro DMW:', err);
                 document.getElementById('windInfo').textContent = 'Erro ao carregar';
                 document.getElementById('statusText').textContent = 'Erro: ' + err.message;
                 hideLoading();
             }
+        }
+        
+        function getDayOfYear(date) {
+            const start = new Date(date.getFullYear(), 0, 0);
+            const diff = date - start;
+            const oneDay = 1000 * 60 * 60 * 24;
+            return Math.floor(diff / oneDay).toString().padStart(3, '0');
+        }
+        
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
         }
         
         function getWindColor(speedKt) {
