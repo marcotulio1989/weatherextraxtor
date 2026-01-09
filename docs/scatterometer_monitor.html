@@ -585,6 +585,64 @@
             <div id="satellite-info" style="margin-top:8px; font-size:10px; color:#888;"></div>
         </div>
         
+        <!-- VENTOS DMW (GOES) -->
+        <h2>🌬️ VENTOS DMW (GOES)</h2>
+        <div class="section" style="border-left: 3px solid #ff9900;">
+            <div class="section-title">
+                <span class="status-indicator" id="dmw-status"></span>
+                Derived Motion Winds - Satélite GOES
+            </div>
+            <p class="source-info">Ventos derivados do movimento das nuvens</p>
+            
+            <!-- Toggle DMW -->
+            <label>🌬️ Ativar DMW:</label>
+            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
+                <button id="btn-dmw-on" class="toggle-btn" onclick="toggleDMW(true)">✅ LIGADO</button>
+                <button id="btn-dmw-off" class="toggle-btn active" onclick="toggleDMW(false)">❌ DESLIGADO</button>
+            </div>
+            
+            <!-- Nível de Vento -->
+            <label>📊 Nível de Altitude:</label>
+            <select id="dmw-level" style="width:100%; margin-bottom:10px; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px;" onchange="loadDMWWinds()">
+                <option value="low" selected>Baixo Nível (&lt;3km) - 700-1000 hPa</option>
+                <option value="mid">Nível Médio (3-7km) - 400-700 hPa</option>
+                <option value="high">Alto Nível (&gt;7km) - 100-400 hPa</option>
+                <option value="all">Todos os Níveis</option>
+            </select>
+            
+            <button onclick="loadDMWWinds()" style="width:100%; margin-bottom:10px;">🔄 ATUALIZAR DMW</button>
+            
+            <!-- Info do arquivo -->
+            <div id="dmw-info" style="font-size:10px; color:#888; margin-bottom:8px;">
+                📅 Aguardando...
+            </div>
+            
+            <!-- Legenda de Intensidade -->
+            <div style="background:#111; padding:8px; border-radius:4px; font-size:10px;">
+                <div style="color:#00ffcc; margin-bottom:5px; font-weight:bold;">📊 Intensidade do Vento:</div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#00ff00; border-radius:2px;"></span>
+                    <span>0-10 kt - Calmo</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ffff00; border-radius:2px;"></span>
+                    <span>10-20 kt - Fraco</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ffa500; border-radius:2px;"></span>
+                    <span>20-30 kt - Moderado</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ff6600; border-radius:2px;"></span>
+                    <span>30-40 kt - Forte</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ff0000; border-radius:2px;"></span>
+                    <span>&gt;40 kt - Muito Forte</span>
+                </div>
+            </div>
+        </div>
+        
         <!-- Log -->
         <h2>📋 LOG</h2>
         <div class="log-area" id="log-area">
@@ -734,6 +792,175 @@
     let pendingSatelliteLayer = null;  // Camada sendo carregada em background
     let autoExtractEnabled = true;  // Auto-extração ligada por padrão
     
+    // =========================================================================
+    // CAMADA DMW (Derived Motion Winds)
+    // =========================================================================
+    let dmwEnabled = false;
+    let dmwLayer = null;
+    let dmwData = null;
+    let dmwMarkers = [];
+    
+    function toggleDMW(enabled) {
+        dmwEnabled = enabled;
+        
+        // Atualizar botões
+        document.getElementById('btn-dmw-on').classList.toggle('active', enabled);
+        document.getElementById('btn-dmw-off').classList.toggle('active', !enabled);
+        
+        // Atualizar status
+        const statusEl = document.getElementById('dmw-status');
+        
+        if (enabled) {
+            log('success', '✅ DMW LIGADO - Carregando ventos...');
+            statusEl.className = 'status-indicator loading';
+            loadDMWWinds();
+        } else {
+            log('info', '❌ DMW DESLIGADO');
+            statusEl.className = 'status-indicator';
+            clearDMWLayer();
+        }
+    }
+    
+    function clearDMWLayer() {
+        if (dmwLayer) {
+            dmwLayer.clearLayers();
+            map.removeLayer(dmwLayer);
+            dmwLayer = null;
+        }
+        dmwMarkers = [];
+    }
+    
+    async function loadDMWWinds() {
+        if (!dmwEnabled) return;
+        
+        const level = document.getElementById('dmw-level').value;
+        const statusEl = document.getElementById('dmw-status');
+        const infoEl = document.getElementById('dmw-info');
+        
+        statusEl.className = 'status-indicator loading';
+        log('info', '🌬️ Carregando dados DMW do GOES...');
+        
+        try {
+            // Níveis de pressão para filtrar
+            const levelConfig = {
+                'low': { min: 700, max: 1100, name: 'Baixo Nível (<3km)' },
+                'mid': { min: 400, max: 700, name: 'Nível Médio (3-7km)' },
+                'high': { min: 100, max: 400, name: 'Alto Nível (>7km)' },
+                'all': { min: 100, max: 1100, name: 'Todos os Níveis' }
+            };
+            
+            const levelInfo = levelConfig[level] || levelConfig['low'];
+            
+            // Buscar arquivo JSON pré-processado
+            const jsonUrl = 'dmw_latest.json';
+            
+            const response = await fetch(jsonUrl);
+            
+            if (!response.ok) {
+                throw new Error(`Dados DMW não encontrados (${response.status})`);
+            }
+            
+            dmwData = await response.json();
+            log('success', `✅ DMW carregado: ${dmwData.count} vetores totais`);
+            
+            // Limpar camada anterior
+            clearDMWLayer();
+            dmwLayer = L.layerGroup().addTo(map);
+            
+            const winds = [];
+            const allWinds = dmwData.winds || [];
+            
+            // Obter bounds da área de interesse (ao redor do navio)
+            const latMin = CONFIG.shipLat - 15;
+            const latMax = CONFIG.shipLat + 15;
+            const lonMin = CONFIG.shipLon - 20;
+            const lonMax = CONFIG.shipLon + 20;
+            
+            for (let i = 0; i < allWinds.length; i++) {
+                const w = allWinds[i];
+                
+                // Filtrar por área ao redor do navio
+                if (w.lat < latMin || w.lat > latMax) continue;
+                if (w.lon < lonMin || w.lon > lonMax) continue;
+                
+                // Filtrar por nível de pressão
+                if (w.pressure_hpa < levelInfo.min || w.pressure_hpa > levelInfo.max) continue;
+                
+                winds.push(w);
+                
+                // Cor baseada na velocidade
+                const color = getDMWColor(w.speed_kt);
+                
+                // Criar seta de vento
+                const arrow = createDMWArrow(w.lat, w.lon, w.direction, w.speed_kt, color);
+                arrow.addTo(dmwLayer);
+                dmwMarkers.push(arrow);
+            }
+            
+            // Atualizar info com horário do arquivo
+            const timestamp = dmwData.timestamp ? new Date(dmwData.timestamp) : new Date();
+            const scanTime = dmwData.scan_time || timestamp.toISOString();
+            infoEl.innerHTML = `📅 <strong>${winds.length}</strong> vetores | ${levelInfo.name}<br>` +
+                              `🛰️ GOES: ${new Date(scanTime).toLocaleString('pt-BR')}`;
+            
+            statusEl.className = 'status-indicator active';
+            log('success', `✅ DMW: ${winds.length} vetores na área do navio`);
+            
+        } catch (err) {
+            console.error('❌ Erro DMW:', err);
+            log('error', 'Erro DMW: ' + err.message);
+            statusEl.className = 'status-indicator error';
+            infoEl.textContent = '❌ Erro ao carregar dados';
+        }
+    }
+    
+    function getDMWColor(speedKt) {
+        if (speedKt < 10) return '#00ff00';      // Verde - Calmo
+        if (speedKt < 20) return '#ffff00';      // Amarelo - Fraco
+        if (speedKt < 30) return '#ffa500';      // Laranja - Moderado
+        if (speedKt < 40) return '#ff6600';      // Laranja escuro - Forte
+        return '#ff0000';                         // Vermelho - Muito forte
+    }
+    
+    function createDMWArrow(lat, lon, direction, speed, color) {
+        // Tamanho da seta baseado na velocidade
+        const arrowLength = Math.min(0.3 + speed * 0.01, 0.8);
+        
+        // Converter direção meteorológica (de onde vem) para direção vetorial (para onde vai)
+        const dirRad = (direction + 180) * Math.PI / 180;
+        
+        // Calcular ponto final da seta
+        const endLat = lat + arrowLength * Math.cos(dirRad);
+        const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+        
+        // Criar linha
+        const line = L.polyline([[lat, lon], [endLat, endLon]], {
+            color: color,
+            weight: 2,
+            opacity: 0.9
+        });
+        
+        // Adicionar ponta da seta
+        const arrowHead = L.circleMarker([endLat, endLon], {
+            radius: 3,
+            color: color,
+            fillColor: color,
+            fillOpacity: 1
+        });
+        
+        // Popup com informações
+        const popup = `<b>Vento DMW (GOES)</b><br>
+                       Velocidade: ${speed.toFixed(1)} kt<br>
+                       Direção: ${direction.toFixed(0)}°<br>
+                       Pressão: ${speed > 0 ? 'N/A' : ''} hPa`;
+        
+        line.bindPopup(popup);
+        arrowHead.bindPopup(popup);
+        
+        // Grupo com linha e ponta
+        return L.layerGroup([line, arrowHead]);
+    }
+
     // Função para ligar/desligar auto-extração
     function toggleAutoExtract(enabled) {
         autoExtractEnabled = enabled;
