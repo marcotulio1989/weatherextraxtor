@@ -10,3 +10,4 @@ output/
 output2/
 *.csv
 !docs/*.csv
+data/

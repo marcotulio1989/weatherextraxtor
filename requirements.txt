@@ -5,3 +5,5 @@ jinja2
 copernicusmarine
 xarray
 netCDF4
+boto3
+s3fs

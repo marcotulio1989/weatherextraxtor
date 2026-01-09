@@ -142,6 +142,86 @@
             justify-content: space-between;
         }
         
+        /* Toggle Button para Camadas */
+        .toggle-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #2d3748, #1a202c);
+            border: 1px solid #444;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .toggle-btn:hover { border-color: #00d4ff; }
+        .toggle-btn.active {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border-color: #00d4ff;
+            color: #000;
+        }
+        .toggle-btn .toggle-indicator {
+            width: 36px;
+            height: 20px;
+            background: #444;
+            border-radius: 10px;
+            position: relative;
+            transition: all 0.3s;
+        }
+        .toggle-btn.active .toggle-indicator {
+            background: rgba(0,0,0,0.3);
+        }
+        .toggle-btn .toggle-indicator::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: #888;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+        .toggle-btn.active .toggle-indicator::after {
+            left: 18px;
+            background: #fff;
+        }
+        
+        /* Wind Legend */
+        .wind-legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.9);
+            padding: 12px;
+            border-radius: 8px;
+            z-index: 1000;
+            border: 1px solid #333;
+            display: none;
+        }
+        .wind-legend.show { display: block; }
+        .wind-legend h4 { 
+            color: #00d4ff; 
+            margin-bottom: 8px; 
+            font-size: 0.85em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .wind-legend-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 0.75em;
+        }
+        .wind-legend-color {
+            width: 30px;
+            height: 4px;
+            border-radius: 2px;
+        }
+        
         /* DEBUG LOG */
         #debugPanel {
             position: fixed;
@@ -176,6 +256,21 @@
             white-space: pre-wrap;
         }
         .test-btn { background: linear-gradient(135deg, #ff6600, #cc3300) !important; }
+        
+        /* Wind Popup Style */
+        .wind-popup .leaflet-popup-content-wrapper {
+            background: rgba(0,0,0,0.9);
+            color: #fff;
+            border: 1px solid #00d4ff;
+        }
+        .wind-popup .leaflet-popup-tip {
+            background: rgba(0,0,0,0.9);
+        }
+        
+        /* Wind Arrow Animation */
+        .wind-arrow-head {
+            transition: transform 0.3s ease;
+        }
     </style>
 </head>
 <body>
@@ -241,8 +336,53 @@
         <button id="downloadBtn" onclick="downloadImage()" disabled>💾 BAIXAR IMAGEM</button>
         <button onclick="fitBounds()">📍 Ver Tudo</button>
         <button onclick="zoomShip()">🚢 Ir ao Navio</button>
-        <button class="test-btn" onclick="testarReprojecao()">🧪 TESTAR REPROJEÇÃO</button>
+        
+        <!-- Toggle DMW Winds -->
+        <div class="toggle-btn" id="toggleDMW" onclick="toggleDMWWinds()">
+            <span>🌬️ Ventos DMW</span>
+            <div class="toggle-indicator"></div>
+        </div>
+        
+        <div class="control-group">
+            <label>🌬️ Nível de Vento</label>
+            <select id="windLevel" onchange="if(dmwEnabled) loadDMWWinds()">
+                <option value="low" selected>Baixo (&lt;3km)</option>
+                <option value="mid">Médio (3-7km)</option>
+                <option value="high">Alto (&gt;7km)</option>
+                <option value="all">Todos</option>
+            </select>
+        </div>
+        
+        <button class="test-btn" onclick="testarReprojecao()">🧪 TESTAR</button>
         <button onclick="toggleDebug()">📋 DEBUG</button>
+    </div>
+    
+    <!-- Wind Legend -->
+    <div class="wind-legend" id="windLegend">
+        <h4>🌬️ Ventos DMW (GOES)</h4>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #00ff00;"></div>
+            <span>0-10 kt (Calmo)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #ffff00;"></div>
+            <span>10-20 kt (Fraco)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #ffa500;"></div>
+            <span>20-30 kt (Moderado)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #ff6600;"></div>
+            <span>30-40 kt (Forte)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #ff0000;"></div>
+            <span>&gt;40 kt (Muito Forte)</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 0.7em; color: #888;">
+            <span id="windInfo">-</span>
+        </div>
     </div>
     
     <!-- DEBUG PANEL -->
@@ -922,10 +1062,199 @@
         }
         
         // =========================================================
+        // DMW - DERIVED MOTION WINDS
+        // =========================================================
+        
+        let dmwEnabled = false;
+        let dmwLayer = null;
+        let dmwMarkers = [];
+        let dmwData = null;
+        
+        function toggleDMWWinds() {
+            const btn = document.getElementById('toggleDMW');
+            dmwEnabled = !dmwEnabled;
+            
+            if (dmwEnabled) {
+                btn.classList.add('active');
+                document.getElementById('windLegend').classList.add('show');
+                loadDMWWinds();
+            } else {
+                btn.classList.remove('active');
+                document.getElementById('windLegend').classList.remove('show');
+                clearDMWLayer();
+            }
+        }
+        
+        function clearDMWLayer() {
+            // Remover marcadores existentes
+            dmwMarkers.forEach(m => map.removeLayer(m));
+            dmwMarkers = [];
+            if (dmwLayer) {
+                map.removeLayer(dmwLayer);
+                dmwLayer = null;
+            }
+        }
+        
+        async function loadDMWWinds() {
+            if (!dmwEnabled) return;
+            
+            const level = document.getElementById('windLevel').value;
+            const satellite = document.getElementById('satellite').value;
+            
+            showLoading('Carregando dados de vento DMW...');
+            setProgress(10);
+            
+            try {
+                // Buscar dados do servidor
+                const bounds = map.getBounds();
+                const url = `/api/dmw?satellite=${satellite}&level=${level}` +
+                           `&lat_min=${bounds.getSouth()}&lat_max=${bounds.getNorth()}` +
+                           `&lon_min=${bounds.getWest()}&lon_max=${bounds.getEast()}`;
+                
+                console.log('🌬️ Buscando DMW:', url);
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                dmwData = await response.json();
+                console.log('✅ DMW data:', dmwData);
+                
+                setProgress(50);
+                
+                // Atualizar info
+                document.getElementById('windInfo').textContent = 
+                    `${dmwData.count} vetores | ${dmwData.level_name}`;
+                
+                // Limpar camada anterior
+                clearDMWLayer();
+                
+                // Criar grupo de camadas para ventos
+                dmwLayer = L.layerGroup().addTo(map);
+                
+                // Adicionar vetores de vento
+                const winds = dmwData.winds || [];
+                
+                for (let i = 0; i < winds.length; i++) {
+                    const w = winds[i];
+                    
+                    // Cor baseada na velocidade
+                    const color = getWindColor(w.speed_kt);
+                    
+                    // Criar seta de vento
+                    const arrow = createWindArrow(w.lat, w.lon, w.direction, w.speed_kt, color);
+                    arrow.addTo(dmwLayer);
+                    dmwMarkers.push(arrow);
+                    
+                    // Progress
+                    if (i % 50 === 0) {
+                        setProgress(50 + (i / winds.length) * 45);
+                    }
+                }
+                
+                setProgress(100);
+                setTimeout(hideLoading, 300);
+                
+                document.getElementById('statusText').textContent = 
+                    `Ventos DMW: ${winds.length} vetores carregados`;
+                
+            } catch (err) {
+                console.error('❌ Erro DMW:', err);
+                document.getElementById('statusText').textContent = 'Erro ao carregar ventos: ' + err.message;
+                hideLoading();
+                
+                // Mostrar mensagem de fallback
+                document.getElementById('windInfo').textContent = 'Erro ao carregar dados';
+            }
+        }
+        
+        function getWindColor(speedKt) {
+            if (speedKt < 10) return '#00ff00';      // Verde - Calmo
+            if (speedKt < 20) return '#ffff00';      // Amarelo - Fraco
+            if (speedKt < 30) return '#ffa500';      // Laranja - Moderado
+            if (speedKt < 40) return '#ff6600';      // Laranja escuro - Forte
+            return '#ff0000';                         // Vermelho - Muito forte
+        }
+        
+        function createWindArrow(lat, lon, direction, speed, color) {
+            // Tamanho da seta baseado na velocidade (normalizado para visualização)
+            const arrowLength = Math.min(0.3 + speed * 0.01, 0.8);
+            
+            // Converter direção meteorológica (de onde vem) para direção vetorial (para onde vai)
+            const dirRad = (direction + 180) * Math.PI / 180;
+            
+            // Calcular ponto final da seta
+            const endLat = lat + arrowLength * Math.cos(dirRad);
+            const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+            
+            // Criar polyline com decorador de seta
+            const line = L.polyline([[lat, lon], [endLat, endLon]], {
+                color: color,
+                weight: 2,
+                opacity: 0.8
+            });
+            
+            // Adicionar popup
+            line.bindPopup(`
+                <div style="text-align:center;">
+                    <b>🌬️ Vento DMW</b><br>
+                    <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
+                    Direção: ${direction.toFixed(0)}°<br>
+                    Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
+                </div>
+            `, { className: 'wind-popup' });
+            
+            // Adicionar cabeça da seta como triângulo
+            const arrowHead = createArrowHead(endLat, endLon, direction, color);
+            
+            // Retornar grupo
+            return L.layerGroup([line, arrowHead]);
+        }
+        
+        function createArrowHead(lat, lon, direction, color) {
+            // Criar marcador com ícone de seta rotacionado
+            const icon = L.divIcon({
+                html: `<div style="
+                    width: 0;
+                    height: 0;
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-bottom: 10px solid ${color};
+                    transform: rotate(${direction + 180}deg);
+                    transform-origin: center center;
+                    filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+                "></div>`,
+                iconSize: [10, 10],
+                iconAnchor: [5, 5],
+                className: 'wind-arrow-head'
+            });
+            
+            return L.marker([lat, lon], { icon, interactive: false });
+        }
+        
+        // Recarregar ventos quando mover o mapa
+        let dmwReloadTimeout = null;
+        
+        function setupDMWAutoReload() {
+            map.on('moveend', () => {
+                if (dmwEnabled) {
+                    // Debounce para não recarregar muito frequentemente
+                    clearTimeout(dmwReloadTimeout);
+                    dmwReloadTimeout = setTimeout(() => {
+                        loadDMWWinds();
+                    }, 1000);
+                }
+            });
+        }
+        
+        // =========================================================
         // INIT
         // =========================================================
         
         init();
+        setupDMWAutoReload();
     </script>
 </body>
 </html>
