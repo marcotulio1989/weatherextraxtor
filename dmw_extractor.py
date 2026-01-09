@@ -280,6 +280,7 @@ class DMWExtractor:
         speed_filtered = speed[mask]
         direction_filtered = direction[mask]
         pressure_filtered = pressure[mask]
+        dqf_filtered = dqf[mask]
         
         # Converter velocidade de m/s para knots
         speed_knots = speed_filtered * 1.94384
@@ -301,6 +302,7 @@ class DMWExtractor:
             speed_knots = speed_knots[indices]
             direction_filtered = direction_filtered[indices]
             pressure_filtered = pressure_filtered[indices]
+            dqf_filtered = dqf_filtered[indices]
             u = u[indices]
             v = v[indices]
             n_points = len(lat_filtered)
@@ -318,6 +320,7 @@ class DMWExtractor:
                 'speed_kt': float(speed_knots[i]),
                 'direction': float(direction_filtered[i]),
                 'pressure_hpa': float(pressure_filtered[i]),
+                'quality_flag': int(dqf_filtered[i]),
                 'u': float(u[i]),
                 'v': float(v[i])
             })

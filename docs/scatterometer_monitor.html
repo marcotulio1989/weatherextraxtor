@@ -1002,8 +1002,10 @@
                 // Cor baseada na velocidade
                 const color = getDMWColor(w.speed_kt);
                 
-                // Criar seta de vento
-                const arrow = createDMWArrow(w.lat, w.lon, w.direction, w.speed_kt, color);
+                // Criar seta de vento com pressão e quality flag
+                const pressure = w.pressure_hpa || 0;
+                const qf = w.quality_flag !== undefined ? w.quality_flag : -1;
+                const arrow = createDMWArrow(w.lat, w.lon, w.direction, w.speed_kt, color, pressure, qf);
                 arrow.addTo(dmwLayer);
                 dmwMarkers.push(arrow);
             }
@@ -1033,7 +1035,7 @@
         return '#ff0000';                         // Vermelho - Muito forte
     }
     
-    function createDMWArrow(lat, lon, direction, speed, color) {
+    function createDMWArrow(lat, lon, direction, speed, color, pressure, qualityFlag) {
         // Tamanho da seta baseado na velocidade (20-32 px)
         const size = Math.min(20 + speed * 0.3, 32);
         
@@ -1060,10 +1062,19 @@
             iconAnchor: [size/2, (size + 12)/2]
         });
         
-        // Popup com informações
+        // Quality flag descrição
+        const qfDesc = qualityFlag === 0 ? '✅ Ótimo' : 
+                       qualityFlag === 1 ? '⚠️ Bom' : 
+                       qualityFlag === 2 ? '⚠️ Degradado' : 
+                       qualityFlag === 3 ? '❌ Baixo' : '❓ N/A';
+        
+        // Popup com informações completas
         const popup = `<b>🌬️ Vento DMW (GOES)</b><br>
-                       <b>Velocidade:</b> ${speed.toFixed(1)} kt<br>
+                       <b>Velocidade:</b> ${speed.toFixed(1)} kt (${(speed * 0.514444).toFixed(1)} m/s)<br>
                        <b>Direção:</b> ${direction.toFixed(0)}° (de onde vem)<br>
+                       <b>Pressão:</b> ${pressure.toFixed(0)} hPa<br>
+                       <b>Qualidade:</b> ${qfDesc}<br>
+                       <hr style="margin:4px 0;border-color:#444;">
                        <b>Lat:</b> ${lat.toFixed(3)}°<br>
                        <b>Lon:</b> ${lon.toFixed(3)}°`;
 
