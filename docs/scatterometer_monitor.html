@@ -701,6 +701,15 @@
         shipName: "Deepwater Aquila"
     };
     
+    // Bounds da imagem de satélite reprojetada (área de interesse)
+    // IMPORTANTE: Definir aqui para ser usada por loadDMWWinds antes de ser redefinida abaixo
+    const REPROJECTION_BOUNDS = {
+        north: 0,
+        south: -30,
+        west: -60,
+        east: -30
+    };
+    
     let map;
     let windDataPoints = [];  // Armazena todos os dados de vento
     let windLayerGroup;
@@ -1099,13 +1108,7 @@
     // REPROJEÇÃO REAL - GOES Full Disk para Web Mercator
     // =========================================================================
     
-    // Bounds de saída para reprojeção (área de interesse)
-    const REPROJECTION_BOUNDS = {
-        north: 0,
-        south: -30,
-        west: -60,
-        east: -30
-    };
+    // REPROJECTION_BOUNDS já definido acima, próximo ao CONFIG
     
     // Função para gerar URL da imagem Full Disk
     function getFullDiskUrl(satellite, product) {
