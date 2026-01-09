@@ -646,14 +646,9 @@
 
 <!-- ABA DE PREVISÃO NO TOPO - FULL WIDTH -->
 <div class="forecast-tabs-container" id="forecast-container">
-    <!-- LINHA 1: Título + Período + Status -->
+    <!-- LINHA 1: Título + Status -->
     <div class="forecast-row-1">
-        <div class="forecast-title">🌊 PREVISÃO (5 Modelos)</div>
-        <div class="forecast-period-tabs">
-            <button class="forecast-period-btn active" onclick="selectForecastPeriod(24)">24h</button>
-            <button class="forecast-period-btn" onclick="selectForecastPeriod(48)">48h</button>
-            <button class="forecast-period-btn" onclick="selectForecastPeriod(72)">72h</button>
-        </div>
+        <div class="forecast-title">🌊 PREVISÃO DE VENTO</div>
         <div class="forecast-status" id="forecast-status">⏰ 15min</div>
         <button class="forecast-toggle-info" id="forecast-toggle-btn" onclick="toggleForecastInfo()">▼ Detalhes</button>
     </div>
@@ -703,7 +698,15 @@
 <div class="container">
     <!-- PAINEL LATERAL -->
     <div class="sidebar">
-        <h1>🛰️ SCATTEROMETER MONITOR</h1>
+        
+        <!-- SELETOR DE PERÍODO -->
+        <div class="section" style="padding:8px;">
+            <div style="display:flex; gap:5px;">
+                <button class="forecast-period-btn active" onclick="selectForecastPeriod(24)" style="flex:1;">24h</button>
+                <button class="forecast-period-btn" onclick="selectForecastPeriod(48)" style="flex:1;">48h</button>
+                <button class="forecast-period-btn" onclick="selectForecastPeriod(72)" style="flex:1;">72h</button>
+            </div>
+        </div>
         
         <!-- POSIÇÃO DO NAVIO -->
         <div class="section">
@@ -730,9 +733,9 @@
         </div>
         <div class="collapsible-content collapsed">
             <div class="section">
-                <!-- Média Multi-Modelo com Pesos Dinâmicos -->
+                <!-- Média Multi-Modelo -->
                 <div style="background:#1a2a1a; border:1px solid #00aa00; border-radius:4px; padding:10px; margin-bottom:10px;">
-                    <div style="font-size:10px; color:#00ff00; margin-bottom:5px;">🌍 MÉDIA PONDERADA (5 MODELOS)</div>
+                    <div style="font-size:10px; color:#00ff00; margin-bottom:5px;">🌍 VENTO ATUAL</div>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <div style="text-align:center;">
                             <div style="font-size:24px; font-weight:bold; color:#00ffcc;" id="avg-model-speed">--</div>
