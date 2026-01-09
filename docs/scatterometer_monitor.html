@@ -654,6 +654,72 @@
             </div>
         </div>
         
+        <!-- PRODUTOS L2 GOES (CAPE, LI, Cloud Info) -->
+        <h2>📊 PRODUTOS L2 GOES</h2>
+        <div class="section" style="border-left: 3px solid #00d4ff;">
+            <div class="section-title">
+                <span class="status-indicator" id="l2-status"></span>
+                Índices de Instabilidade e Nuvens
+            </div>
+            <p class="source-info">CAPE, Lifted Index, Altura/Fase de Nuvem, TPW</p>
+            
+            <!-- Toggle L2 -->
+            <label>📊 Ativar Dados L2:</label>
+            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
+                <button id="btn-l2-on" class="toggle-btn" onclick="toggleL2(true)">✅ LIGADO</button>
+                <button id="btn-l2-off" class="toggle-btn active" onclick="toggleL2(false)">❌ DESLIGADO</button>
+            </div>
+            
+            <!-- Variável para exibir -->
+            <label>📈 Variável Principal:</label>
+            <select id="l2-variable" style="width:100%; margin-bottom:10px; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px;" onchange="updateL2Display()">
+                <option value="CAPE" selected>⚡ CAPE (J/kg) - Energia Convectiva</option>
+                <option value="LI">🌡️ Lifted Index (K) - Instabilidade</option>
+                <option value="TPW">💧 TPW (mm) - Água Precipitável</option>
+                <option value="HT">☁️ Altura da Nuvem (km)</option>
+                <option value="Phase">🧊 Fase da Nuvem (água/gelo)</option>
+            </select>
+            
+            <button onclick="loadL2Data()" style="width:100%; margin-bottom:10px;">🔄 CARREGAR L2</button>
+            
+            <!-- Info -->
+            <div id="l2-info" style="font-size:10px; color:#888; margin-bottom:8px;">
+                📅 Aguardando...
+            </div>
+            
+            <!-- Estatísticas L2 no ponto do navio -->
+            <div id="l2-ship-data" style="display:none; background:#0a1a2a; padding:10px; border-radius:4px; margin-bottom:10px;">
+                <div style="color:#00d4ff; font-size:11px; font-weight:bold; margin-bottom:5px;">📍 NO PONTO DO NAVIO:</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px; font-size:10px;">
+                    <div>⚡ CAPE: <span id="l2-ship-cape" style="color:#ffcc00;">--</span></div>
+                    <div>🌡️ LI: <span id="l2-ship-li" style="color:#00ff88;">--</span></div>
+                    <div>💧 TPW: <span id="l2-ship-tpw" style="color:#00ccff;">--</span></div>
+                    <div>☁️ Altura: <span id="l2-ship-ht" style="color:#ff88ff;">--</span></div>
+                </div>
+            </div>
+            
+            <!-- Legenda CAPE -->
+            <div id="l2-legend-cape" style="background:#111; padding:8px; border-radius:4px; font-size:10px;">
+                <div style="color:#00d4ff; margin-bottom:5px; font-weight:bold;">⚡ CAPE (Energia Convectiva):</div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#00ff00; border-radius:2px;"></span>
+                    <span>0-500 - Fraco</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ffff00; border-radius:2px;"></span>
+                    <span>500-1000 - Moderado</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ff9900; border-radius:2px;"></span>
+                    <span>1000-2000 - Alto</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
+                    <span style="display:inline-block; width:12px; height:12px; background:#ff0000; border-radius:2px;"></span>
+                    <span>&gt;2000 - Extremo</span>
+                </div>
+            </div>
+        </div>
+        
         <!-- Log -->
         <h2>📋 LOG</h2>
         <div class="log-area" id="log-area">
@@ -1079,6 +1145,308 @@
 
         return L.marker([lat, lon], { icon: icon })
             .bindPopup(popup);
+    }
+
+    // =========================================================================
+    // CAMADA L2 GOES (CAPE, LI, Cloud Height, TPW)
+    // =========================================================================
+    let l2Enabled = false;
+    let l2Layer = null;
+    let l2Data = null;
+    let l2Markers = [];
+    
+    function toggleL2(enabled) {
+        l2Enabled = enabled;
+        
+        // Atualizar botões
+        document.getElementById('btn-l2-on').classList.toggle('active', enabled);
+        document.getElementById('btn-l2-off').classList.toggle('active', !enabled);
+        
+        // Atualizar status
+        const statusEl = document.getElementById('l2-status');
+        
+        if (enabled) {
+            log('success', '✅ L2 LIGADO - Carregando dados...');
+            statusEl.className = 'status-indicator loading';
+            loadL2Data();
+        } else {
+            log('info', '❌ L2 DESLIGADO');
+            statusEl.className = 'status-indicator';
+            clearL2Layer();
+            document.getElementById('l2-ship-data').style.display = 'none';
+        }
+    }
+    
+    function clearL2Layer() {
+        if (l2Layer) {
+            l2Layer.clearLayers();
+            map.removeLayer(l2Layer);
+            l2Layer = null;
+        }
+        l2Markers = [];
+    }
+    
+    async function loadL2Data() {
+        if (!l2Enabled) return;
+        
+        const statusEl = document.getElementById('l2-status');
+        const infoEl = document.getElementById('l2-info');
+        
+        try {
+            statusEl.className = 'status-indicator loading';
+            infoEl.textContent = '📡 Carregando dados L2...';
+            
+            // Tentar API primeiro (extração em tempo real)
+            let response;
+            let usedApi = false;
+            
+            try {
+                response = await fetch(`/api/l2?satellite=goes19&lat=${CONFIG.shipLat}&lon=${CONFIG.shipLon}&radius=100&products=DSIF,ACHAF,ACTPF,TPWF`);
+                if (response.ok) {
+                    usedApi = true;
+                    log('info', '📡 L2: Usando API (extração em tempo real)');
+                }
+            } catch (apiErr) {
+                log('warning', '⚠️ L2: API não disponível, usando cache JSON');
+            }
+            
+            // Fallback para arquivo JSON estático
+            if (!usedApi) {
+                response = await fetch('goes_l2_latest.json?' + Date.now());
+            }
+            
+            if (!response || !response.ok) {
+                throw new Error('Dados L2 não disponíveis');
+            }
+            
+            l2Data = await response.json();
+            
+            // Limpar camada anterior
+            clearL2Layer();
+            l2Layer = L.layerGroup().addTo(map);
+            
+            // Exibir dados com a variável selecionada
+            updateL2Display();
+            
+            // Atualizar info
+            const timestamp = new Date(l2Data.timestamp);
+            const source = usedApi ? '(API)' : '(cache)';
+            infoEl.innerHTML = `📅 ${timestamp.toLocaleString('pt-BR')} ${source}<br>🛰️ ${l2Data.satellite_name || 'GOES-19'}`;
+            
+            statusEl.className = 'status-indicator active';
+            log('success', `✅ L2: Dados carregados`);
+            
+        } catch (err) {
+            console.error('❌ Erro L2:', err);
+            log('error', 'Erro L2: ' + err.message);
+            statusEl.className = 'status-indicator error';
+            infoEl.textContent = '❌ Erro ao carregar dados';
+        }
+    }
+    
+    function updateL2Display() {
+        if (!l2Data || !l2Layer) return;
+        
+        l2Layer.clearLayers();
+        l2Markers = [];
+        
+        const selectedVar = document.getElementById('l2-variable').value;
+        const shipData = document.getElementById('l2-ship-data');
+        
+        // Encontrar qual produto tem a variável
+        let productKey = null;
+        let productData = null;
+        
+        if (selectedVar === 'CAPE' || selectedVar === 'LI' || selectedVar === 'KI' || selectedVar === 'TT' || selectedVar === 'SI') {
+            productKey = 'DSIF';
+        } else if (selectedVar === 'TPW') {
+            productKey = 'TPWF';
+        } else if (selectedVar === 'HT') {
+            productKey = 'ACHAF';
+        } else if (selectedVar === 'Phase') {
+            productKey = 'ACTPF';
+        }
+        
+        if (productKey && l2Data.products[productKey] && l2Data.products[productKey].data) {
+            productData = l2Data.products[productKey].data;
+        }
+        
+        if (!productData || productData.length === 0) {
+            log('warning', `⚠️ Sem dados para ${selectedVar}`);
+            return;
+        }
+        
+        // Encontrar dados no ponto do navio (mais próximo)
+        let closestToShip = null;
+        let minDist = Infinity;
+        
+        for (const point of productData) {
+            const dist = Math.sqrt(Math.pow(point.lat - CONFIG.shipLat, 2) + Math.pow(point.lon - CONFIG.shipLon, 2));
+            if (dist < minDist) {
+                minDist = dist;
+                closestToShip = point;
+            }
+        }
+        
+        // Exibir dados do ponto mais próximo ao navio
+        if (closestToShip && minDist < 0.5) {
+            shipData.style.display = 'block';
+            
+            // DSIF
+            if (l2Data.products.DSIF && l2Data.products.DSIF.data) {
+                const dsif = l2Data.products.DSIF.data.find(p => 
+                    Math.abs(p.lat - closestToShip.lat) < 0.1 && Math.abs(p.lon - closestToShip.lon) < 0.1
+                );
+                if (dsif) {
+                    document.getElementById('l2-ship-cape').textContent = dsif.CAPE ? dsif.CAPE.toFixed(0) + ' J/kg' : '--';
+                    document.getElementById('l2-ship-li').textContent = dsif.LI ? dsif.LI.toFixed(1) + ' K' : '--';
+                }
+            }
+            
+            // TPW
+            if (l2Data.products.TPWF && l2Data.products.TPWF.data) {
+                const tpw = l2Data.products.TPWF.data.find(p => 
+                    Math.abs(p.lat - closestToShip.lat) < 0.1 && Math.abs(p.lon - closestToShip.lon) < 0.1
+                );
+                if (tpw) {
+                    document.getElementById('l2-ship-tpw').textContent = tpw.TPW ? tpw.TPW.toFixed(1) + ' mm' : '--';
+                }
+            }
+            
+            // Cloud Height
+            if (l2Data.products.ACHAF && l2Data.products.ACHAF.data) {
+                const ht = l2Data.products.ACHAF.data.find(p => 
+                    Math.abs(p.lat - closestToShip.lat) < 0.1 && Math.abs(p.lon - closestToShip.lon) < 0.1
+                );
+                if (ht && ht.HT) {
+                    document.getElementById('l2-ship-ht').textContent = (ht.HT / 1000).toFixed(1) + ' km';
+                } else {
+                    document.getElementById('l2-ship-ht').textContent = '☀️ Céu limpo';
+                }
+            }
+        }
+        
+        // Exibir marcadores no mapa
+        for (const point of productData) {
+            const value = point[selectedVar];
+            if (value === undefined || value === null) continue;
+            
+            const color = getL2Color(selectedVar, value);
+            const label = formatL2Value(selectedVar, value);
+            
+            const marker = createL2Marker(point.lat, point.lon, label, color, selectedVar, point);
+            marker.addTo(l2Layer);
+            l2Markers.push(marker);
+        }
+        
+        log('info', `📊 L2: ${l2Markers.length} pontos de ${selectedVar}`);
+    }
+    
+    function getL2Color(variable, value) {
+        switch(variable) {
+            case 'CAPE':
+                if (value < 500) return '#00ff00';
+                if (value < 1000) return '#ffff00';
+                if (value < 2000) return '#ff9900';
+                return '#ff0000';
+            
+            case 'LI':
+                // LI negativo = instável
+                if (value > 0) return '#00ff00';     // Estável
+                if (value > -2) return '#ffff00';   // Marginalmente instável
+                if (value > -4) return '#ff9900';   // Moderadamente instável
+                return '#ff0000';                    // Muito instável
+            
+            case 'TPW':
+                if (value < 30) return '#00ccff';
+                if (value < 50) return '#00ff88';
+                if (value < 70) return '#ffff00';
+                return '#ff0000';
+            
+            case 'HT':
+                if (value < 3000) return '#00ff00';   // Baixas
+                if (value < 6000) return '#ffff00';   // Médias
+                if (value < 10000) return '#ff9900';  // Altas
+                return '#ff0000';                      // Muito altas
+            
+            case 'Phase':
+                const phases = ['#00aaff', '#00ff00', '#00ffcc', '#ffff00', '#ff00ff', '#888888'];
+                return phases[Math.floor(value)] || '#888888';
+            
+            default:
+                return '#ffffff';
+        }
+    }
+    
+    function formatL2Value(variable, value) {
+        switch(variable) {
+            case 'CAPE':
+                return value.toFixed(0);
+            case 'LI':
+                return value.toFixed(1);
+            case 'TPW':
+                return value.toFixed(0);
+            case 'HT':
+                return (value / 1000).toFixed(1);
+            case 'Phase':
+                const labels = ['☀️', '💧', '❄️', '🌀', '🧊', '❓'];
+                return labels[Math.floor(value)] || '?';
+            default:
+                return value.toFixed(1);
+        }
+    }
+    
+    function createL2Marker(lat, lon, label, color, variable, point) {
+        const size = 28;
+        
+        const markerHtml = `
+            <div style="
+                width: ${size}px;
+                height: ${size}px;
+                background: ${color};
+                border: 2px solid #000;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 9px;
+                font-weight: bold;
+                color: #000;
+                text-shadow: none;
+            ">${label}</div>
+        `;
+
+        const icon = L.divIcon({
+            className: 'l2-marker',
+            html: markerHtml,
+            iconSize: [size, size],
+            iconAnchor: [size/2, size/2]
+        });
+        
+        // Popup com todos os dados disponíveis
+        let popupContent = `<b>📊 Dados L2 (GOES)</b><br>`;
+        popupContent += `<b>Lat:</b> ${lat.toFixed(3)}°<br>`;
+        popupContent += `<b>Lon:</b> ${lon.toFixed(3)}°<br>`;
+        popupContent += `<hr style="margin:4px 0;border-color:#444;">`;
+        
+        // Adicionar dados específicos do ponto
+        if (point.CAPE !== undefined) popupContent += `<b>⚡ CAPE:</b> ${point.CAPE.toFixed(0)} J/kg<br>`;
+        if (point.LI !== undefined) popupContent += `<b>🌡️ LI:</b> ${point.LI.toFixed(1)} K<br>`;
+        if (point.KI !== undefined) popupContent += `<b>📈 K-Index:</b> ${point.KI.toFixed(1)}<br>`;
+        if (point.TT !== undefined) popupContent += `<b>📊 TT-Index:</b> ${point.TT.toFixed(1)}<br>`;
+        if (point.TPW !== undefined) popupContent += `<b>💧 TPW:</b> ${point.TPW.toFixed(1)} mm<br>`;
+        if (point.HT !== undefined) popupContent += `<b>☁️ Altura:</b> ${(point.HT/1000).toFixed(1)} km<br>`;
+        if (point.Phase !== undefined) {
+            const phaseLabels = ['Céu Limpo', 'Água', 'Super-resfriada', 'Mista', 'Gelo', 'Incerto'];
+            popupContent += `<b>🧊 Fase:</b> ${phaseLabels[Math.floor(point.Phase)] || 'N/A'}<br>`;
+        }
+        if (point.DQF !== undefined) {
+            const dqfLabels = ['✅ Ótimo', '⚠️ Degradado', '❌ Ruim'];
+            popupContent += `<b>📋 DQF:</b> ${dqfLabels[point.DQF] || point.DQF}<br>`;
+        }
+
+        return L.marker([lat, lon], { icon: icon })
+            .bindPopup(popupContent);
     }
 
     // Função para ligar/desligar auto-extração

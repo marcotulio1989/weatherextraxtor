@@ -52,6 +52,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.list_dmw_files(parsed.query)
             return
         
+        # API para dados L2 (CAPE, LI, Cloud Height, TPW)
+        if parsed.path == '/api/l2':
+            self.get_l2_data(parsed.query)
+            return
+        
         # Servir arquivos estáticos normalmente
         super().do_GET()
     
@@ -232,6 +237,63 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(json.dumps({
                 'error': str(e)
             }).encode())
+    
+    def get_l2_data(self, query_string):
+        """Retorna dados L2 do GOES (CAPE, LI, Cloud Height, TPW)."""
+        params = parse_qs(query_string)
+        satellite = params.get('satellite', ['goes19'])[0]
+        products_str = params.get('products', ['DSIF,ACHAF,ACTPF,TPWF'])[0]
+        products = products_str.split(',')
+        
+        # Posição central e raio
+        center_lat = float(params.get('lat', ['-22.5'])[0])
+        center_lon = float(params.get('lon', ['-40.5'])[0])
+        radius_nm = float(params.get('radius', ['100'])[0])
+        
+        try:
+            from goes_l2_extractor import GOESL2Extractor, generate_grid_points
+            
+            print(f"📊 L2: Extraindo dados ({satellite}/{products_str})")
+            
+            # Gerar grade de pontos
+            grid_points = generate_grid_points(center_lat, center_lon, radius_nm=radius_nm, step_nm=25)
+            
+            extractor = GOESL2Extractor(satellite=satellite)
+            data = extractor.extract_all_products(grid_points, products=products)
+            
+            # Salvar também no arquivo JSON para uso offline
+            import json
+            output_file = '/workspaces/weatherextraxtor/docs/goes_l2_latest.json'
+            with open(output_file, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'max-age=600')
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+            
+        except ImportError as e:
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                'error': 'Módulo L2 não disponível',
+                'details': str(e)
+            }).encode())
+            
+        except Exception as e:
+            import traceback
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }).encode())
 
 def run():
     os.chdir('/workspaces/weatherextraxtor')
@@ -239,7 +301,8 @@ def run():
     with socketserver.TCPServer(("", PORT), ProxyHandler) as httpd:
         print(f"🌊 Servidor rodando em http://localhost:{PORT}")
         print(f"📡 Proxy NOAA: http://localhost:{PORT}/api/noaa?url=...")
-        print(f"🌬️ DMW API: http://localhost:{PORT}/api/dmw?satellite=goes16&level=low")
+        print(f"🌬️ DMW API: http://localhost:{PORT}/api/dmw?satellite=goes19&level=low")
+        print(f"📊 L2 API: http://localhost:{PORT}/api/l2?satellite=goes19&products=DSIF,TPWF")
         print(f"🌐 Viewer: http://localhost:{PORT}/docs/full_disk_viewer.html")
         httpd.serve_forever()
 
