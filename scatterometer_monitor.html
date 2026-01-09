@@ -280,6 +280,133 @@
             color: #00aaff;
         }
         
+        /* Forecast Tabs */
+        .forecast-tabs-container {
+            position: fixed;
+            top: 0;
+            left: 380px;
+            right: 0;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+            border-bottom: 2px solid #00ffcc;
+            padding: 10px 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .forecast-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .forecast-title {
+            color: #00ffcc;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .forecast-period-tabs {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .forecast-period-btn {
+            padding: 6px 16px;
+            background: #333;
+            border: 1px solid #555;
+            color: #888;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        .forecast-period-btn:hover {
+            background: #444;
+            color: #ccc;
+        }
+        
+        .forecast-period-btn.active {
+            background: #00cc99;
+            border-color: #00ffcc;
+            color: #000;
+        }
+        
+        .forecast-timeline {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        
+        .forecast-hour-btn {
+            min-width: 50px;
+            padding: 5px 8px;
+            background: #222;
+            border: 1px solid #444;
+            color: #888;
+            cursor: pointer;
+            font-size: 10px;
+            text-align: center;
+            border-radius: 3px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        
+        .forecast-hour-btn:hover {
+            background: #333;
+            color: #fff;
+        }
+        
+        .forecast-hour-btn.active {
+            background: #0088ff;
+            border-color: #00aaff;
+            color: #fff;
+        }
+        
+        .forecast-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .forecast-wind-display {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .forecast-wind-value {
+            text-align: center;
+        }
+        
+        .forecast-wind-value .value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffcc;
+        }
+        
+        .forecast-wind-value .label {
+            font-size: 9px;
+            color: #666;
+        }
+        
+        .forecast-status {
+            font-size: 10px;
+            color: #666;
+        }
+        
+        /* Ajustar mapa para dar espaço para a aba */
+        #map {
+            margin-top: 100px;
+            height: calc(100vh - 100px) !important;
+        }
+        
         /* Info Icon com Tooltip */
         .input-with-info {
             display: flex;
@@ -366,6 +493,40 @@
     </style>
 </head>
 <body>
+
+<!-- ABA DE PREVISÃO NO TOPO -->
+<div class="forecast-tabs-container" id="forecast-container">
+    <div class="forecast-header">
+        <div class="forecast-title">🌊 PREVISÃO DE VENTO (Média Ponderada Multi-Modelo)</div>
+        <div class="forecast-period-tabs">
+            <button class="forecast-period-btn active" onclick="selectForecastPeriod(24)">24h (1h)</button>
+            <button class="forecast-period-btn" onclick="selectForecastPeriod(48)">48h (3h)</button>
+            <button class="forecast-period-btn" onclick="selectForecastPeriod(72)">72h (6h)</button>
+        </div>
+    </div>
+    <div class="forecast-timeline" id="forecast-timeline">
+        <!-- Horas serão preenchidas via JavaScript -->
+    </div>
+    <div class="forecast-info">
+        <div class="forecast-wind-display">
+            <div class="forecast-wind-value">
+                <div class="value" id="forecast-speed">--</div>
+                <div class="label">Velocidade (kn)</div>
+            </div>
+            <div class="forecast-wind-value">
+                <div class="value" id="forecast-dir">--</div>
+                <div class="label">Direção (°)</div>
+            </div>
+            <div class="forecast-wind-value">
+                <div class="value" id="forecast-gust">--</div>
+                <div class="label">Rajada (kn)</div>
+            </div>
+        </div>
+        <div class="forecast-status" id="forecast-status">
+            ⏰ Próxima atualização: --:--
+        </div>
+    </div>
+</div>
 
 <div class="container">
     <!-- PAINEL LATERAL -->
@@ -2286,8 +2447,8 @@
             // Atualizar display
             updateModelAverage();
             
-            // Criar grid de pontos para o mapa (50 NM)
-            await fetchGridPoints();
+            // Carregar previsão horária
+            await fetchForecastData();
             
             updateWindDisplay();
             setStatus('openmeteo-status', 'active');
@@ -2301,77 +2462,190 @@
         }
     }
     
-    async function fetchGridPoints() {
-        // Grid CIRCULAR com espaçamento ajustado para o raio de 100NM
-        // Usando 0.25° (~15 NM) para melhor distribuição no círculo maior
-        const step = 0.25;  // Espaçamento maior para cobrir 100 NM sem sobrecarregar
-        const raioGraus = RAIO_GRAUS;
+    // =========================================================================
+    // SISTEMA DE PREVISÃO MULTI-MODELO (24h/48h/72h)
+    // =========================================================================
+    let forecastPeriod = 24;  // Período selecionado (24, 48, 72)
+    let forecastHour = 0;     // Hora selecionada dentro do período
+    let allForecastData = {}; // Dados de previsão de todos os modelos
+    let forecastRefreshInterval = null;
+    
+    function selectForecastPeriod(period) {
+        forecastPeriod = period;
+        forecastHour = 0;  // Reset para primeira hora
         
-        let queryLats = [];
-        let queryLons = [];
+        // Atualizar botões
+        document.querySelectorAll('.forecast-period-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
         
-        // Calcular quantos passos cabem no raio
-        const numSteps = Math.floor(raioGraus / step);
+        // Reconstruir timeline
+        buildForecastTimeline();
         
-        // Iterar de -numSteps a +numSteps (garante simetria perfeita)
-        for (let i = -numSteps; i <= numSteps; i++) {
-            for (let j = -numSteps; j <= numSteps; j++) {
-                const lat = CONFIG.shipLat + (i * step);
-                const lon = CONFIG.shipLon + (j * step);
-                
-                // Distância do centro em passos
-                const dist = Math.sqrt(i*i + j*j) * step;
-                
-                // Só incluir se dentro do círculo
-                if (dist <= raioGraus) {
-                    queryLats.push(lat.toFixed(3));
-                    queryLons.push(lon.toFixed(3));
-                }
-            }
-        }
+        // Recarregar dados
+        fetchForecastData();
         
-        log('info', `📍 Grid circular: ${queryLats.length} pontos (step ${step}°, raio ${RAIO_NM} NM)`);
-        
-        // Usar forecast API com modelo padrão para o grid
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${queryLats.join(',')}&longitude=${queryLons.join(',')}&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=kn`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        let addedCount = 0;
-        
-        if (Array.isArray(data)) {
-            data.forEach((point, idx) => {
-                // Usar coordenadas SOLICITADAS, não as retornadas pela API
-                const lat = parseFloat(queryLats[idx]);
-                const lon = parseFloat(queryLons[idx]);
-                
-                if (point.current && point.current.wind_speed_10m !== null) {
-                    addWindPoint({
-                        lat: lat,
-                        lon: lon,
-                        speed: point.current.wind_speed_10m,
-                        direction: point.current.wind_direction_10m,
-                        time: new Date(),
-                        source: 'Modelo (Open-Meteo)'
-                    });
-                    addedCount++;
-                }
-            });
-        } else if (data.current && data.current.wind_speed_10m !== null) {
-            addWindPoint({
-                lat: parseFloat(queryLats[0]),
-                lon: parseFloat(queryLons[0]),
-                speed: data.current.wind_speed_10m,
-                direction: data.current.wind_direction_10m,
-                time: new Date(),
-                source: 'Modelo (Open-Meteo)'
-            });
-            addedCount++;
-        }
-        
-        log('info', `📍 Pontos adicionados: ${addedCount}/${queryLats.length}`);
+        log('info', `📅 Período de previsão: ${period}h`);
     }
+    
+    function buildForecastTimeline() {
+        const container = document.getElementById('forecast-timeline');
+        container.innerHTML = '';
+        
+        // Intervalo baseado no período
+        // 24h = 1 em 1 hora, 48h = 3 em 3 horas, 72h = 6 em 6 horas
+        let interval;
+        if (forecastPeriod === 24) interval = 1;
+        else if (forecastPeriod === 48) interval = 3;
+        else interval = 6;
+        
+        const now = new Date();
+        
+        for (let h = 0; h <= forecastPeriod; h += interval) {
+            const btn = document.createElement('button');
+            btn.className = 'forecast-hour-btn' + (h === forecastHour ? ' active' : '');
+            
+            // Calcular hora real
+            const forecastTime = new Date(now.getTime() + h * 60 * 60 * 1000);
+            const dayLabel = h === 0 ? 'Agora' : 
+                             h < 24 ? '+' + h + 'h' : 
+                             '+' + Math.floor(h/24) + 'd' + (h%24 ? (h%24) + 'h' : '');
+            const timeLabel = forecastTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            
+            btn.innerHTML = `<div>${dayLabel}</div><div style="font-size:9px;color:#666;">${timeLabel}</div>`;
+            btn.onclick = () => selectForecastHour(h);
+            container.appendChild(btn);
+        }
+    }
+    
+    function selectForecastHour(hour) {
+        forecastHour = hour;
+        
+        // Atualizar botões
+        document.querySelectorAll('.forecast-hour-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Atualizar display com dados do horário selecionado
+        updateForecastDisplay();
+    }
+    
+    async function fetchForecastData() {
+        log('info', `🌊 Buscando previsão ${forecastPeriod}h (5 modelos)...`);
+        
+        try {
+            // Limpar dados anteriores
+            allForecastData = {};
+            
+            // Buscar dados de todos os modelos
+            const promises = MODELS.map(async model => {
+                try {
+                    // Calcular horas necessárias
+                    const hours = [];
+                    let interval = forecastPeriod === 24 ? 1 : (forecastPeriod === 48 ? 3 : 6);
+                    for (let h = 0; h <= forecastPeriod; h += interval) {
+                        hours.push(h);
+                    }
+                    
+                    const url = `https://api.open-meteo.com/v1/forecast?` +
+                        `latitude=${CONFIG.shipLat}&longitude=${CONFIG.shipLon}&` +
+                        `hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m&` +
+                        `models=${model}&wind_speed_unit=kn&` +
+                        `forecast_hours=${forecastPeriod + 1}`;
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (data.hourly) {
+                        allForecastData[model] = {
+                            times: data.hourly.time,
+                            speeds: data.hourly.wind_speed_10m,
+                            directions: data.hourly.wind_direction_10m,
+                            gusts: data.hourly.wind_gusts_10m
+                        };
+                        log('info', `  ✓ ${MODEL_NAMES[model]}: ${data.hourly.time.length} horas`);
+                    }
+                } catch (e) {
+                    log('warning', `  ✗ ${MODEL_NAMES[model]}: ${e.message}`);
+                }
+            });
+            
+            await Promise.all(promises);
+            
+            // Atualizar display
+            updateForecastDisplay();
+            
+            // Atualizar status
+            const now = new Date();
+            const nextUpdate = new Date(now.getTime() + 15 * 60 * 1000);
+            document.getElementById('forecast-status').textContent = 
+                `⏰ Próx. atualização: ${nextUpdate.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})} | Última: ${now.toLocaleTimeString('pt-BR')}`;
+            
+            log('success', `✅ Previsão ${forecastPeriod}h carregada`);
+            
+        } catch (error) {
+            log('error', `❌ Erro previsão: ${error.message}`);
+        }
+    }
+    
+    function updateForecastDisplay() {
+        // Calcular índice da hora no array
+        const interval = forecastPeriod === 24 ? 1 : (forecastPeriod === 48 ? 3 : 6);
+        const hourIndex = forecastHour;  // Index direto para dados hourly (0, 1, 2, ...)
+        
+        let validModels = 0;
+        let weightedSpeed = 0;
+        let weightedGust = 0;
+        let weightedDirX = 0;
+        let weightedDirY = 0;
+        
+        MODELS.forEach(model => {
+            const data = allForecastData[model];
+            const weight = modelWeights[model];
+            
+            if (data && data.speeds && data.speeds[hourIndex] !== null && data.speeds[hourIndex] !== undefined) {
+                const speed = data.speeds[hourIndex];
+                const dir = data.directions[hourIndex];
+                const gust = data.gusts ? data.gusts[hourIndex] : speed * 1.3;
+                
+                weightedSpeed += speed * weight;
+                weightedGust += gust * weight;
+                const rad = dir * Math.PI / 180;
+                weightedDirX += Math.cos(rad) * weight;
+                weightedDirY += Math.sin(rad) * weight;
+                validModels++;
+            }
+        });
+        
+        if (validModels > 0) {
+            let avgDir = Math.atan2(weightedDirY, weightedDirX) * 180 / Math.PI;
+            if (avgDir < 0) avgDir += 360;
+            
+            document.getElementById('forecast-speed').textContent = weightedSpeed.toFixed(1);
+            document.getElementById('forecast-dir').textContent = avgDir.toFixed(0) + '°';
+            document.getElementById('forecast-gust').textContent = weightedGust.toFixed(1);
+        } else {
+            document.getElementById('forecast-speed').textContent = '--';
+            document.getElementById('forecast-dir').textContent = '--';
+            document.getElementById('forecast-gust').textContent = '--';
+        }
+    }
+    
+    // Iniciar atualização automática de previsão a cada 15 minutos
+    function startForecastAutoRefresh() {
+        if (forecastRefreshInterval) clearInterval(forecastRefreshInterval);
+        
+        forecastRefreshInterval = setInterval(() => {
+            log('info', '⏰ Atualizando previsão (15 min)...');
+            fetchForecastData();
+        }, 15 * 60 * 1000);  // 15 minutos
+    }
+    
+    // Construir timeline inicial
+    buildForecastTimeline();
+    startForecastAutoRefresh();
     
     function updateModelAverage() {
         // Atualizar valores individuais na UI
@@ -2428,12 +2702,15 @@
     function clearOpenMeteoData() {
         windDataPoints = windDataPoints.filter(p => 
             !p.source.includes('GFS') && !p.source.includes('ECMWF') && 
-            !p.source.includes('ICON') && !p.source.includes('Modelo') && 
-            p.source !== 'Open-Meteo'
+            !p.source.includes('ICON') && p.source !== 'Open-Meteo'
         );
         MODELS.forEach(m => modelData[m] = { speed: null, direction: null });
+        allForecastData = {};
         document.getElementById('avg-model-speed').textContent = '--';
         document.getElementById('avg-model-dir').textContent = '--';
+        document.getElementById('forecast-speed').textContent = '--';
+        document.getElementById('forecast-dir').textContent = '--';
+        document.getElementById('forecast-gust').textContent = '--';
         updateWindDisplay();
         setStatus('openmeteo-status', '');
         log('info', '🗑️ Dados de modelos removidos');
