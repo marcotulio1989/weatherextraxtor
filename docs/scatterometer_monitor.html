@@ -70,6 +70,53 @@
             gap: 8px;
         }
         
+        /* Seções Colapsáveis */
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 10px;
+            user-select: none;
+        }
+        
+        .collapsible-header:hover {
+            color: #00ffcc;
+        }
+        
+        .collapsible-header h2 {
+            margin: 0;
+            font-size: 13px;
+            color: #ff9900;
+            text-transform: uppercase;
+        }
+        
+        .collapsible-arrow {
+            font-size: 12px;
+            transition: transform 0.3s;
+            color: #888;
+        }
+        
+        .collapsible-header.collapsed .collapsible-arrow {
+            transform: rotate(-90deg);
+        }
+        
+        .collapsible-content {
+            max-height: 2000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, opacity 0.3s;
+            opacity: 1;
+        }
+        
+        .collapsible-content.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            padding: 0;
+        }
+        
         .status-indicator {
             width: 8px;
             height: 8px;
@@ -663,226 +710,166 @@
             </div>
         </div>
         
-        <!-- FONTES DE DADOS -->
-        <h2>📡 FONTES DE DADOS</h2>
-        
-        <!-- Open-Meteo (Background - Modelo) -->
-        <div class="section" style="border-left: 3px solid #666;">
-            <div class="section-title">
-                <span class="status-indicator" id="openmeteo-status"></span>
-                OPEN-METEO (Modelo)
-            </div>
-            <p class="source-info">✅ GRATUITO - Dados de fundo, atualiza a cada 15 min</p>
-            <button onclick="fetchOpenMeteoData()">🔄 Atualizar Open-Meteo</button>
-            <button class="secondary" onclick="clearOpenMeteoData()">🗑️ Limpar</button>
+        <!-- FONTES DE DADOS (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>📡 FONTES DE DADOS</h2>
+            <span class="collapsible-arrow">▼</span>
         </div>
-        
-        <!-- Satélite em Tempo Real -->
-        <h2>🛰️ SATÉLITE (Reprojeção REAL)</h2>
-        <div class="section" style="border-left: 3px solid #00ff00;">
-            <div class="section-title">
-                <span class="status-indicator" id="satellite-status"></span>
-                <span id="satellite-name">GOES-19</span> - Reprojeção em tempo real
-            </div>
-            <p class="source-info">✅ Imagem Full Disk reprojetada para Web Mercator</p>
-            
-            <!-- Toggle de Satélite -->
-            <label>🛰️ Satélite:</label>
-            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
-                <button id="btn-goes19" class="toggle-btn active" onclick="selectSatellite('goes19')">GOES-19</button>
-                <button id="btn-goes16" class="toggle-btn" onclick="selectSatellite('goes16')">GOES-16</button>
-            </div>
-            
-            <!-- Produto -->
-            <label>📷 Produto:</label>
-            <select id="satellite-product" style="width:100%; margin-bottom:10px; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px;">
-                <option value="GEOCOLOR" selected>🌍 GeoColor (Visível/IR)</option>
-                <option value="13">🌡️ IR Limpo (Band 13)</option>
-                <option value="14">🌡️ IR (Band 14)</option>
-                <option value="08">💧 Vapor d'Água Alto (Band 8)</option>
-                <option value="09">💧 Vapor d'Água Médio (Band 9)</option>
-                <option value="02">☀️ Visível (Band 2)</option>
-                <option value="AirMass">🌀 Air Mass (RGB)</option>
-                <option value="Sandwich">🥪 Sandwich (IR + Visível)</option>
-            </select>
-            
-            <!-- Qualidade -->
-            <label>⚡ Qualidade:</label>
-            <select id="satellite-quality" style="width:100%; margin-bottom:10px; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px;">
-                <option value="low">Rápida (600px)</option>
-                <option value="medium" selected>Média (1200px)</option>
-                <option value="high">Alta (2400px)</option>
-                <option value="max">Máxima (4800px)</option>
-            </select>
-            
-            <label>🔍 Opacidade: <span id="opacity-value">75%</span></label>
-            <input type="range" id="satellite-opacity" min="0" max="100" value="75" 
-                   style="width:100%; margin-bottom:8px;" 
-                   oninput="updateSatelliteOpacity(this.value)">
-            
-            <!-- Toggle Auto-Extração -->
-            <label>🔄 Auto-Extração (5 min):</label>
-            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
-                <button id="btn-autoextract-on" class="toggle-btn active" onclick="toggleAutoExtract(true)">✅ LIGADO</button>
-                <button id="btn-autoextract-off" class="toggle-btn" onclick="toggleAutoExtract(false)">❌ DESLIGADO</button>
-            </div>
-            
-            <div style="display:flex; gap:5px; margin-top:5px;">
-                <button onclick="loadSatelliteWithReprojection()" style="flex:1;">🌍 CARREGAR</button>
-                <button class="secondary" onclick="toggleSatelliteLayer()">👁️ On/Off</button>
-            </div>
-            
-            <!-- Progress Bar -->
-            <div id="satellite-progress" style="display:none; margin-top:10px;">
-                <div style="background:#333; border-radius:3px; height:6px; overflow:hidden;">
-                    <div id="satellite-progress-bar" style="width:0%; height:100%; background:#00d4ff; transition:width 0.2s;"></div>
+        <div class="collapsible-content collapsed">
+            <div class="section" style="border-left: 3px solid #666;">
+                <div class="section-title">
+                    <span class="status-indicator" id="openmeteo-status"></span>
+                    OPEN-METEO (Modelo)
                 </div>
-                <div id="satellite-progress-text" style="font-size:10px; color:#888; margin-top:3px;">0%</div>
-            </div>
-            
-            <div id="satellite-info" style="margin-top:8px; font-size:10px; color:#888;"></div>
-        </div>
-        
-        <!-- VENTOS DMW (GOES) -->
-        <h2>🌬️ VENTOS DMW (GOES)</h2>
-        <div class="section" style="border-left: 3px solid #ff9900;">
-            <div class="section-title">
-                <span class="status-indicator" id="dmw-status"></span>
-                Derived Motion Winds - Satélite GOES
-            </div>
-            <p class="source-info">Ventos derivados do movimento das nuvens</p>
-            
-            <!-- Toggle DMW -->
-            <label>🌬️ Ativar DMW:</label>
-            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
-                <button id="btn-dmw-on" class="toggle-btn" onclick="toggleDMW(true)">✅ LIGADO</button>
-                <button id="btn-dmw-off" class="toggle-btn active" onclick="toggleDMW(false)">❌ DESLIGADO</button>
-            </div>
-            
-            <!-- Nível de Vento -->
-            <label>📊 Nível de Altitude:</label>
-            <select id="dmw-level" style="width:100%; margin-bottom:10px; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px;" onchange="loadDMWWinds()">
-                <option value="low" selected>Baixo Nível (&lt;3km) - 700-1000 hPa</option>
-                <option value="mid">Nível Médio (3-7km) - 400-700 hPa</option>
-                <option value="high">Alto Nível (&gt;7km) - 100-400 hPa</option>
-                <option value="all">Todos os Níveis</option>
-            </select>
-            
-            <button onclick="loadDMWWinds()" style="width:100%; margin-bottom:10px;">🔄 ATUALIZAR DMW</button>
-            
-            <!-- Info do arquivo -->
-            <div id="dmw-info" style="font-size:10px; color:#888; margin-bottom:8px;">
-                📅 Aguardando...
-            </div>
-            
-            <!-- Info de próxima atualização -->
-            <div id="dmw-next-update" style="font-size:10px; color:#ff9900; margin-bottom:8px; display:none;">
-                ⏰ Próxima atualização: --:05
-            </div>
-            
-            <!-- Legenda de Intensidade -->
-            <div style="background:#111; padding:8px; border-radius:4px; font-size:10px;">
-                <div style="color:#00ffcc; margin-bottom:5px; font-weight:bold;">📊 Intensidade do Vento:</div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#00ff00; border-radius:2px;"></span>
-                    <span>0-10 kt - Calmo</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ffff00; border-radius:2px;"></span>
-                    <span>10-20 kt - Fraco</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ffa500; border-radius:2px;"></span>
-                    <span>20-30 kt - Moderado</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ff6600; border-radius:2px;"></span>
-                    <span>30-40 kt - Forte</span>
-                </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ff0000; border-radius:2px;"></span>
-                    <span>&gt;40 kt - Muito Forte</span>
-                </div>
+                <p class="source-info">✅ GRATUITO - Atualiza 15 min</p>
+                <button onclick="fetchOpenMeteoData()">🔄 Atualizar</button>
+                <button class="secondary" onclick="clearOpenMeteoData()">🗑️ Limpar</button>
             </div>
         </div>
         
-        <!-- PRODUTOS L2 GOES (CAPE, LI, Cloud Info) -->
-        <h2>📊 PRODUTOS L2 GOES</h2>
-        <div class="section" style="border-left: 3px solid #00d4ff;">
-            <div class="section-title">
-                <span class="status-indicator" id="l2-status"></span>
-                Índices de Instabilidade e Nuvens
-            </div>
-            <p class="source-info">CAPE, Lifted Index, Altura/Fase de Nuvem, TPW</p>
-            
-            <!-- Toggle L2 -->
-            <label>📊 Ativar Dados L2:</label>
-            <div class="toggle-container" style="display:flex; gap:5px; margin-bottom:10px;">
-                <button id="btn-l2-on" class="toggle-btn" onclick="toggleL2(true)">✅ LIGADO</button>
-                <button id="btn-l2-off" class="toggle-btn active" onclick="toggleL2(false)">❌ DESLIGADO</button>
-            </div>
-            
-            <!-- Variável para exibir -->
-            <label>📈 Variável Principal:</label>
-            <select id="l2-variable" style="width:100%; margin-bottom:10px; padding:6px; background:#222; color:#fff; border:1px solid #444; border-radius:3px;" onchange="updateL2Display()">
-                <option value="CAPE" selected>⚡ CAPE (J/kg) - Energia Convectiva</option>
-                <option value="LI">🌡️ Lifted Index (K) - Instabilidade</option>
-                <option value="TPW">💧 TPW (mm) - Água Precipitável</option>
-                <option value="HT">☁️ Altura da Nuvem (km)</option>
-                <option value="Phase">🧊 Fase da Nuvem (água/gelo)</option>
-            </select>
-            
-            <button onclick="loadL2Data()" style="width:100%; margin-bottom:10px;">🔄 CARREGAR L2</button>
-            
-            <!-- Info -->
-            <div id="l2-info" style="font-size:10px; color:#888; margin-bottom:8px;">
-                📅 Aguardando...
-            </div>
-            
-            <!-- Estatísticas L2 no ponto do navio -->
-            <div id="l2-ship-data" style="display:none; background:#0a1a2a; padding:10px; border-radius:4px; margin-bottom:10px;">
-                <div style="color:#00d4ff; font-size:11px; font-weight:bold; margin-bottom:5px;">📍 NO PONTO DO NAVIO:</div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px; font-size:10px;">
-                    <div>⚡ CAPE: <span id="l2-ship-cape" style="color:#ffcc00;">--</span></div>
-                    <div>🌡️ LI: <span id="l2-ship-li" style="color:#00ff88;">--</span></div>
-                    <div>💧 TPW: <span id="l2-ship-tpw" style="color:#00ccff;">--</span></div>
-                    <div>☁️ Altura: <span id="l2-ship-ht" style="color:#ff88ff;">--</span></div>
+        <!-- Satélite (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>🛰️ SATÉLITE</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="section" style="border-left: 3px solid #00ff00;">
+                <div class="section-title">
+                    <span class="status-indicator" id="satellite-status"></span>
+                    <span id="satellite-name">GOES-19</span>
                 </div>
-            </div>
-            
-            <!-- Legenda CAPE -->
-            <div id="l2-legend-cape" style="background:#111; padding:8px; border-radius:4px; font-size:10px;">
-                <div style="color:#00d4ff; margin-bottom:5px; font-weight:bold;">⚡ CAPE (Energia Convectiva):</div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#00ff00; border-radius:2px;"></span>
-                    <span>0-500 - Fraco</span>
+                
+                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                    <button id="btn-goes19" class="toggle-btn active" onclick="selectSatellite('goes19')" style="flex:1;">GOES-19</button>
+                    <button id="btn-goes16" class="toggle-btn" onclick="selectSatellite('goes16')" style="flex:1;">GOES-16</button>
                 </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ffff00; border-radius:2px;"></span>
-                    <span>500-1000 - Moderado</span>
+                
+                <select id="satellite-product" style="width:100%; margin-bottom:6px; padding:5px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; font-size:11px;">
+                    <option value="GEOCOLOR" selected>🌍 GeoColor</option>
+                    <option value="13">🌡️ IR (Band 13)</option>
+                    <option value="08">💧 Vapor d'Água</option>
+                    <option value="AirMass">🌀 Air Mass</option>
+                </select>
+                
+                <select id="satellite-quality" style="width:100%; margin-bottom:6px; padding:5px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; font-size:11px;">
+                    <option value="low">Rápida</option>
+                    <option value="medium" selected>Média</option>
+                    <option value="high">Alta</option>
+                </select>
+                
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <span style="font-size:10px;">Opacidade:</span>
+                    <input type="range" id="satellite-opacity" min="0" max="100" value="75" style="flex:1;" oninput="updateSatelliteOpacity(this.value)">
+                    <span id="opacity-value" style="font-size:10px;">75%</span>
                 </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ff9900; border-radius:2px;"></span>
-                    <span>1000-2000 - Alto</span>
+                
+                <div style="display:flex; gap:5px; margin-bottom:6px;">
+                    <button id="btn-autoextract-on" class="toggle-btn active" onclick="toggleAutoExtract(true)" style="flex:1; font-size:10px;">Auto ✅</button>
+                    <button id="btn-autoextract-off" class="toggle-btn" onclick="toggleAutoExtract(false)" style="flex:1; font-size:10px;">Auto ❌</button>
                 </div>
-                <div style="display:flex; align-items:center; gap:5px; margin:2px 0;">
-                    <span style="display:inline-block; width:12px; height:12px; background:#ff0000; border-radius:2px;"></span>
-                    <span>&gt;2000 - Extremo</span>
+                
+                <div style="display:flex; gap:5px;">
+                    <button onclick="loadSatelliteWithReprojection()" style="flex:1;">🌍 CARREGAR</button>
+                    <button class="secondary" onclick="toggleSatelliteLayer()">👁️</button>
                 </div>
+                
+                <div id="satellite-progress" style="display:none; margin-top:8px;">
+                    <div style="background:#333; border-radius:3px; height:4px; overflow:hidden;">
+                        <div id="satellite-progress-bar" style="width:0%; height:100%; background:#00d4ff;"></div>
+                    </div>
+                    <div id="satellite-progress-text" style="font-size:9px; color:#888; margin-top:2px;">0%</div>
+                </div>
+                <div id="satellite-info" style="margin-top:6px; font-size:9px; color:#888;"></div>
             </div>
         </div>
         
-        <!-- Log -->
-        <h2>📋 LOG</h2>
-        <div class="log-area" id="log-area">
-            <div class="log-entry info">Sistema iniciado...</div>
+        <!-- VENTOS DMW (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>🌬️ VENTOS DMW</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="section" style="border-left: 3px solid #ff9900;">
+                <div class="section-title">
+                    <span class="status-indicator" id="dmw-status"></span>
+                    Derived Motion Winds
+                </div>
+                
+                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                    <button id="btn-dmw-on" class="toggle-btn" onclick="toggleDMW(true)" style="flex:1;">✅ ON</button>
+                    <button id="btn-dmw-off" class="toggle-btn active" onclick="toggleDMW(false)" style="flex:1;">❌ OFF</button>
+                </div>
+                
+                <select id="dmw-level" style="width:100%; margin-bottom:6px; padding:5px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; font-size:11px;" onchange="loadDMWWinds()">
+                    <option value="low" selected>Baixo (&lt;3km)</option>
+                    <option value="mid">Médio (3-7km)</option>
+                    <option value="high">Alto (&gt;7km)</option>
+                    <option value="all">Todos</option>
+                </select>
+                
+                <button onclick="loadDMWWinds()" style="width:100%; margin-bottom:6px;">🔄 ATUALIZAR</button>
+                
+                <div id="dmw-info" style="font-size:9px; color:#888;">📅 Aguardando...</div>
+                <div id="dmw-next-update" style="font-size:9px; color:#ff9900; display:none;">⏰ --:05</div>
+            </div>
+        </div>
+        
+        <!-- PRODUTOS L2 (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>📊 PRODUTOS L2</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="section" style="border-left: 3px solid #00d4ff;">
+                <div class="section-title">
+                    <span class="status-indicator" id="l2-status"></span>
+                    CAPE, LI, TPW, Nuvens
+                </div>
+                
+                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                    <button id="btn-l2-on" class="toggle-btn" onclick="toggleL2(true)" style="flex:1;">✅ ON</button>
+                    <button id="btn-l2-off" class="toggle-btn active" onclick="toggleL2(false)" style="flex:1;">❌ OFF</button>
+                </div>
+                
+                <select id="l2-variable" style="width:100%; margin-bottom:6px; padding:5px; background:#222; color:#fff; border:1px solid #444; border-radius:3px; font-size:11px;" onchange="updateL2Display()">
+                    <option value="CAPE" selected>⚡ CAPE</option>
+                    <option value="LI">🌡️ LI</option>
+                    <option value="TPW">💧 TPW</option>
+                    <option value="HT">☁️ Altura</option>
+                    <option value="Phase">🧊 Fase</option>
+                </select>
+                
+                <button onclick="loadL2Data()" style="width:100%; margin-bottom:6px;">🔄 CARREGAR</button>
+                
+                <div id="l2-info" style="font-size:9px; color:#888;">📅 Aguardando...</div>
+                
+                <div id="l2-ship-data" style="display:none; background:#0a1a2a; padding:8px; border-radius:4px; margin-top:6px;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px; font-size:9px;">
+                        <div>⚡ <span id="l2-ship-cape" style="color:#ffcc00;">--</span></div>
+                        <div>🌡️ <span id="l2-ship-li" style="color:#00ff88;">--</span></div>
+                        <div>💧 <span id="l2-ship-tpw" style="color:#00ccff;">--</span></div>
+                        <div>☁️ <span id="l2-ship-ht" style="color:#ff88ff;">--</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="l2-legend-cape" style="display:none;"></div>
+        
+        <!-- LOG (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>📋 LOG</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="log-area" id="log-area" style="height:100px;">
+                <div class="log-entry info">Sistema iniciado...</div>
+            </div>
         </div>
         
         <!-- Ações -->
-        <div style="margin-top: 15px;">
-            <button onclick="fetchAllSources()">🔄 BUSCAR TODOS</button>
-            <button class="secondary" onclick="clearData()">🗑️ Limpar</button>
-            <button class="secondary" onclick="exportData()">📥 Exportar CSV</button>
+        <div style="margin-top: 10px; display:flex; gap:5px;">
+            <button onclick="fetchAllSources()" style="flex:1;">🔄 ATUALIZAR</button>
+            <button class="secondary" onclick="clearData()">🗑️</button>
         </div>
         
     </div>
@@ -1039,6 +1026,15 @@
     let dmwMarkers = [];
     let dmwAutoRefreshInterval = null;
     let lastDMWHour = -1;  // Para controlar atualização por hora
+    
+    // ============ FUNÇÃO TOGGLE COLLAPSIBLE ============
+    function toggleCollapsible(header) {
+        header.classList.toggle('collapsed');
+        const content = header.nextElementSibling;
+        if (content && content.classList.contains('collapsible-content')) {
+            content.classList.toggle('collapsed');
+        }
+    }
     
     function toggleDMW(enabled) {
         dmwEnabled = enabled;
