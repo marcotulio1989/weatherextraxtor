@@ -1298,21 +1298,21 @@
     }
     
     function createDMWArrow(lat, lon, direction, speed, color, pressure, qualityFlag) {
-        // Tamanho da seta baseado na velocidade (20-32 px)
-        const size = Math.min(20 + speed * 0.3, 32);
+        // Tamanho da seta GRANDE para visualização de 10m de distância
+        const size = Math.min(50 + speed * 0.8, 80);
         
         // DIREÇÃO: Valor indica DE ONDE o vento vem (convenção meteorológica)
         // Seta aponta PARA ONDE o vento vai (rotação +180°)
         const arrowRotation = (direction + 180) % 360;
         
-        // Criar HTML da seta usando SVG (formato de seta real)
+        // Criar HTML da seta usando SVG (formato de seta real) - GRANDE E VISÍVEL
         const arrowHtml = `
             <div style="transform: rotate(${arrowRotation}deg); width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
-                <svg viewBox="0 0 24 24" width="${size - 4}" height="${size - 4}">
-                    <path fill="${color}" stroke="#000" stroke-width="0.5" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                <svg viewBox="0 0 24 24" width="${size - 8}" height="${size - 8}">
+                    <path fill="${color}" stroke="#000" stroke-width="1.5" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                 </svg>
             </div>
-            <div style="text-align:center; font-size:9px; font-weight:bold; color:${color}; text-shadow: 1px 1px 2px black; margin-top:-2px;">
+            <div style="text-align:center; font-size:18px; font-weight:bold; color:${color}; text-shadow: 2px 2px 4px black, -1px -1px 2px black; margin-top:-4px;">
                 ${speed.toFixed(0)}
             </div>
         `;
@@ -1320,8 +1320,8 @@
         const icon = L.divIcon({
             className: 'dmw-wind-arrow',
             html: arrowHtml,
-            iconSize: [size, size + 12],
-            iconAnchor: [size/2, (size + 12)/2]
+            iconSize: [size, size + 24],
+            iconAnchor: [size/2, (size + 24)/2]
         });
         
         // Quality flag descrição
