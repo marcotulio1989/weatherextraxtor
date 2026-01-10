@@ -462,7 +462,7 @@
             📅 <span id="scatTimestamp">--</span>
         </div>
         <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
-            <label style="font-size: 0.7em; color: #888;">Auto-refresh (6h):</label>
+            <label style="font-size: 0.7em; color: #888;">Auto-check (1h):</label>
             <input type="checkbox" id="scatAutoRefresh" onclick="toggleScatAutoRefresh()">
             <span id="scatNextUpdate" style="font-size: 0.65em; color: #666;"></span>
         </div>
@@ -1377,23 +1377,24 @@
         let scatMarkers = [];
         let scatData = null;
         let scatAutoRefreshInterval = null;
+        let scatLastTimestamp = null;  // Timestamp dos dados atuais
         
         function toggleScatAutoRefresh() {
             const checkbox = document.getElementById('scatAutoRefresh');
             const nextUpdateSpan = document.getElementById('scatNextUpdate');
             
             if (checkbox.checked) {
-                // Iniciar auto-refresh a cada 6 horas
-                const SIX_HOURS = 6 * 60 * 60 * 1000;
+                // Verificar a cada 1 hora se há dados mais novos
+                const ONE_HOUR = 60 * 60 * 1000;
                 
                 scatAutoRefreshInterval = setInterval(() => {
-                    console.log('🔄 SCAT Auto-refresh: Atualizando dados...');
-                    loadScatWinds();
+                    console.log('🔍 SCAT: Verificando se há dados mais novos...');
+                    checkAndUpdateScatWinds();
                     updateScatNextUpdateTime();
-                }, SIX_HOURS);
+                }, ONE_HOUR);
                 
                 updateScatNextUpdateTime();
-                console.log('⏰ SCAT Auto-refresh ativado (a cada 6h)');
+                console.log('⏰ SCAT Auto-refresh ativado (verifica a cada 1h)');
             } else {
                 // Parar auto-refresh
                 if (scatAutoRefreshInterval) {
@@ -1405,10 +1406,41 @@
             }
         }
         
+        async function checkAndUpdateScatWinds() {
+            // Verificar se há dados mais novos antes de baixar
+            try {
+                // Buscar apenas o header/metadata para verificar timestamp
+                const response = await fetch('scatterometer_latest.json', { method: 'HEAD' });
+                if (!response.ok) {
+                    console.log('⚠️ Não foi possível verificar timestamp');
+                    return;
+                }
+                
+                // Tentar buscar o JSON para comparar timestamp
+                const jsonResponse = await fetch('scatterometer_latest.json');
+                if (!jsonResponse.ok) return;
+                
+                const newData = await jsonResponse.json();
+                const newTimestamp = newData.timestamp ? new Date(newData.timestamp).getTime() : 0;
+                const currentTimestamp = scatLastTimestamp ? new Date(scatLastTimestamp).getTime() : 0;
+                
+                if (newTimestamp > currentTimestamp) {
+                    console.log(`✅ SCAT: Dados mais novos encontrados! ${new Date(newTimestamp).toLocaleString('pt-BR')}`);
+                    console.log(`   Anterior: ${currentTimestamp ? new Date(currentTimestamp).toLocaleString('pt-BR') : 'N/A'}`);
+                    loadScatWinds();  // Baixar e renderizar
+                } else {
+                    console.log(`ℹ️ SCAT: Dados atuais são os mais recentes (${new Date(currentTimestamp).toLocaleString('pt-BR')})`);
+                }
+                
+            } catch (err) {
+                console.error('❌ Erro ao verificar atualizações SCAT:', err);
+            }
+        }
+        
         function updateScatNextUpdateTime() {
             const nextUpdateSpan = document.getElementById('scatNextUpdate');
             const now = new Date();
-            const nextUpdate = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+            const nextUpdate = new Date(now.getTime() + 60 * 60 * 1000);  // 1 hora
             nextUpdateSpan.textContent = `Próx: ${nextUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
         }
         
@@ -1562,8 +1594,9 @@
                 document.getElementById('scatInfo').textContent = 
                     `${displayedCount} vetores | ${satellites}`;
                 
-                // Atualizar timestamp
+                // Atualizar timestamp e salvar para comparação futura
                 if (scatData.timestamp) {
+                    scatLastTimestamp = scatData.timestamp;  // Salvar para verificação de atualização
                     const ts = new Date(scatData.timestamp);
                     const tsStr = ts.toLocaleString('pt-BR', {
                         day: '2-digit', month: '2-digit', year: 'numeric',
@@ -1688,16 +1721,13 @@
             }
             
             // Seta de vento com direção (ASCAT)
-            // Direção meteorológica = de onde o vento VEM
-            // Queremos mostrar para onde o vento SOPRA (oposto)
+            // Usar direção exatamente como vem do arquivo do satélite
             const arrowLength = Math.min(0.25 + speed * 0.008, 0.6);
             
-            // Direção de onde vem -> converter para onde vai (adicionar 180°)
-            // Em coordenadas: Norte=0°, Leste=90°, Sul=180°, Oeste=270°
-            const blowToDir = (direction + 180) % 360;
-            const dirRad = blowToDir * Math.PI / 180;
+            // Direção em graus (0=Norte, 90=Leste, 180=Sul, 270=Oeste)
+            const dirRad = direction * Math.PI / 180;
             
-            // cos(dir) = componente Norte/Sul, sin(dir) = componente Leste/Oeste
+            // Calcular ponto final da seta
             const endLat = lat - arrowLength * Math.cos(dirRad);
             const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
@@ -1716,7 +1746,7 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta - apontar na direção para onde o vento sopra
+            // Cabeça da seta
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1724,7 +1754,7 @@
                     border-left: 4px solid transparent;
                     border-right: 4px solid transparent;
                     border-bottom: 8px solid ${color};
-                    transform: rotate(${blowToDir}deg);
+                    transform: rotate(${direction}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
