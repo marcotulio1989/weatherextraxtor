@@ -1749,8 +1749,7 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta - rotação CSS (0=cima, 90=direita)
-            // Usar adjustedDir (já com -180°) sem adicionar 180° de novo
+            // Cabeça da seta - no INÍCIO da linha (lat, lon) girada 180°
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1758,7 +1757,7 @@
                     border-left: 5px solid transparent;
                     border-right: 5px solid transparent;
                     border-bottom: 10px solid ${color};
-                    transform: rotate(${adjustedDir}deg);
+                    transform: rotate(${(adjustedDir + 180) % 360}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
@@ -1767,7 +1766,7 @@
                 className: 'scat-arrow-head'
             });
             
-            const head = L.marker([endLat, endLon], { icon: arrowHead, interactive: false });
+            const head = L.marker([lat, lon], { icon: arrowHead, interactive: false });
             
             return L.layerGroup([line, head]);
         }
