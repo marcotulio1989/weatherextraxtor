@@ -1722,14 +1722,20 @@
             
             // Seta de vento com direção (ASCAT)
             // O arquivo traz a direção para onde vai, subtrair 180° para mostrar de onde VEM
-            const arrowLength = Math.min(0.25 + speed * 0.008, 0.6);
+            const arrowLength = Math.min(0.15 + speed * 0.005, 0.4);
             
             // Subtrair 180° para mostrar de onde o vento vem
             const fromDir = (direction - 180 + 360) % 360;
+            
+            // Converter para radianos
+            // Em meteorologia: 0°=N, 90°=E, 180°=S, 270°=W
+            // Para coordenadas: Norte = +lat, Leste = +lon
             const dirRad = fromDir * Math.PI / 180;
             
-            // Calcular ponto final da seta (apontar de onde vem)
-            const endLat = lat - arrowLength * Math.cos(dirRad);
+            // Calcular ponto final da seta
+            // Norte (0°): cos=1, sin=0 -> lat aumenta
+            // Leste (90°): cos=0, sin=1 -> lon aumenta
+            const endLat = lat + arrowLength * Math.cos(dirRad);
             const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
             const line = L.polyline([[lat, lon], [endLat, endLon]], {
@@ -1747,20 +1753,22 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta - apontar de onde vem
+            // Cabeça da seta no ponto de ORIGEM da linha (de onde vem)
+            // Rotação CSS: 0deg=cima, 90deg=direita, 180deg=baixo, 270deg=esquerda
+            // Queremos que a seta aponte NA direção fromDir
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
                     height: 0;
-                    border-left: 4px solid transparent;
-                    border-right: 4px solid transparent;
-                    border-bottom: 8px solid ${color};
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-bottom: 10px solid ${color};
                     transform: rotate(${fromDir}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
-                iconSize: [8, 8],
-                iconAnchor: [4, 4],
+                iconSize: [10, 10],
+                iconAnchor: [5, 5],
                 className: 'scat-arrow-head'
             });
             
