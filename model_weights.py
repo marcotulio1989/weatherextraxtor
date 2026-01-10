@@ -474,7 +474,9 @@ class ModelWeightsManager:
         # Extrair referência
         ref_speed, ref_dir = self._extract_reference_wind(scat_data)
         
-        print(f"   📍 Referência SCAT: {ref_speed:.1f} kt @ {ref_dir:.0f}°")
+        # Exibir direção calibrada (-180°)
+        ref_dir_cal = calibrate_wind_direction(ref_dir)
+        print(f"   📍 Referência SCAT: {ref_speed:.1f} kt @ {ref_dir_cal:.0f}°")
         
         # Criar novo estado
         self.state = WeightsState()
@@ -507,11 +509,17 @@ class ModelWeightsManager:
         ref_speed = self.state.reference_speed_kt
         ref_dir = self.state.reference_direction
         
-        print(f"\n📊 Calculando pesos iniciais (ref: {ref_speed:.1f}kt @ {ref_dir:.0f}°):")
+        # Direção calibrada para exibição
+        ref_dir_cal = calibrate_wind_direction(ref_dir)
+        
+        print(f"\n📊 Calculando pesos iniciais (ref: {ref_speed:.1f}kt @ {ref_dir_cal:.0f}°):")
         
         for model_name, (model_dir, model_speed_kt) in model_forecasts.items():
             if model_name not in self.state.weights:
                 continue
+            
+            # Direção do modelo calibrada para exibição
+            model_dir_cal = calibrate_wind_direction(model_dir)
             
             # Calcular peso inicial
             combined, dir_w, dir_var, spd_w, spd_var = calculate_combined_initial_weight(
@@ -528,7 +536,7 @@ class ModelWeightsManager:
             weight.last_updated = utcnow().isoformat()
             
             print(f"   {model_name}:")
-            print(f"      Previsão: {model_speed_kt:.1f}kt @ {model_dir:.0f}°")
+            print(f"      Previsão: {model_speed_kt:.1f}kt @ {model_dir_cal:.0f}°")
             print(f"      Δ Dir: {dir_var:+.1f}° (peso: {dir_w:.3f})")
             print(f"      Δ Vel: {spd_var:+.1f}kt (peso: {spd_w:.3f})")
             print(f"      Peso inicial: {combined:.3f}")
@@ -604,12 +612,16 @@ class ModelWeightsManager:
         """Retorna status completo para exibição."""
         normalized = self.get_normalized_weights()
         
+        # Direção calibrada para exibição
+        ref_dir_cal = calibrate_wind_direction(self.state.reference_direction)
+        
         return {
             "scat_timestamp": self.state.scat_timestamp,
             "cycle_start": self.state.cycle_start,
             "reference": {
                 "speed_kt": self.state.reference_speed_kt,
-                "direction": self.state.reference_direction
+                "direction": ref_dir_cal,
+                "direction_raw": self.state.reference_direction
             },
             "models": {
                 model_name: {
