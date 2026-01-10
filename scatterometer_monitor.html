@@ -3781,11 +3781,11 @@
         // Velocidade
         speedCorrectCount: 0,  // Acertos de velocidade
         speedWrongCount: 0,    // Erros de velocidade
-        speedScore: 100,       // Score de velocidade (0-150)
+        speedScore: 0,         // Score acumulado de velocidade (soma dos pesos)
         // Direção
         dirCorrectCount: 0,    // Acertos de direção
         dirWrongCount: 0,      // Erros de direção
-        dirScore: 100          // Score de direção (0-150)
+        dirScore: 0            // Score acumulado de direção (soma dos pesos)
     });
     
     // Threshold para considerar "acerto" vs "erro"
@@ -4139,8 +4139,12 @@
         // =====================================================================
         let calibrationResults = [];
         
-        // Primeiro, calcular erros de todos os modelos
-        let modelErrors = {};
+        // =====================================================================
+        // SISTEMA SIMPLES E DIRETO:
+        // - Velocidade: 0 kt erro = peso 100%, 30 kt erro = peso 0%
+        // - Direção: 0° erro = peso 100%, 180° erro = peso 0%
+        // =====================================================================
+        
         MODELS.forEach(model => {
             const modelValue = modelData[model];
             if (!modelValue || modelValue.speed === null) return;
@@ -4149,84 +4153,37 @@
             const dirError = observedDir !== null && modelValue.direction !== null ? 
                              directionError(modelValue.direction, observedDir) : null;
             
-            modelErrors[model] = { speedError, dirError };
-        });
-        
-        // Encontrar o maior e menor erro para normalização
-        let maxSpeedError = 0, minSpeedError = Infinity;
-        let maxDirError = 0, minDirError = Infinity;
-        
-        Object.values(modelErrors).forEach(e => {
-            if (e.speedError > maxSpeedError) maxSpeedError = e.speedError;
-            if (e.speedError < minSpeedError) minSpeedError = e.speedError;
-            if (e.dirError !== null) {
-                if (e.dirError > maxDirError) maxDirError = e.dirError;
-                if (e.dirError < minDirError) minDirError = e.dirError;
-            }
-        });
-        
-        // Agora calcular scores PROPORCIONAIS ao erro
-        MODELS.forEach(model => {
-            const errors = modelErrors[model];
-            if (!errors) return;
-            
-            const speedError = errors.speedError;
-            const dirError = errors.dirError;
-            
             // Atualizar contadores
             modelStats[model].totalComparisons++;
             
-            // === VELOCIDADE - PROPORCIONAL ===
-            // Score baseado em quão perto do melhor modelo este está
-            // Modelo com menor erro = score mais alto
-            // Fórmula: score proporcional = 1 - (erro / erroMáximo)
-            // Se erroMáximo = 0, todos são perfeitos
+            // === VELOCIDADE ===
+            // Peso linear: 0 kt = 100%, 30 kt = 0%
+            const speedWeight = Math.max(0, 1 - speedError / 30);
             
-            const speedRange = Math.max(1, maxSpeedError - minSpeedError);
-            // Quanto menor o erro em relação ao pior, maior o multiplicador (0.5 a 1.5)
-            const speedMultiplier = 1.5 - (speedError - minSpeedError) / speedRange;
+            // Acumulador: score vai de 0 a infinito, proporcional à precisão
+            // Cada calibração adiciona o peso (0-1) multiplicado pelo peso da fonte
+            modelStats[model].speedScore += speedWeight * sourceWeight * 10;
             
-            const speedCorrect = speedError < ACCURACY_THRESHOLD_SPEED;
-            if (speedCorrect) {
+            // Contadores de acerto/erro para exibição
+            if (speedError < ACCURACY_THRESHOLD_SPEED) {
                 modelStats[model].speedCorrectCount++;
-                // Bonus PROPORCIONAL - modelo com menor erro ganha mais
-                const baseReward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
-                const reward = baseReward * speedMultiplier;
-                modelStats[model].speedScore = Math.min(150, modelStats[model].speedScore + reward);
             } else {
                 modelStats[model].speedWrongCount++;
-                // Penalidade PROPORCIONAL - modelo com maior erro perde mais
-                const wrongRatio = modelStats[model].speedWrongCount / Math.max(1, modelStats[model].totalComparisons);
-                const penaltyMultiplier = 1 + wrongRatio * 2;
-                // Modelo com maior erro relativo = maior penalidade
-                const errorMultiplier = 0.5 + (speedError - minSpeedError) / speedRange;
-                const penalty = (speedError / 30) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier * errorMultiplier;
-                modelStats[model].speedScore = Math.max(10, modelStats[model].speedScore - penalty);
             }
             
-            // === DIREÇÃO - PROPORCIONAL ===
-            let dirCorrect = true;
+            // === DIREÇÃO ===
             if (dirError !== null) {
-                const dirRange = Math.max(1, maxDirError - minDirError);
-                // Quanto menor o erro em relação ao pior, maior o multiplicador (0.5 a 1.5)
-                const dirMultiplier = 1.5 - (dirError - minDirError) / dirRange;
+                // Peso linear: 0° = 100%, 180° = 0%
+                const dirWeight = Math.max(0, 1 - dirError / 180);
                 
-                dirCorrect = dirError < ACCURACY_THRESHOLD_DIR;
-                if (dirCorrect) {
+                // Acumulador
+                modelStats[model].dirScore += dirWeight * sourceWeight * 10;
+                
+                // Contadores
+                if (dirError < ACCURACY_THRESHOLD_DIR) {
                     modelStats[model].dirCorrectCount++;
-                    // Bonus PROPORCIONAL - modelo com menor erro ganha mais
-                    const baseReward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
-                    const reward = baseReward * dirMultiplier;
-                    modelStats[model].dirScore = Math.min(150, modelStats[model].dirScore + reward);
                 } else {
                     modelStats[model].dirWrongCount++;
-                    // Penalidade PROPORCIONAL - modelo com maior erro perde mais
-                    const wrongRatio = modelStats[model].dirWrongCount / Math.max(1, modelStats[model].totalComparisons);
-                    const penaltyMultiplier = 1 + wrongRatio * 2;
-                    // Modelo com maior erro relativo = maior penalidade
-                    const errorMultiplier = 0.5 + (dirError - minDirError) / dirRange;
-                    const penalty = (dirError / 180) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier * errorMultiplier;
-                    modelStats[model].dirScore = Math.max(10, modelStats[model].dirScore - penalty);
                 }
             }
             
@@ -4234,8 +4191,8 @@
                 model: MODEL_NAMES[model],
                 speedError: speedError.toFixed(1),
                 dirError: dirError !== null ? dirError.toFixed(0) : 'N/A',
-                speedCorrect,
-                dirCorrect,
+                speedWeight: (speedWeight * 100).toFixed(0),
+                dirWeight: dirError !== null ? ((1 - dirError / 180) * 100).toFixed(0) : 'N/A',
                 speedScore: modelStats[model].speedScore.toFixed(0),
                 dirScore: modelStats[model].dirScore.toFixed(0)
             });
@@ -4243,9 +4200,7 @@
         
         // Log detalhado
         calibrationResults.forEach(r => {
-            const spdEmoji = r.speedCorrect ? '✅' : '❌';
-            const dirEmoji = r.dirCorrect ? '✅' : '❌';
-            log('info', `${r.model}: Spd ${spdEmoji}Δ${r.speedError}kt→${r.speedScore} | Dir ${dirEmoji}Δ${r.dirError}°→${r.dirScore}`);
+            log('info', `${r.model}: Vel Δ${r.speedError}kt=${r.speedWeight}%→${r.speedScore} | Dir Δ${r.dirError}°=${r.dirWeight}%→${r.dirScore}`);
         });
         
         // Recalcular pesos
@@ -4296,7 +4251,7 @@
     }
     
     // Versão da calibração - incrementar para forçar reset quando houver mudanças importantes
-    const CALIBRATION_VERSION = 6;  // v6: sistema proporcional - pesos baseados no erro relativo
+    const CALIBRATION_VERSION = 7;  // v7: sistema linear simples - vel 0-30kt, dir 0-180°
     
     // Carregar histórico e estatísticas do localStorage
     function loadForecastHistory() {
@@ -4333,10 +4288,10 @@
                             totalComparisons: parsed[m].totalComparisons || 0,
                             speedCorrectCount: parsed[m].speedCorrectCount || 0,
                             speedWrongCount: parsed[m].speedWrongCount || 0,
-                            speedScore: parsed[m].speedScore || 100,
+                            speedScore: parsed[m].speedScore || 0,
                             dirCorrectCount: parsed[m].dirCorrectCount || 0,
                             dirWrongCount: parsed[m].dirWrongCount || 0,
-                            dirScore: parsed[m].dirScore || 100
+                            dirScore: parsed[m].dirScore || 0
                         };
                     }
                 });
@@ -4697,10 +4652,10 @@
                 totalComparisons: 0,
                 speedCorrectCount: 0,
                 speedWrongCount: 0,
-                speedScore: 100,
+                speedScore: 0,
                 dirCorrectCount: 0,
                 dirWrongCount: 0,
-                dirScore: 100
+                dirScore: 0
             };
             modelWeights[m] = 1 / MODELS.length;
             modelSpeedWeights[m] = 1 / MODELS.length;
