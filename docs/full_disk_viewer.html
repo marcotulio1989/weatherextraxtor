@@ -1723,13 +1723,12 @@
             // Seta de vento
             const arrowLength = Math.min(0.15 + speed * 0.005, 0.4);
             
-            // Arquivo tem direção para onde vai, calcular de onde vem
-            const fromDir = (direction - 180 + 360) % 360;
-            const dirRad = fromDir * Math.PI / 180;
+            // Direção do arquivo (NÃO MEXER)
+            const dirRad = direction * Math.PI / 180;
             
-            // Calcular ponto final na direção de onde vem
-            const endLat = lat + arrowLength * Math.cos(dirRad);
-            const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+            // Desenhar vetor na direção OPOSTA (girar 180°)
+            const endLat = lat - arrowLength * Math.cos(dirRad);
+            const endLon = lon - arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
             const line = L.polyline([[lat, lon], [endLat, endLon]], {
                 color: color,
@@ -1741,12 +1740,12 @@
                 <div style="text-align:center;">
                     <b>🛰️ ${satellite}</b><br>
                     <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
-                    Vem de: ${fromDir.toFixed(0)}°<br>
+                    Vem de: ${direction.toFixed(0)}°<br>
                     Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta aponta na direção de onde vem
+            // Cabeça da seta (girada 180° do valor)
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1754,7 +1753,7 @@
                     border-left: 5px solid transparent;
                     border-right: 5px solid transparent;
                     border-bottom: 10px solid ${color};
-                    transform: rotate(${fromDir}deg);
+                    transform: rotate(${(direction + 180) % 360}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
