@@ -3446,94 +3446,87 @@
     
     // Calibrar modelos com dados OBSERVADOS (DMW ou SCAT)
     function calibrateWithObservedData() {
-        // Verificar se há dados DMW novos
+        // Verificar se há dados DMW ou SCAT novos
+        // IMPORTANTE: Calibrar separadamente - SCAT ou DMW, nunca misturar
+        // Podem ter até 12h de diferença, misturar prejudica os cálculos
         const dmwTimestamp = dmwData && dmwData.timestamp ? new Date(dmwData.timestamp).getTime() : 0;
         const scatTimestamp = scatData && scatData.timestamp ? new Date(scatData.timestamp).getTime() : 0;
         
-        let hasNewDMW = dmwTimestamp > lastDMWCalibrationTimestamp;
-        let hasNewSCAT = scatTimestamp > lastSCATCalibrationTimestamp;
+        const hasNewDMW = dmwTimestamp > lastDMWCalibrationTimestamp;
+        const hasNewSCAT = scatTimestamp > lastSCATCalibrationTimestamp;
         
         if (!hasNewDMW && !hasNewSCAT) {
             log('info', '📊 Calibração: Sem dados novos de DMW/SCAT');
             return;
         }
         
-        // Obter vetores no raio de 100nm
-        const dmwVectors = getDMWVectorsInRadius();
-        const scatVectors = getSCATVectorsInRadius();
-        
-        // Atualizar estatísticas de observação
-        observedStats.dmw = {
-            count: dmwVectors.count,
-            avgSpeed: dmwVectors.avgSpeed,
-            avgDir: dmwVectors.avgDir,
-            weight: calculateObservationWeight(dmwVectors.count)
-        };
-        observedStats.scat = {
-            count: scatVectors.count,
-            avgSpeed: scatVectors.avgSpeed,
-            avgDir: scatVectors.avgDir,
-            weight: calculateObservationWeight(scatVectors.count)
-        };
-        
-        // Log de vetores encontrados
-        log('info', `🌬️ DMW: ${dmwVectors.count} vetores (peso ${(observedStats.dmw.weight * 100).toFixed(0)}%) | ` +
-                    `SCAT: ${scatVectors.count} vetores (peso ${(observedStats.scat.weight * 100).toFixed(0)}%)`);
-        
-        // Se não tem vetores suficientes, não calibrar
-        const totalWeight = observedStats.dmw.weight + observedStats.scat.weight;
-        if (totalWeight < 0.1) {
-            log('warning', '⚠️ Calibração: Poucos vetores no raio de 100nm (peso < 10%)');
-            updateWeightReasonUI('Poucos vetores no raio 100nm', dmwVectors.count, scatVectors.count);
-            return;
-        }
-        
-        // Calcular valor observado médio (ponderado por peso de cada fonte)
+        // Decidir qual fonte usar (apenas UMA por vez)
+        // Prioridade para o que acabou de atualizar
+        let useSource = null;
         let observedSpeed = null;
         let observedDir = null;
+        let sourceWeight = 0;
+        let vectorCount = 0;
         
-        if (totalWeight > 0) {
-            // Calcular média ponderada
-            let speedSum = 0, speedWeightSum = 0;
-            let dirSin = 0, dirCos = 0, dirWeightSum = 0;
+        if (hasNewSCAT) {
+            // SCAT atualizou - usar APENAS SCAT
+            const scatVectors = getSCATVectorsInRadius();
+            observedStats.scat = {
+                count: scatVectors.count,
+                avgSpeed: scatVectors.avgSpeed,
+                avgDir: scatVectors.avgDir,
+                weight: calculateObservationWeight(scatVectors.count)
+            };
             
-            if (hasNewDMW && observedStats.dmw.avgSpeed !== null) {
-                speedSum += observedStats.dmw.avgSpeed * observedStats.dmw.weight;
-                speedWeightSum += observedStats.dmw.weight;
-                if (observedStats.dmw.avgDir !== null) {
-                    dirSin += Math.sin(observedStats.dmw.avgDir * Math.PI / 180) * observedStats.dmw.weight;
-                    dirCos += Math.cos(observedStats.dmw.avgDir * Math.PI / 180) * observedStats.dmw.weight;
-                    dirWeightSum += observedStats.dmw.weight;
-                }
+            if (scatVectors.count > 0 && scatVectors.avgSpeed !== null) {
+                useSource = 'SCAT';
+                observedSpeed = scatVectors.avgSpeed;
+                observedDir = scatVectors.avgDir;
+                sourceWeight = observedStats.scat.weight;
+                vectorCount = scatVectors.count;
+                lastSCATCalibrationTimestamp = scatTimestamp;
+                log('info', `🛰️ SCAT atualizado: ${scatVectors.count} vetores (peso ${(sourceWeight * 100).toFixed(0)}%)`);
             }
+        } else if (hasNewDMW) {
+            // DMW atualizou - usar APENAS DMW
+            const dmwVectors = getDMWVectorsInRadius();
+            observedStats.dmw = {
+                count: dmwVectors.count,
+                avgSpeed: dmwVectors.avgSpeed,
+                avgDir: dmwVectors.avgDir,
+                weight: calculateObservationWeight(dmwVectors.count)
+            };
             
-            if (hasNewSCAT && observedStats.scat.avgSpeed !== null) {
-                speedSum += observedStats.scat.avgSpeed * observedStats.scat.weight;
-                speedWeightSum += observedStats.scat.weight;
-                if (observedStats.scat.avgDir !== null) {
-                    dirSin += Math.sin(observedStats.scat.avgDir * Math.PI / 180) * observedStats.scat.weight;
-                    dirCos += Math.cos(observedStats.scat.avgDir * Math.PI / 180) * observedStats.scat.weight;
-                    dirWeightSum += observedStats.scat.weight;
-                }
-            }
-            
-            if (speedWeightSum > 0) {
-                observedSpeed = speedSum / speedWeightSum;
-            }
-            if (dirWeightSum > 0) {
-                observedDir = Math.atan2(dirSin / dirWeightSum, dirCos / dirWeightSum) * 180 / Math.PI;
-                if (observedDir < 0) observedDir += 360;
+            if (dmwVectors.count > 0 && dmwVectors.avgSpeed !== null) {
+                useSource = 'DMW';
+                observedSpeed = dmwVectors.avgSpeed;
+                observedDir = dmwVectors.avgDir;
+                sourceWeight = observedStats.dmw.weight;
+                vectorCount = dmwVectors.count;
+                lastDMWCalibrationTimestamp = dmwTimestamp;
+                log('info', `🌀 DMW atualizado: ${dmwVectors.count} vetores (peso ${(sourceWeight * 100).toFixed(0)}%)`);
             }
         }
         
-        if (observedSpeed === null) {
-            log('warning', '⚠️ Calibração: Sem velocidade observada');
+        // Se não tem fonte válida, sair
+        if (!useSource || observedSpeed === null) {
+            log('warning', '⚠️ Calibração: Fonte sem vetores válidos no raio de 100nm');
+            updateWeightReasonUI('Sem vetores no raio 100nm', 
+                observedStats.dmw?.count || 0, 
+                observedStats.scat?.count || 0);
             return;
         }
         
-        log('success', `📍 Valor Observado: ${observedSpeed.toFixed(1)} kt, ${observedDir ? observedDir.toFixed(0) + '°' : 'N/A'}`);
+        // Se peso muito baixo, não calibrar
+        if (sourceWeight < 0.1) {
+            log('warning', `⚠️ Calibração: ${useSource} com poucos vetores (peso < 10%)`);
+            updateWeightReasonUI(`${useSource} - poucos vetores`, vectorCount, 0);
+            return;
+        }
         
-        // Agora comparar cada modelo com o valor observado
+        log('success', `📍 Calibrando com ${useSource}: ${observedSpeed.toFixed(1)} kt, ${observedDir ? observedDir.toFixed(0) + '°' : 'N/A'}`);
+        
+        // Comparar cada modelo com o valor observado
         let calibrationResults = [];
         
         MODELS.forEach(model => {
@@ -3550,7 +3543,7 @@
             const normalizedError = (speedError / 30) * 0.6 + (dirError / 180) * 0.4;
             
             // Aplicar peso da observação (quanto mais vetores, mais certeza no erro)
-            const weightedError = normalizedError * totalWeight;
+            const weightedError = normalizedError * sourceWeight;
             
             // Atualizar contadores
             modelStats[model].totalErrors += weightedError;
@@ -3562,7 +3555,7 @@
             if (isCorrect) {
                 modelStats[model].correctCount++;
                 // Recuperar score levemente (proporcional ao peso da observação)
-                const reward = 2 * CORRECT_REWARD_FACTOR * totalWeight;
+                const reward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
                 modelStats[model].cumulativeScore = Math.min(150, 
                     modelStats[model].cumulativeScore + reward);
             } else {
@@ -3591,10 +3584,6 @@
             log('info', `${emoji} ${r.model}: Δspd=${r.speedError}kt Δdir=${r.dirError}° → score=${r.score}`);
         });
         
-        // Atualizar timestamps
-        if (hasNewDMW) lastDMWCalibrationTimestamp = dmwTimestamp;
-        if (hasNewSCAT) lastSCATCalibrationTimestamp = scatTimestamp;
-        
         // Recalcular pesos
         calculateDynamicWeights();
         
@@ -3602,11 +3591,7 @@
         saveForecastHistory();
         
         // Atualizar UI
-        updateWeightReasonUI(
-            hasNewDMW && hasNewSCAT ? 'DMW + SCAT' : (hasNewDMW ? 'DMW' : 'SCAT'),
-            dmwVectors.count,
-            scatVectors.count
-        );
+        updateWeightReasonUI(useSource, vectorCount, 0);
     }
     
     // Atualizar UI de razão dos pesos
