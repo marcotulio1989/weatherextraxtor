@@ -801,31 +801,31 @@
                         <thead>
                             <tr style="background:#222;">
                                 <th style="padding:3px; text-align:left; color:#888;">Mod</th>
-                                <th colspan="2" style="padding:3px; text-align:center; color:#88ccff; border-left:1px solid #444;">Vel</th>
-                                <th colspan="2" style="padding:3px; text-align:center; color:#ffcc88; border-left:1px solid #444;">Dir</th>
-                                <th style="padding:3px; text-align:center; color:#00ffcc; border-left:1px solid #444;">Peso</th>
+                                <th colspan="3" style="padding:3px; text-align:center; color:#88ccff; border-left:1px solid #444;">Velocidade</th>
+                                <th colspan="3" style="padding:3px; text-align:center; color:#ffcc88; border-left:1px solid #444;">Direção</th>
                             </tr>
                             <tr style="background:#1a1a1a;">
                                 <th style="padding:2px;"></th>
-                                <th style="padding:2px; text-align:center; color:#00ff00; font-size:7px; border-left:1px solid #444;">✓/✗</th>
+                                <th style="padding:2px; text-align:center; color:#888; font-size:7px; border-left:1px solid #444;">✓/✗</th>
                                 <th style="padding:2px; text-align:center; color:#88ccff; font-size:7px;">Sc</th>
-                                <th style="padding:2px; text-align:center; color:#00ff00; font-size:7px; border-left:1px solid #444;">✓/✗</th>
+                                <th style="padding:2px; text-align:center; color:#00ffcc; font-size:7px;">%</th>
+                                <th style="padding:2px; text-align:center; color:#888; font-size:7px; border-left:1px solid #444;">✓/✗</th>
                                 <th style="padding:2px; text-align:center; color:#ffcc88; font-size:7px;">Sc</th>
-                                <th style="padding:2px; border-left:1px solid #444;"></th>
+                                <th style="padding:2px; text-align:center; color:#00ffcc; font-size:7px;">%</th>
                             </tr>
                         </thead>
                         <tbody id="calibration-table">
-                            <tr><td style="padding:2px; color:#aaa;">GFS</td><td id="calib-spd-count-gfs_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-gfs_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-dir-count-gfs_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-gfs_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-weight-gfs_seamless" style="text-align:center; color:#00ffcc; border-left:1px solid #333;">20%</td></tr>
-                            <tr><td style="padding:2px; color:#aaa;">ECMWF</td><td id="calib-spd-count-ecmwf_ifs025" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-ecmwf_ifs025" style="text-align:center; color:#88ccff;">100</td><td id="calib-dir-count-ecmwf_ifs025" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-ecmwf_ifs025" style="text-align:center; color:#ffcc88;">100</td><td id="calib-weight-ecmwf_ifs025" style="text-align:center; color:#00ffcc; border-left:1px solid #333;">20%</td></tr>
-                            <tr><td style="padding:2px; color:#aaa;">ICON</td><td id="calib-spd-count-icon_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-icon_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-dir-count-icon_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-icon_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-weight-icon_seamless" style="text-align:center; color:#00ffcc; border-left:1px solid #333;">20%</td></tr>
-                            <tr><td style="padding:2px; color:#aaa;">MFR</td><td id="calib-spd-count-meteofrance_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-meteofrance_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-dir-count-meteofrance_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-meteofrance_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-weight-meteofrance_seamless" style="text-align:center; color:#00ffcc; border-left:1px solid #333;">20%</td></tr>
-                            <tr><td style="padding:2px; color:#aaa;">JMA</td><td id="calib-spd-count-jma_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-jma_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-dir-count-jma_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-jma_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-weight-jma_seamless" style="text-align:center; color:#00ffcc; border-left:1px solid #333;">20%</td></tr>
+                            <tr><td style="padding:2px; color:#aaa;">GFS</td><td id="calib-spd-count-gfs_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-gfs_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-spd-weight-gfs_seamless" style="text-align:center; color:#00ffcc;">20</td><td id="calib-dir-count-gfs_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-gfs_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-dir-weight-gfs_seamless" style="text-align:center; color:#00ffcc;">20</td></tr>
+                            <tr><td style="padding:2px; color:#aaa;">ECMWF</td><td id="calib-spd-count-ecmwf_ifs025" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-ecmwf_ifs025" style="text-align:center; color:#88ccff;">100</td><td id="calib-spd-weight-ecmwf_ifs025" style="text-align:center; color:#00ffcc;">20</td><td id="calib-dir-count-ecmwf_ifs025" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-ecmwf_ifs025" style="text-align:center; color:#ffcc88;">100</td><td id="calib-dir-weight-ecmwf_ifs025" style="text-align:center; color:#00ffcc;">20</td></tr>
+                            <tr><td style="padding:2px; color:#aaa;">ICON</td><td id="calib-spd-count-icon_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-icon_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-spd-weight-icon_seamless" style="text-align:center; color:#00ffcc;">20</td><td id="calib-dir-count-icon_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-icon_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-dir-weight-icon_seamless" style="text-align:center; color:#00ffcc;">20</td></tr>
+                            <tr><td style="padding:2px; color:#aaa;">MFR</td><td id="calib-spd-count-meteofrance_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-meteofrance_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-spd-weight-meteofrance_seamless" style="text-align:center; color:#00ffcc;">20</td><td id="calib-dir-count-meteofrance_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-meteofrance_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-dir-weight-meteofrance_seamless" style="text-align:center; color:#00ffcc;">20</td></tr>
+                            <tr><td style="padding:2px; color:#aaa;">JMA</td><td id="calib-spd-count-jma_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-spd-score-jma_seamless" style="text-align:center; color:#88ccff;">100</td><td id="calib-spd-weight-jma_seamless" style="text-align:center; color:#00ffcc;">20</td><td id="calib-dir-count-jma_seamless" style="text-align:center; color:#888; border-left:1px solid #333;">0/0</td><td id="calib-dir-score-jma_seamless" style="text-align:center; color:#ffcc88;">100</td><td id="calib-dir-weight-jma_seamless" style="text-align:center; color:#00ffcc;">20</td></tr>
                         </tbody>
                     </table>
                 </div>
                 
                 <div style="font-size:8px; color:#666; margin-bottom:8px;">
-                    Vel: &lt;3kt | Dir: &lt;20° | Score 50% + 50%
+                    Vel: acerto &lt;3kt | Dir: acerto &lt;20°
                 </div>
                 
                 <button class="secondary" onclick="testCalibration()" style="width:100%; font-size:10px; margin-bottom:5px; background:#ff9900; color:#000;">
@@ -3583,7 +3583,15 @@
     let modelData = {};
     MODELS.forEach(m => modelData[m] = { speed: null, direction: null });
     
-    // Pesos dinâmicos (iniciam iguais)
+    // Pesos dinâmicos SEPARADOS para velocidade e direção
+    let modelSpeedWeights = {};
+    let modelDirWeights = {};
+    MODELS.forEach(m => {
+        modelSpeedWeights[m] = 1 / MODELS.length;
+        modelDirWeights[m] = 1 / MODELS.length;
+    });
+    
+    // Peso combinado (para compatibilidade)
     let modelWeights = {};
     MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
     
@@ -3921,7 +3929,7 @@
     }
     
     // Versão da calibração - incrementar para forçar reset quando houver mudanças importantes
-    const CALIBRATION_VERSION = 3;  // v3: scores separados para velocidade e direção
+    const CALIBRATION_VERSION = 4;  // v4: pesos separados para velocidade e direção na previsão
     
     // Carregar histórico e estatísticas do localStorage
     function loadForecastHistory() {
@@ -4062,70 +4070,85 @@
         });
     }
     
-    // Calcular pesos baseado no SCORE de velocidade e direção SEPARADOS
+    // Calcular pesos SEPARADOS para velocidade e direção
     function calculateDynamicWeights() {
         const hasStats = MODELS.some(m => modelStats[m].totalComparisons > 0);
         
         if (!hasStats) {
-            MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
+            MODELS.forEach(m => {
+                modelSpeedWeights[m] = 1 / MODELS.length;
+                modelDirWeights[m] = 1 / MODELS.length;
+                modelWeights[m] = 1 / MODELS.length;
+            });
             const weightReasonEl = document.getElementById('weight-reason');
             if (weightReasonEl) weightReasonEl.textContent = '⏳ Pesos iguais (aguardando calibração)';
             updateCalibrationUI();
             return;
         }
         
-        // Calcular score combinado: 50% velocidade + 50% direção
-        let totalScore = 0;
-        let modelCombinedScores = {};
-        MODELS.forEach(m => {
-            // Score combinado = média de velocidade e direção
-            modelCombinedScores[m] = (modelStats[m].speedScore + modelStats[m].dirScore) / 2;
-            totalScore += modelCombinedScores[m];
-        });
+        // === PESOS DE VELOCIDADE ===
+        let totalSpeedScore = 0;
+        MODELS.forEach(m => totalSpeedScore += modelStats[m].speedScore);
         
-        if (totalScore === 0) {
-            MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
-            return;
+        if (totalSpeedScore > 0) {
+            MODELS.forEach(m => {
+                modelSpeedWeights[m] = modelStats[m].speedScore / totalSpeedScore;
+            });
+            // Limitar entre 5% e 50%
+            MODELS.forEach(m => {
+                modelSpeedWeights[m] = Math.max(0.05, Math.min(0.50, modelSpeedWeights[m]));
+            });
+            // Renormalizar
+            let sumSpd = 0;
+            MODELS.forEach(m => sumSpd += modelSpeedWeights[m]);
+            MODELS.forEach(m => modelSpeedWeights[m] /= sumSpd);
         }
         
-        // Converter scores em pesos
+        // === PESOS DE DIREÇÃO ===
+        let totalDirScore = 0;
+        MODELS.forEach(m => totalDirScore += modelStats[m].dirScore);
+        
+        if (totalDirScore > 0) {
+            MODELS.forEach(m => {
+                modelDirWeights[m] = modelStats[m].dirScore / totalDirScore;
+            });
+            // Limitar entre 5% e 50%
+            MODELS.forEach(m => {
+                modelDirWeights[m] = Math.max(0.05, Math.min(0.50, modelDirWeights[m]));
+            });
+            // Renormalizar
+            let sumDir = 0;
+            MODELS.forEach(m => sumDir += modelDirWeights[m]);
+            MODELS.forEach(m => modelDirWeights[m] /= sumDir);
+        }
+        
+        // Peso combinado (para compatibilidade - média dos dois)
         MODELS.forEach(m => {
-            modelWeights[m] = modelCombinedScores[m] / totalScore;
+            modelWeights[m] = (modelSpeedWeights[m] + modelDirWeights[m]) / 2;
         });
         
-        // Limitar entre 5% e 50%
-        MODELS.forEach(m => {
-            modelWeights[m] = Math.max(0.05, Math.min(0.50, modelWeights[m]));
-        });
-        
-        // Renormalizar
-        let sum = 0;
-        MODELS.forEach(m => sum += modelWeights[m]);
-        MODELS.forEach(m => modelWeights[m] /= sum);
-        
-        // Encontrar melhor e pior modelo
-        let bestModel = MODELS[0];
-        let worstModel = MODELS[0];
-        let highestScore = modelCombinedScores[MODELS[0]];
-        let lowestScore = modelCombinedScores[MODELS[0]];
+        // Encontrar melhor modelo em cada categoria
+        let bestSpeedModel = MODELS[0];
+        let bestDirModel = MODELS[0];
+        let highestSpeedScore = modelStats[MODELS[0]].speedScore;
+        let highestDirScore = modelStats[MODELS[0]].dirScore;
         
         MODELS.forEach(m => {
-            if (modelCombinedScores[m] > highestScore) {
-                highestScore = modelCombinedScores[m];
-                bestModel = m;
+            if (modelStats[m].speedScore > highestSpeedScore) {
+                highestSpeedScore = modelStats[m].speedScore;
+                bestSpeedModel = m;
             }
-            if (modelCombinedScores[m] < lowestScore) {
-                lowestScore = modelCombinedScores[m];
-                worstModel = m;
+            if (modelStats[m].dirScore > highestDirScore) {
+                highestDirScore = modelStats[m].dirScore;
+                bestDirModel = m;
             }
         });
         
         const totalComparisons = modelStats[MODELS[0]].totalComparisons;
-        // NÃO sobrescrever weight-reason aqui - deixar a última calibração mostrada
-        // Apenas logar no console
-        console.log(`⚖️ ${totalComparisons} verificações | Melhor: ${MODEL_NAMES[bestModel]} | Pior: ${MODEL_NAMES[worstModel]}`);
+        console.log(`⚖️ ${totalComparisons} verificações | Melhor Vel: ${MODEL_NAMES[bestSpeedModel]} | Melhor Dir: ${MODEL_NAMES[bestDirModel]}`);
         
-        log('info', `⚖️ Pesos: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelWeights[m]*100).toFixed(0) + '%').join(' | ')}`);
+        log('info', `⚖️ Vel: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelSpeedWeights[m]*100).toFixed(0) + '%').join(' ')}`);
+        log('info', `⚖️ Dir: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelDirWeights[m]*100).toFixed(0) + '%').join(' ')}`);
         
         updateCalibrationUI();
     }
@@ -4134,20 +4157,23 @@
     function updateCalibrationUI() {
         MODELS.forEach(m => {
             const stats = modelStats[m];
-            const weight = (modelWeights[m] * 100).toFixed(0);
+            const spdWeight = (modelSpeedWeights[m] * 100).toFixed(0);
+            const dirWeight = (modelDirWeights[m] * 100).toFixed(0);
             
             // Atualizar elementos de velocidade
             const spdCountEl = document.getElementById(`calib-spd-count-${m}`);
             const spdScoreEl = document.getElementById(`calib-spd-score-${m}`);
+            const spdWeightEl = document.getElementById(`calib-spd-weight-${m}`);
             const dirCountEl = document.getElementById(`calib-dir-count-${m}`);
             const dirScoreEl = document.getElementById(`calib-dir-score-${m}`);
-            const weightEl = document.getElementById(`calib-weight-${m}`);
+            const dirWeightEl = document.getElementById(`calib-dir-weight-${m}`);
             
             if (spdCountEl) spdCountEl.textContent = `${stats.speedCorrectCount}/${stats.speedWrongCount}`;
             if (spdScoreEl) spdScoreEl.textContent = stats.speedScore.toFixed(0);
+            if (spdWeightEl) spdWeightEl.textContent = spdWeight;
             if (dirCountEl) dirCountEl.textContent = `${stats.dirCorrectCount}/${stats.dirWrongCount}`;
             if (dirScoreEl) dirScoreEl.textContent = stats.dirScore.toFixed(0);
-            if (weightEl) weightEl.textContent = weight + '%';
+            if (dirWeightEl) dirWeightEl.textContent = dirWeight;
             
             // Colorir score de velocidade
             if (spdScoreEl) {
@@ -4281,6 +4307,8 @@
                 dirScore: 100
             };
             modelWeights[m] = 1 / MODELS.length;
+            modelSpeedWeights[m] = 1 / MODELS.length;
+            modelDirWeights[m] = 1 / MODELS.length;
         });
         
         forecastHistory = [];
@@ -4288,6 +4316,7 @@
         localStorage.removeItem('modelStatsCumulative');
         
         calculateDynamicWeights();
+        updateForecastDisplay();  // Atualizar header com novos pesos
         log('warning', '🔄 Calibração resetada - todos os modelos com peso igual');
     }
     
@@ -4638,17 +4667,19 @@
         const hourIndex = forecastHour;  // Index direto para dados hourly (0, 1, 2, ...)
         
         // =====================================================================
-        // MÉDIA PONDERADA DINÂMICA - MESMO MÉTODO DO PAINEL PRINCIPAL
+        // MÉDIA PONDERADA DINÂMICA - PESOS SEPARADOS PARA VELOCIDADE E DIREÇÃO
         // =====================================================================
         // Passo 1: Identificar quais modelos têm dados para este horário
         let availableModels = [];
-        let totalWeight = 0;
+        let totalSpeedWeight = 0;
+        let totalDirWeight = 0;
         
         MODELS.forEach(model => {
             const data = allForecastData[model];
             if (data && data.speeds && data.speeds[hourIndex] !== null && data.speeds[hourIndex] !== undefined) {
                 availableModels.push(model);
-                totalWeight += modelWeights[model];
+                totalSpeedWeight += modelSpeedWeights[model];
+                totalDirWeight += modelDirWeights[model];
             }
         });
         
@@ -4663,12 +4694,14 @@
         }
         
         // Passo 2: Renormalizar pesos para os modelos disponíveis (soma = 1)
-        let normalizedWeights = {};
+        let normSpeedWeights = {};
+        let normDirWeights = {};
         availableModels.forEach(model => {
-            normalizedWeights[model] = modelWeights[model] / totalWeight;
+            normSpeedWeights[model] = modelSpeedWeights[model] / totalSpeedWeight;
+            normDirWeights[model] = modelDirWeights[model] / totalDirWeight;
         });
         
-        // Passo 3: Calcular média ponderada
+        // Passo 3: Calcular média ponderada COM PESOS SEPARADOS
         let weightedSpeed = 0;
         let weightedGust = 0;
         let weightedDirX = 0;
@@ -4676,7 +4709,8 @@
         
         availableModels.forEach(model => {
             const data = allForecastData[model];
-            const weight = normalizedWeights[model];
+            const spdWeight = normSpeedWeights[model];
+            const dirWeight = normDirWeights[model];
             
             const speed = data.speeds[hourIndex];
             const dir = data.directions[hourIndex];
@@ -4689,13 +4723,14 @@
                 gust = speed * 1.3;
             }
             
-            weightedSpeed += speed * weight;
-            weightedGust += gust * weight;
+            // Velocidade e rajada usam peso de velocidade
+            weightedSpeed += speed * spdWeight;
+            weightedGust += gust * spdWeight;
             
-            // Direção: usar componentes vetoriais para média correta
+            // Direção usa peso de direção
             const rad = dir * Math.PI / 180;
-            weightedDirX += Math.cos(rad) * weight;
-            weightedDirY += Math.sin(rad) * weight;
+            weightedDirX += Math.cos(rad) * dirWeight;
+            weightedDirY += Math.sin(rad) * dirWeight;
         });
         
         // Calcular direção resultante
@@ -4721,7 +4756,7 @@
         if (fDir) fDir.textContent = avgDir.toFixed(0) + '°';
         if (fGust) fGust.textContent = weightedGust.toFixed(1);
         
-        // Atualizar pesos na interface
+        // Atualizar pesos na interface (mostrar peso de velocidade)
         const uiMap = {
             'gfs_seamless': 'gfs',
             'ecmwf_ifs025': 'ecmwf',
@@ -4734,8 +4769,9 @@
             const uiKey = uiMap[model];
             const el = document.getElementById(`fw-${uiKey}`);
             if (el) {
-                if (normalizedWeights[model] !== undefined) {
-                    el.textContent = (normalizedWeights[model] * 100).toFixed(0) + '%';
+                if (normSpeedWeights[model] !== undefined) {
+                    // Mostrar peso de velocidade (o principal para previsão)
+                    el.textContent = (normSpeedWeights[model] * 100).toFixed(0) + '%';
                     el.style.fontWeight = 'bold';
                 } else {
                     el.textContent = '--';
@@ -4747,7 +4783,7 @@
         // Log para debug (apenas quando muda de hora)
         if (hourIndex === 0) {
             const weightsStr = availableModels.map(m => 
-                `${MODEL_NAMES[m]}:${(normalizedWeights[m]*100).toFixed(0)}%`
+                `${MODEL_NAMES[m]}: V${(normSpeedWeights[m]*100).toFixed(0)}% D${(normDirWeights[m]*100).toFixed(0)}%`
             ).join(' | ');
             log('info', `📊 Previsão h+${forecastHour}: ${weightedSpeed.toFixed(1)}kn ${avgDir.toFixed(0)}° [${weightsStr}]`);
         }
