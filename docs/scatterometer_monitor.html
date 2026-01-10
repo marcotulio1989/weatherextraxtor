@@ -1308,19 +1308,18 @@
     }
     
     function createDMWArrow(lat, lon, direction, speed, color, pressure, qualityFlag) {
-        // DMW usa CÍRCULO com seta SVG (diferente do Scatterometer que usa seta simples)
+        // DMW usa seta de navegação limpa (sem fundo) - DIFERENTE DO SCATTEROMETER
         const size = Math.min(50 + speed * 0.8, 80);
         
         // DIREÇÃO: Valor indica DE ONDE o vento vem (convenção meteorológica)
         // Seta aponta PARA ONDE o vento vai (rotação +180°)
         const arrowRotation = (direction + 180) % 360;
         
-        // SVG de QUADRADO com seta estilizada dentro - DIFERENTE DO SCATTEROMETER
+        // SVG de seta de navegação estilo "play" - limpa, sem fundo
         const arrowHtml = `
             <div style="width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
                 <svg viewBox="0 0 24 24" width="${size - 8}" height="${size - 8}" style="transform: rotate(${arrowRotation}deg);">
-                    <rect x="2" y="2" width="20" height="20" rx="2" fill="rgba(0,0,0,0.7)" stroke="${color}" stroke-width="2.5"/>
-                    <path fill="${color}" d="M12 4 L7 15 L12 12 L17 15 Z"/>
+                    <path fill="${color}" stroke="#000" stroke-width="1.5" d="M2 12 L22 12 M22 12 L14 4 M22 12 L14 20"/>
                 </svg>
             </div>
             <div style="text-align:center; font-size:18px; font-weight:bold; color:${color}; text-shadow: 2px 2px 4px black, -1px -1px 2px black; margin-top:-4px;">
