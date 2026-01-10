@@ -1721,13 +1721,14 @@
             }
             
             // Seta de vento com direção (ASCAT)
-            // Usar direção exatamente como vem do arquivo do satélite
+            // O arquivo traz a direção para onde vai, subtrair 180° para mostrar de onde VEM
             const arrowLength = Math.min(0.25 + speed * 0.008, 0.6);
             
-            // Direção em graus (0=Norte, 90=Leste, 180=Sul, 270=Oeste)
-            const dirRad = direction * Math.PI / 180;
+            // Subtrair 180° para mostrar de onde o vento vem
+            const fromDir = (direction - 180 + 360) % 360;
+            const dirRad = fromDir * Math.PI / 180;
             
-            // Calcular ponto final da seta
+            // Calcular ponto final da seta (apontar de onde vem)
             const endLat = lat - arrowLength * Math.cos(dirRad);
             const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
@@ -1741,12 +1742,12 @@
                 <div style="text-align:center;">
                     <b>🛰️ ${satellite}</b><br>
                     <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
-                    Direção: ${direction.toFixed(0)}°<br>
+                    Vem de: ${fromDir.toFixed(0)}°<br>
                     Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta
+            // Cabeça da seta - apontar de onde vem
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1754,7 +1755,7 @@
                     border-left: 4px solid transparent;
                     border-right: 4px solid transparent;
                     border-bottom: 8px solid ${color};
-                    transform: rotate(${direction}deg);
+                    transform: rotate(${fromDir}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
