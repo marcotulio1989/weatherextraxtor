@@ -3831,9 +3831,23 @@
         updateObservedVectorsUI();
     }
     
+    // Versão da calibração - incrementar para forçar reset quando houver mudanças importantes
+    const CALIBRATION_VERSION = 2;  // v2: corrigido adjustedDir no getSCATVectorsInRadius
+    
     // Carregar histórico e estatísticas do localStorage
     function loadForecastHistory() {
         try {
+            // Verificar versão - se mudou, limpar dados antigos
+            const savedVersion = localStorage.getItem('calibrationVersion');
+            if (savedVersion !== String(CALIBRATION_VERSION)) {
+                log('warning', `🔄 Nova versão de calibração (v${CALIBRATION_VERSION}) - resetando dados antigos...`);
+                localStorage.removeItem('forecastHistoryMulti');
+                localStorage.removeItem('modelStatsCumulative');
+                localStorage.setItem('calibrationVersion', String(CALIBRATION_VERSION));
+                calculateDynamicWeights();
+                return;
+            }
+            
             const saved = localStorage.getItem('forecastHistoryMulti');
             if (saved) {
                 forecastHistory = JSON.parse(saved);
