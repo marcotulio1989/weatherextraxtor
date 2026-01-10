@@ -1766,7 +1766,7 @@
                 className: 'scat-arrow-head'
             });
             
-            const head = L.marker([lat, lon], { icon: arrowHead, interactive: false });
+            const head = L.marker([endLat, endLon], { icon: arrowHead, interactive: false });
             
             return L.layerGroup([line, head]);
         }
