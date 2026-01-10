@@ -1461,8 +1461,8 @@
                 
                 console.log(`🛰️ Buscando SCAT para área: lat ${latMin.toFixed(1)} a ${latMax.toFixed(1)}, lon ${lonMin.toFixed(1)} a ${lonMax.toFixed(1)}`);
                 
-                // Grid de amostragem para reduzir densidade (~0.5° = ~50km)
-                const GRID_SIZE = 0.5;  // graus
+                // Grid de amostragem para reduzir densidade (~0.25° = ~25km)
+                const GRID_SIZE = 0.25;  // graus
                 const sampledGrid = new Map();  // key: "lat_lon" -> wind data
                 
                 // Tentar buscar do servidor local primeiro
