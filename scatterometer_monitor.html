@@ -4261,8 +4261,19 @@
         
         const dmwCount = dmwVectors.count;
         const scatCount = scatVectors.count;
-        const dmwWeight = calculateObservationWeight(dmwCount);
-        const scatWeight = calculateObservationWeight(scatCount);
+        
+        // Calcular peso de cada fonte baseado na quantidade de vetores
+        const dmwRawWeight = calculateObservationWeight(dmwCount);
+        const scatRawWeight = calculateObservationWeight(scatCount);
+        
+        // PROPORÇÃO RELATIVA: se só tem uma fonte, ela é 100%
+        const totalWeight = dmwRawWeight + scatRawWeight;
+        let dmwPct = 0, scatPct = 0;
+        
+        if (totalWeight > 0) {
+            dmwPct = (dmwRawWeight / totalWeight) * 100;
+            scatPct = (scatRawWeight / totalWeight) * 100;
+        }
         
         const dmwCountEl = document.getElementById('dmw-vectors-count');
         const scatCountEl = document.getElementById('scat-vectors-count');
@@ -4271,8 +4282,8 @@
         
         if (dmwCountEl) dmwCountEl.textContent = dmwCount;
         if (scatCountEl) scatCountEl.textContent = scatCount;
-        if (dmwWeightEl) dmwWeightEl.textContent = (dmwWeight * 100).toFixed(0) + '%';
-        if (scatWeightEl) scatWeightEl.textContent = (scatWeight * 100).toFixed(0) + '%';
+        if (dmwWeightEl) dmwWeightEl.textContent = dmwPct.toFixed(0) + '%';
+        if (scatWeightEl) scatWeightEl.textContent = scatPct.toFixed(0) + '%';
     }
     
     // Atualizar UI de razão dos pesos (última calibração)
