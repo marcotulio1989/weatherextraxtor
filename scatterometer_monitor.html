@@ -1308,18 +1308,18 @@
     }
     
     function createDMWArrow(lat, lon, direction, speed, color, pressure, qualityFlag) {
-        // DMW usa seta de navegação limpa (sem fundo) - DIFERENTE DO SCATTEROMETER
+        // Tamanho da seta GRANDE para visualização de 10m de distância
         const size = Math.min(50 + speed * 0.8, 80);
         
         // DIREÇÃO: Valor indica DE ONDE o vento vem (convenção meteorológica)
         // Seta aponta PARA ONDE o vento vai (rotação +180°)
         const arrowRotation = (direction + 180) % 360;
         
-        // SVG de seta de navegação estilo "play" - limpa, sem fundo
+        // Criar HTML da seta usando SVG (formato de seta triangular tipo avião) - GRANDE E VISÍVEL
         const arrowHtml = `
-            <div style="width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
-                <svg viewBox="0 0 24 24" width="${size - 8}" height="${size - 8}" style="transform: rotate(${arrowRotation}deg);">
-                    <path fill="${color}" stroke="#000" stroke-width="1.5" d="M2 12 L22 12 M22 12 L14 4 M22 12 L14 20"/>
+            <div style="transform: rotate(${arrowRotation}deg); width: ${size}px; height: ${size}px; display: flex; align-items: center; justify-content: center;">
+                <svg viewBox="0 0 24 24" width="${size - 8}" height="${size - 8}">
+                    <path fill="${color}" stroke="#000" stroke-width="1.5" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                 </svg>
             </div>
             <div style="text-align:center; font-size:18px; font-weight:bold; color:${color}; text-shadow: 2px 2px 4px black, -1px -1px 2px black; margin-top:-4px;">

@@ -1334,13 +1334,13 @@
         }
         
         function createWindArrow(lat, lon, direction, speed, color) {
-            // DMW usa seta de navegação limpa (sem fundo)
+            // DMW usa seta triangular tipo avião (navigation) - DIFERENTE DO SCATTEROMETER
             const size = 28 + Math.min(speed * 0.3, 14);
             
             // Direção: rotacionar para onde o vento VAI (convenção: +180° do valor meteorológico)
             const arrowRotation = (direction + 180) % 360;
             
-            // SVG de seta de navegação estilo "play" - limpa, sem fundo
+            // SVG de seta triangular tipo avião - formato original
             const arrowHtml = `
                 <div style="
                     width: ${size}px;
@@ -1348,7 +1348,7 @@
                     transform: rotate(${arrowRotation}deg);
                 ">
                     <svg viewBox="0 0 24 24" width="${size}" height="${size}">
-                        <path fill="${color}" stroke="#000" stroke-width="1.5" d="M2 12 L22 12 M22 12 L14 4 M22 12 L14 20"/>
+                        <path fill="${color}" stroke="#000" stroke-width="1" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
                     </svg>
                 </div>
                 <div style="
