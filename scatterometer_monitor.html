@@ -781,13 +781,18 @@
                     Pesos Dinâmicos (Cumulativo)
                 </div>
                 
-                <!-- Info de vetores DMW/SCAT -->
-                <div id="weight-reason" style="font-size:9px; color:#888; margin-bottom:8px; background:#0a0a0a; padding:6px; border-radius:4px;">
-                    <div style="margin-bottom:4px;">
-                        🌬️ DMW: <b id="dmw-vectors-count">--</b> vetores (<span id="dmw-weight-pct">--</span>) | 
-                        🛰️ SCAT: <b id="scat-vectors-count">--</b> vetores (<span id="scat-weight-pct">--</span>)
+                <!-- Info de vetores DMW/SCAT no raio de 100nm -->
+                <div id="observed-vectors-info" style="font-size:9px; color:#888; margin-bottom:6px; background:#0a0a0a; padding:6px; border-radius:4px;">
+                    <div>📍 Vetores no raio 100nm:</div>
+                    <div style="margin-top:3px;">
+                        🌬️ DMW: <b id="dmw-vectors-count">0</b> (<span id="dmw-weight-pct">0%</span>) | 
+                        🛰️ SCAT: <b id="scat-vectors-count">0</b> (<span id="scat-weight-pct">0%</span>)
                     </div>
-                    <div style="color:#666;">Aguardando dados observados...</div>
+                </div>
+                
+                <!-- Resumo da calibração -->
+                <div id="weight-reason" style="font-size:9px; color:#888; margin-bottom:8px; background:#0a0a0a; padding:6px; border-radius:4px;">
+                    ⏳ Aguardando calibração...
                 </div>
                 
                 <!-- Tabela de estatísticas por modelo -->
@@ -3509,16 +3514,14 @@
         // Se não tem fonte válida, sair
         if (!useSource || observedSpeed === null) {
             log('warning', '⚠️ Calibração: Fonte sem vetores válidos no raio de 100nm');
-            updateWeightReasonUI('Sem vetores no raio 100nm', 
-                observedStats.dmw?.count || 0, 
-                observedStats.scat?.count || 0);
+            updateObservedVectorsUI();  // Atualizar contagens na UI
             return;
         }
         
         // Se peso muito baixo, não calibrar
         if (sourceWeight < 0.1) {
             log('warning', `⚠️ Calibração: ${useSource} com poucos vetores (peso < 10%)`);
-            updateWeightReasonUI(`${useSource} - poucos vetores`, vectorCount, 0);
+            updateObservedVectorsUI();  // Atualizar contagens na UI
             return;
         }
         
@@ -3589,24 +3592,39 @@
         saveForecastHistory();
         
         // Atualizar UI
-        updateWeightReasonUI(useSource, vectorCount, 0);
+        updateWeightReasonUI(useSource, vectorCount);
     }
     
-    // Atualizar UI de razão dos pesos
-    function updateWeightReasonUI(source, dmwCount, scatCount) {
-        const el = document.getElementById('weight-reason');
-        if (!el) return;
-        
+    // Atualizar UI de vetores observados (área separada)
+    function updateObservedVectorsUI() {
+        const dmwCount = observedStats.dmw?.count || 0;
+        const scatCount = observedStats.scat?.count || 0;
         const dmwWeight = calculateObservationWeight(dmwCount);
         const scatWeight = calculateObservationWeight(scatCount);
         
-        el.innerHTML = `
-            <div style="margin-bottom:4px;">
-                🌬️ DMW: <b>${dmwCount}</b> vetores (${(dmwWeight * 100).toFixed(0)}%) | 
-                🛰️ SCAT: <b>${scatCount}</b> vetores (${(scatWeight * 100).toFixed(0)}%)
-            </div>
-            <div style="color:#888;">Última calibração: ${source}</div>
-        `;
+        const dmwCountEl = document.getElementById('dmw-vectors-count');
+        const scatCountEl = document.getElementById('scat-vectors-count');
+        const dmwWeightEl = document.getElementById('dmw-weight-pct');
+        const scatWeightEl = document.getElementById('scat-weight-pct');
+        
+        if (dmwCountEl) dmwCountEl.textContent = dmwCount;
+        if (scatCountEl) scatCountEl.textContent = scatCount;
+        if (dmwWeightEl) dmwWeightEl.textContent = (dmwWeight * 100).toFixed(0) + '%';
+        if (scatWeightEl) scatWeightEl.textContent = (scatWeight * 100).toFixed(0) + '%';
+    }
+    
+    // Atualizar UI de razão dos pesos (última calibração)
+    function updateWeightReasonUI(source, vectorCount) {
+        const el = document.getElementById('weight-reason');
+        if (!el) return;
+        
+        const weight = calculateObservationWeight(vectorCount);
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        
+        el.innerHTML = `✅ ${source}: ${vectorCount} vetores (${(weight * 100).toFixed(0)}% peso) às ${now}`;
+        
+        // Atualizar também a área de vetores observados
+        updateObservedVectorsUI();
     }
     
     // Carregar histórico e estatísticas do localStorage
@@ -3742,7 +3760,7 @@
         if (!hasStats) {
             MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
             const weightReasonEl = document.getElementById('weight-reason');
-            if (weightReasonEl) weightReasonEl.textContent = 'Pesos iguais (histórico insuficiente)';
+            if (weightReasonEl) weightReasonEl.textContent = '⏳ Pesos iguais (aguardando calibração)';
             updateCalibrationUI();
             return;
         }
@@ -3791,13 +3809,9 @@
         });
         
         const totalComparisons = modelStats[MODELS[0]].totalComparisons;
-        const weightReasonEl = document.getElementById('weight-reason');
-        if (weightReasonEl) {
-            weightReasonEl.innerHTML = 
-                `⚖️ ${totalComparisons} verificações | ` +
-                `Melhor: <span style="color:#00ff00;">${MODEL_NAMES[bestModel]}</span> | ` +
-                `Pior: <span style="color:#ff6666;">${MODEL_NAMES[worstModel]}</span>`;
-        }
+        // NÃO sobrescrever weight-reason aqui - deixar a última calibração mostrada
+        // Apenas logar no console
+        console.log(`⚖️ ${totalComparisons} verificações | Melhor: ${MODEL_NAMES[bestModel]} | Pior: ${MODEL_NAMES[worstModel]}`);
         
         log('info', `⚖️ Pesos: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelWeights[m]*100).toFixed(0) + '%').join(' | ')}`);
         
