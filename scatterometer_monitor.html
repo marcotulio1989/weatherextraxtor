@@ -781,9 +781,9 @@
                     Pesos Dinâmicos (Cumulativo)
                 </div>
                 
-                <!-- Info de vetores DMW/SCAT no raio de 100nm -->
+                <!-- Info de vetores DMW/SCAT no raio de 20nm -->
                 <div id="observed-vectors-info" style="font-size:9px; color:#888; margin-bottom:6px; background:#0a0a0a; padding:6px; border-radius:4px;">
-                    <div>📍 Vetores no raio 100nm:</div>
+                    <div>📍 Vetores no raio 20nm:</div>
                     <div style="margin-top:3px;">
                         🌬️ DMW: <b id="dmw-vectors-count">0</b> (<span id="dmw-weight-pct">0%</span>) | 
                         🛰️ SCAT: <b id="scat-vectors-count">0</b> (<span id="scat-weight-pct">0%</span>)
@@ -1063,6 +1063,10 @@
     // Raio para busca de dados Open-Meteo (igual ao visual para cobrir todo círculo)
     const RAIO_NM = 100;  // Raio em milhas náuticas para busca de dados
     const RAIO_GRAUS = RAIO_NM / 60;  // 1 grau = 60 NM
+    
+    // Raio para observação de vetores DMW/SCAT (calibração)
+    const RAIO_OBSERVACAO_NM = 20;  // Raio em milhas náuticas para calibração
+    const RAIO_OBSERVACAO_GRAUS = RAIO_OBSERVACAO_NM / 60;  // ~0.33 graus
     
     // IMPORTANTE: Idade máxima dos dados em MINUTOS
     // Dados com mais de 60 min serão descartados
@@ -3353,12 +3357,12 @@
         scat: { count: 0, avgSpeed: null, avgDir: null, weight: 0 }
     };
     
-    // Calcular vetores DMW dentro do raio de 100nm do navio
+    // Calcular vetores DMW dentro do raio de 20nm do navio
     function getDMWVectorsInRadius() {
         if (!dmwData || !dmwData.winds) return { count: 0, avgSpeed: null, avgDir: null };
         
         const winds = dmwData.winds;
-        const radiusDeg = RAIO_GRAUS;  // ~1.67 graus para 100nm
+        const radiusDeg = RAIO_OBSERVACAO_GRAUS;  // ~0.33 graus para 20nm
         let speeds = [];
         let dirs = [];
         
@@ -3394,12 +3398,12 @@
         return { count: speeds.length, avgSpeed, avgDir };
     }
     
-    // Calcular vetores SCAT dentro do raio de 100nm do navio
+    // Calcular vetores SCAT dentro do raio de 20nm do navio
     function getSCATVectorsInRadius() {
         if (!scatData || !scatData.winds) return { count: 0, avgSpeed: null, avgDir: null };
         
         const winds = scatData.winds;
-        const radiusDeg = RAIO_GRAUS;  // ~1.67 graus para 100nm
+        const radiusDeg = RAIO_OBSERVACAO_GRAUS;  // ~0.33 graus para 20nm
         let speeds = [];
         let dirs = [];
         
