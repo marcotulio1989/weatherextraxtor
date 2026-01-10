@@ -3613,7 +3613,9 @@
                 
                 speeds.push(w.speed_kt);
                 if (w.direction !== null && w.direction !== undefined) {
-                    dirs.push(w.direction);
+                    // IMPORTANTE: Ajustar direção igual ao popup (direction - 180)
+                    const adjustedDir = (w.direction - 180 + 360) % 360;
+                    dirs.push(adjustedDir);
                 }
             }
         }
