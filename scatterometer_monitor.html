@@ -4198,25 +4198,34 @@
                 // Penalidade PROPORCIONAL - modelo com maior erro perde mais
                 const wrongRatio = modelStats[model].speedWrongCount / Math.max(1, modelStats[model].totalComparisons);
                 const penaltyMultiplier = 1 + wrongRatio * 2;
-                const penalty = (speedError / 30) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier;
+                // Modelo com maior erro relativo = maior penalidade
+                const errorMultiplier = 0.5 + (speedError - minSpeedError) / speedRange;
+                const penalty = (speedError / 30) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier * errorMultiplier;
                 modelStats[model].speedScore = Math.max(10, modelStats[model].speedScore - penalty);
             }
             
             // === DIREÇÃO - PROPORCIONAL ===
             let dirCorrect = true;
             if (dirError !== null) {
+                const dirRange = Math.max(1, maxDirError - minDirError);
+                // Quanto menor o erro em relação ao pior, maior o multiplicador (0.5 a 1.5)
+                const dirMultiplier = 1.5 - (dirError - minDirError) / dirRange;
+                
                 dirCorrect = dirError < ACCURACY_THRESHOLD_DIR;
                 if (dirCorrect) {
                     modelStats[model].dirCorrectCount++;
-                    // Recuperar score de direção
-                    const reward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
+                    // Bonus PROPORCIONAL - modelo com menor erro ganha mais
+                    const baseReward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
+                    const reward = baseReward * dirMultiplier;
                     modelStats[model].dirScore = Math.min(150, modelStats[model].dirScore + reward);
                 } else {
                     modelStats[model].dirWrongCount++;
-                    // Penalizar score de direção
+                    // Penalidade PROPORCIONAL - modelo com maior erro perde mais
                     const wrongRatio = modelStats[model].dirWrongCount / Math.max(1, modelStats[model].totalComparisons);
                     const penaltyMultiplier = 1 + wrongRatio * 2;
-                    const penalty = (dirError / 180) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier;
+                    // Modelo com maior erro relativo = maior penalidade
+                    const errorMultiplier = 0.5 + (dirError - minDirError) / dirRange;
+                    const penalty = (dirError / 180) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier * errorMultiplier;
                     modelStats[model].dirScore = Math.max(10, modelStats[model].dirScore - penalty);
                 }
             }
@@ -4287,7 +4296,7 @@
     }
     
     // Versão da calibração - incrementar para forçar reset quando houver mudanças importantes
-    const CALIBRATION_VERSION = 5;  // v5: sistema de validação de previsões (previsão vs realidade)
+    const CALIBRATION_VERSION = 6;  // v6: sistema proporcional - pesos baseados no erro relativo
     
     // Carregar histórico e estatísticas do localStorage
     function loadForecastHistory() {
