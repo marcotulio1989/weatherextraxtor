@@ -1750,7 +1750,7 @@
             `, { className: 'wind-popup' });
             
             // Cabeça da seta - rotação CSS (0=cima, 90=direita)
-            // Para apontar de onde vem, usar direction + 180
+            // Usar adjustedDir (já com -180°) sem adicionar 180° de novo
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1758,7 +1758,7 @@
                     border-left: 5px solid transparent;
                     border-right: 5px solid transparent;
                     border-bottom: 10px solid ${color};
-                    transform: rotate(${(direction + 180) % 360}deg);
+                    transform: rotate(${adjustedDir}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
