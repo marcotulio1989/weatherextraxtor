@@ -1721,20 +1721,17 @@
             }
             
             // Seta de vento com direção (ASCAT)
-            // O arquivo traz a direção para onde vai, subtrair 180° para mostrar de onde VEM
+            // O valor no arquivo JÁ É de onde vem, usar direto
             const arrowLength = Math.min(0.15 + speed * 0.005, 0.4);
             
-            // Subtrair 180° para mostrar de onde o vento vem
-            const fromDir = (direction - 180 + 360) % 360;
+            // Usar direção original do arquivo (já é de onde vem)
+            const fromDir = direction;
             
-            // Converter para radianos
-            // Em meteorologia: 0°=N, 90°=E, 180°=S, 270°=W
-            // Para coordenadas: Norte = +lat, Leste = +lon
-            const dirRad = fromDir * Math.PI / 180;
+            // O vetor aponta NA direção de onde vem, então girar 180° para desenhar
+            const drawDir = (direction + 180) % 360;
+            const dirRad = drawDir * Math.PI / 180;
             
             // Calcular ponto final da seta
-            // Norte (0°): cos=1, sin=0 -> lat aumenta
-            // Leste (90°): cos=0, sin=1 -> lon aumenta
             const endLat = lat + arrowLength * Math.cos(dirRad);
             const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
@@ -1753,9 +1750,7 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta no ponto de ORIGEM da linha (de onde vem)
-            // Rotação CSS: 0deg=cima, 90deg=direita, 180deg=baixo, 270deg=esquerda
-            // Queremos que a seta aponte NA direção fromDir
+            // Cabeça da seta - girada 180° do valor original
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1763,7 +1758,7 @@
                     border-left: 5px solid transparent;
                     border-right: 5px solid transparent;
                     border-bottom: 10px solid ${color};
-                    transform: rotate(${fromDir}deg);
+                    transform: rotate(${drawDir}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
