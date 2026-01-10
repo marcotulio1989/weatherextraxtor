@@ -1743,7 +1743,7 @@
                 <div style="text-align:center;">
                     <b>🛰️ ${satellite}</b><br>
                     <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
-                    Vem de: ${direction.toFixed(0)}°<br>
+                    Vem de: ${((direction - 180 + 360) % 360).toFixed(0)}°<br>
                     Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
                 </div>
             `, { className: 'wind-popup' });
