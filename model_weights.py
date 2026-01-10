@@ -159,13 +159,28 @@ def angular_difference_absolute(angle1: float, angle2: float) -> float:
 # FUNÇÕES DE PESO
 # =============================================================================
 
+def calibrate_wind_direction(direction: float) -> float:
+    """
+    Calibra a direção do vento subtraindo 180°.
+    Tanto o scatterometer quanto os modelos usam a mesma convenção.
+    
+    Args:
+        direction: Direção original em graus (0-360)
+    
+    Returns:
+        Direção calibrada em graus (0-360)
+    """
+    return (direction - 180.0) % 360.0
+
+
 def calculate_direction_weight(scat_dir: float, model_dir: float) -> Tuple[float, float]:
     """
     Calcula o peso baseado na variação de direção.
+    NOTA: As direções já devem estar calibradas (subtraído 180°).
     
     Args:
-        scat_dir: Direção medida pelo scatterometer (graus)
-        model_dir: Direção prevista pelo modelo (graus)
+        scat_dir: Direção medida pelo scatterometer (graus, calibrada)
+        model_dir: Direção prevista pelo modelo (graus, calibrada)
     
     Returns:
         Tuple (peso, variação em graus)
@@ -207,14 +222,27 @@ def calculate_combined_initial_weight(
     scat_dir: float, 
     model_dir: float,
     scat_speed_kt: float, 
-    model_speed_kt: float
+    model_speed_kt: float,
+    apply_calibration: bool = True
 ) -> Tuple[float, float, float, float, float]:
     """
     Calcula o peso inicial combinado (direção + velocidade).
     
+    Args:
+        scat_dir: Direção do SCAT (graus, bruta)
+        model_dir: Direção do modelo (graus, bruta)
+        scat_speed_kt: Velocidade do SCAT (knots)
+        model_speed_kt: Velocidade do modelo (knots)
+        apply_calibration: Se True, aplica -180° às direções
+    
     Returns:
         Tuple (peso_combinado, peso_dir, var_dir, peso_vel, var_vel)
     """
+    # Aplicar calibração (-180°) às direções
+    if apply_calibration:
+        scat_dir = calibrate_wind_direction(scat_dir)
+        model_dir = calibrate_wind_direction(model_dir)
+    
     dir_weight, dir_variation = calculate_direction_weight(scat_dir, model_dir)
     speed_weight, speed_variation = calculate_speed_weight(scat_speed_kt, model_speed_kt)
     
@@ -229,14 +257,28 @@ def update_weight_with_comparison(
     scat_dir: float,
     model_dir: float,
     scat_speed_kt: float,
-    model_speed_kt: float
+    model_speed_kt: float,
+    apply_calibration: bool = True
 ) -> Tuple[float, float, float]:
     """
     Atualiza o peso usando a fórmula: sqrt(peso_inicial * peso_comparativo)
     
+    Args:
+        initial_weight: Peso inicial do ciclo
+        scat_dir: Direção do SCAT (graus, bruta)
+        model_dir: Direção do modelo (graus, bruta)
+        scat_speed_kt: Velocidade do SCAT (knots)
+        model_speed_kt: Velocidade do modelo (knots)
+        apply_calibration: Se True, aplica -180° às direções
+    
     Returns:
         Tuple (novo_peso, erro_dir, erro_vel)
     """
+    # Aplicar calibração (-180°) às direções
+    if apply_calibration:
+        scat_dir = calibrate_wind_direction(scat_dir)
+        model_dir = calibrate_wind_direction(model_dir)
+    
     dir_weight, dir_error = calculate_direction_weight(scat_dir, model_dir)
     speed_weight, speed_error = calculate_speed_weight(scat_speed_kt, model_speed_kt)
     
@@ -396,7 +438,8 @@ class ModelWeightsManager:
         speeds = [w.get("speed_kt", 0) for w in nearby_winds]
         avg_speed = sum(speeds) / len(speeds)
         
-        # Média circular para direção
+        # Média circular para direção (valor bruto, sem calibração)
+        # A calibração (-180°) é aplicada nas funções de cálculo de peso
         directions = [w.get("direction", 0) for w in nearby_winds]
         x_sum = sum(math.cos(math.radians(d)) for d in directions)
         y_sum = sum(math.sin(math.radians(d)) for d in directions)
@@ -404,11 +447,7 @@ class ModelWeightsManager:
         if avg_dir < 0:
             avg_dir += 360
         
-        # IMPORTANTE: Subtrair 180° para calibração correta
-        # O scatterometer mede "de onde vem o vento", precisamos ajustar
-        avg_dir_calibrated = (avg_dir - 180.0) % 360.0
-        
-        return avg_speed, avg_dir_calibrated
+        return avg_speed, avg_dir
     
     def check_and_reset_if_new_scat(self) -> bool:
         """
