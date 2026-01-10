@@ -1723,12 +1723,15 @@
             // Seta de vento
             const arrowLength = Math.min(0.15 + speed * 0.005, 0.4);
             
-            // Direção do arquivo (NÃO MEXER NO VALOR)
-            const dirRad = direction * Math.PI / 180;
+            // Converter direção meteorológica (0=N, 90=E, sentido horário)
+            // para matemática (0=E, 90=N, sentido anti-horário)
+            // mathAngle = 90 - meteoAngle
+            const mathAngle = (90 - direction + 360) % 360;
+            const dirRad = mathAngle * Math.PI / 180;
             
-            // Desenhar vetor - SINAIS POSITIVOS
-            const endLat = lat + arrowLength * Math.cos(dirRad);
-            const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+            // Calcular ponto final - agora girado 180° (sinais negativos)
+            const endLat = lat - arrowLength * Math.sin(dirRad);
+            const endLon = lon - arrowLength * Math.cos(dirRad) / Math.cos(lat * Math.PI / 180);
             
             const line = L.polyline([[lat, lon], [endLat, endLon]], {
                 color: color,
@@ -1745,7 +1748,8 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta
+            // Cabeça da seta - rotação CSS (0=cima, 90=direita)
+            // Para apontar de onde vem, usar direction + 180
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1753,7 +1757,7 @@
                     border-left: 5px solid transparent;
                     border-right: 5px solid transparent;
                     border-bottom: 10px solid ${color};
-                    transform: rotate(${direction}deg);
+                    transform: rotate(${(direction + 180) % 360}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
