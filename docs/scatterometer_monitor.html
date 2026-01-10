@@ -710,6 +710,18 @@
             </div>
         </div>
         
+        <!-- CONTROLE DE ZOOM -->
+        <div class="section" style="padding:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:11px; color:#888;">🔍 Zoom:</span>
+                <button onclick="changeZoom(-1)" style="width:28px; height:28px; font-size:16px; padding:0;">−</button>
+                <input type="number" id="zoom-input" value="7" min="3" max="18" 
+                       style="width:50px; height:28px; text-align:center; font-size:14px; font-weight:bold; background:#222; color:#fff; border:1px solid #444; border-radius:4px;"
+                       onchange="setZoom(this.value)">
+                <button onclick="changeZoom(1)" style="width:28px; height:28px; font-size:16px; padding:0;">+</button>
+            </div>
+        </div>
+        
         <!-- POSIÇÃO DO NAVIO -->
         <div class="section">
             <div class="section-title">
@@ -1200,6 +1212,12 @@
             maxZoom: 19
         }).addTo(map);
         
+        // Atualizar input de zoom quando mapa mudar
+        map.on('zoomend', function() {
+            const zoomInput = document.getElementById('zoom-input');
+            if (zoomInput) zoomInput.value = map.getZoom();
+        });
+        
         // Grupos de camadas
         windLayerGroup = L.layerGroup().addTo(map);
         gridLayer = L.layerGroup();
@@ -1329,6 +1347,23 @@
     let scatLastTimestamp = null;  // Timestamp dos dados atuais
     let scatOpacityInterval = null;  // Intervalo para atualizar opacidade
     const SCAT_MAX_AGE_HOURS = 6;  // Dados expiram após 6 horas
+    
+    // ============ FUNÇÕES DE ZOOM ============
+    function setZoom(level) {
+        const zoom = parseInt(level);
+        if (zoom >= 3 && zoom <= 18 && map) {
+            map.setZoom(zoom);
+        }
+    }
+    
+    function changeZoom(delta) {
+        if (map) {
+            const newZoom = map.getZoom() + delta;
+            if (newZoom >= 3 && newZoom <= 18) {
+                map.setZoom(newZoom);
+            }
+        }
+    }
     
     // ============ FUNÇÃO TOGGLE COLLAPSIBLE ============
     function toggleCollapsible(header) {
@@ -4205,6 +4240,10 @@
         
         // Recalcular pesos
         calculateDynamicWeights();
+        
+        // ATUALIZAR TABELA DE PREVISÃO COM NOVOS PESOS
+        buildForecastTimeline();
+        updateForecastDisplay();
         
         // Salvar estatísticas
         saveForecastHistory();
