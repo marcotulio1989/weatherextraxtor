@@ -844,6 +844,10 @@
                     🧪 TEST CALIBRATION
                 </button>
                 
+                <button class="secondary" onclick="testRandomWeights()" style="width:100%; font-size:10px; margin-bottom:5px; background:#ff00ff; color:#000;">
+                    🎲 TESTAR PESOS ALEATÓRIOS
+                </button>
+                
                 <button class="secondary" onclick="resetCalibration()" style="width:100%; font-size:10px;">
                     🔄 Resetar Calibração
                 </button>
@@ -4689,6 +4693,43 @@
         lastSCATCalibrationTimestamp = savedSCAT;
         
         log('warning', '🧪 ========== FIM TEST CALIBRATION ==========');
+    }
+    
+    // TESTE DE PESOS ALEATÓRIOS - para verificar se tabela atualiza
+    function testRandomWeights() {
+        log('warning', '🎲 ========== TESTE PESOS ALEATÓRIOS ==========');
+        
+        // Gerar pesos aleatórios BEM DIFERENTES para cada modelo
+        // Usar valores de 1 a 100 para ter bastante variação
+        const randomValues = {};
+        MODELS.forEach(m => {
+            randomValues[m] = Math.random() * 99 + 1;  // 1 a 100
+        });
+        
+        // Normalizar para somar 100%
+        const total = Object.values(randomValues).reduce((a, b) => a + b, 0);
+        
+        MODELS.forEach(m => {
+            modelSpeedWeights[m] = randomValues[m] / total;
+            modelDirWeights[m] = (Math.random() * 99 + 1) / total;  // Direção diferente!
+        });
+        
+        // Renormalizar direção
+        let sumDir = 0;
+        MODELS.forEach(m => sumDir += modelDirWeights[m]);
+        MODELS.forEach(m => modelDirWeights[m] /= sumDir);
+        
+        // Log dos novos pesos
+        log('info', `🎲 Pesos Vel: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelSpeedWeights[m]*100).toFixed(0) + '%').join(' | ')}`);
+        log('info', `🎲 Pesos Dir: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelDirWeights[m]*100).toFixed(0) + '%').join(' | ')}`);
+        
+        // ATUALIZAR TUDO
+        updateCalibrationUI();
+        buildForecastTimeline();
+        updateForecastDisplay();
+        
+        log('success', '✅ Tabela de previsão reconstruída com pesos aleatórios!');
+        log('warning', '🎲 ========== FIM TESTE PESOS ALEATÓRIOS ==========');
     }
     
     // Resetar calibração (para recomeçar do zero)
