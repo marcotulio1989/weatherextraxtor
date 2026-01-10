@@ -3630,11 +3630,99 @@
     let forecastHistory = [];
     
     // =========================================================================
+    // SISTEMA DE PREVISÕES PENDENTES (para calibração real)
+    // =========================================================================
+    // Armazena previsões feitas pelos modelos para horários futuros
+    // Quando esse horário chegar e tivermos dados observados, comparamos
+    let pendingForecasts = [];
+    const FORECAST_VALIDATION_HOURS = [1, 2, 3];  // Validar previsões h+1, h+2, h+3
+    const FORECAST_TOLERANCE_MINUTES = 30;  // Tolerância de ±30 minutos
+    
+    // Salvar previsões para validação futura
+    function savePendingForecasts() {
+        const now = Date.now();
+        
+        FORECAST_VALIDATION_HOURS.forEach(hoursAhead => {
+            const targetTime = now + hoursAhead * 60 * 60 * 1000;  // Horário alvo
+            
+            const forecast = {
+                savedAt: now,
+                targetTime: targetTime,
+                hoursAhead: hoursAhead,
+                validated: false,
+                models: {}
+            };
+            
+            // Salvar previsão de cada modelo para esse horário
+            MODELS.forEach(model => {
+                const data = allForecastData[model];
+                if (data && data.speeds && data.speeds[hoursAhead] !== null) {
+                    forecast.models[model] = {
+                        speed: data.speeds[hoursAhead],
+                        direction: data.directions[hoursAhead]
+                    };
+                }
+            });
+            
+            // Só salvar se temos dados de pelo menos 1 modelo
+            if (Object.keys(forecast.models).length > 0) {
+                pendingForecasts.push(forecast);
+            }
+        });
+        
+        // Limitar array (manter últimas 24 horas de previsões)
+        const maxAge = 24 * 60 * 60 * 1000;
+        pendingForecasts = pendingForecasts.filter(f => now - f.savedAt < maxAge);
+        
+        // Salvar no localStorage
+        try {
+            localStorage.setItem('pendingForecasts', JSON.stringify(pendingForecasts));
+        } catch (e) {
+            console.warn('Erro ao salvar pendingForecasts:', e);
+        }
+        
+        log('info', `📝 Salvas ${FORECAST_VALIDATION_HOURS.length * MODELS.length} previsões pendentes (h+${FORECAST_VALIDATION_HOURS.join(', h+')})`);
+    }
+    
+    // Carregar previsões pendentes do localStorage
+    function loadPendingForecasts() {
+        try {
+            const saved = localStorage.getItem('pendingForecasts');
+            if (saved) {
+                pendingForecasts = JSON.parse(saved);
+                // Filtrar apenas não validadas e dentro da janela válida
+                const now = Date.now();
+                pendingForecasts = pendingForecasts.filter(f => 
+                    !f.validated && (now - f.savedAt < 24 * 60 * 60 * 1000)
+                );
+            }
+        } catch (e) {
+            console.warn('Erro ao carregar pendingForecasts:', e);
+            pendingForecasts = [];
+        }
+    }
+    
+    // Encontrar previsões que correspondem ao horário da observação
+    function findMatchingForecasts(observationTime) {
+        const tolerance = FORECAST_TOLERANCE_MINUTES * 60 * 1000;  // ±30 min
+        
+        return pendingForecasts.filter(f => 
+            !f.validated && 
+            Math.abs(f.targetTime - observationTime) <= tolerance
+        );
+    }
+    
+    // =========================================================================
     // CALIBRAÇÃO COM DADOS OBSERVADOS (DMW/SCAT)
     // =========================================================================
     // Timestamps da última calibração com DMW/SCAT
     let lastDMWCalibrationTimestamp = 0;   // Timestamp do DMW usado para última calibração
     let lastSCATCalibrationTimestamp = 0;  // Timestamp do SCAT usado para última calibração
+    
+    // Pesos de acurácia de previsão (comparando previsão vs realidade)
+    // Esses pesos são MULTIPLICADOS pelos pesos de calibração DMW/SCAT
+    let modelForecastAccuracy = {};
+    MODELS.forEach(m => modelForecastAccuracy[m] = { speedAccuracy: 1.0, dirAccuracy: 1.0 });
     
     // Estatísticas de vetores observados
     let observedStats = {
@@ -3824,7 +3912,60 @@
         
         log('success', `📍 Calibrando com ${useSource}: ${observedSpeed.toFixed(1)} kt, ${observedDir ? observedDir.toFixed(0) + '°' : 'N/A'}`);
         
-        // Comparar cada modelo com o valor observado
+        // =====================================================================
+        // PARTE 1: VALIDAR PREVISÕES PENDENTES (previsão vs realidade)
+        // =====================================================================
+        const observationTime = useSource === 'SCAT' ? scatTimestamp : dmwTimestamp;
+        const matchingForecasts = findMatchingForecasts(observationTime);
+        
+        if (matchingForecasts.length > 0) {
+            log('info', `🔮 Validando ${matchingForecasts.length} previsões pendentes...`);
+            
+            matchingForecasts.forEach(forecast => {
+                const hoursAgo = forecast.hoursAhead;  // Quantas horas antes foi feita
+                
+                MODELS.forEach(model => {
+                    const predicted = forecast.models[model];
+                    if (!predicted || predicted.speed === null) return;
+                    
+                    // Comparar previsão com o observado
+                    const speedError = Math.abs(predicted.speed - observedSpeed);
+                    const dirError = observedDir !== null && predicted.direction !== null ? 
+                                     directionError(predicted.direction, observedDir) : null;
+                    
+                    // Atualizar acurácia do modelo (média móvel exponencial)
+                    const alpha = 0.3;  // Fator de suavização (30% peso para nova observação)
+                    
+                    // Acurácia de velocidade: 1.0 = perfeito, 0.0 = péssimo
+                    // speedError de 0 = acc 1.0, speedError de 10+ = acc ~0.3
+                    const speedAcc = Math.max(0.3, 1.0 - speedError / 15);
+                    modelForecastAccuracy[model].speedAccuracy = 
+                        (1 - alpha) * modelForecastAccuracy[model].speedAccuracy + alpha * speedAcc;
+                    
+                    // Acurácia de direção
+                    if (dirError !== null) {
+                        // dirError de 0 = acc 1.0, dirError de 60+ = acc ~0.3
+                        const dirAcc = Math.max(0.3, 1.0 - dirError / 90);
+                        modelForecastAccuracy[model].dirAccuracy = 
+                            (1 - alpha) * modelForecastAccuracy[model].dirAccuracy + alpha * dirAcc;
+                    }
+                    
+                    log('info', `   🔮 ${MODEL_NAMES[model]} h-${hoursAgo}: prev ${predicted.speed.toFixed(1)}kt vs obs ${observedSpeed.toFixed(1)}kt | Δ${speedError.toFixed(1)}kt → acc ${(modelForecastAccuracy[model].speedAccuracy*100).toFixed(0)}%`);
+                });
+                
+                // Marcar como validada
+                forecast.validated = true;
+            });
+            
+            // Salvar previsões atualizadas
+            try {
+                localStorage.setItem('pendingForecasts', JSON.stringify(pendingForecasts));
+            } catch (e) {}
+        }
+        
+        // =====================================================================
+        // PARTE 2: COMPARAR MODELOS COM OBSERVADO ATUAL (sistema original)
+        // =====================================================================
         let calibrationResults = [];
         
         MODELS.forEach(model => {
@@ -3940,7 +4081,7 @@
     }
     
     // Versão da calibração - incrementar para forçar reset quando houver mudanças importantes
-    const CALIBRATION_VERSION = 4;  // v4: pesos separados para velocidade e direção na previsão
+    const CALIBRATION_VERSION = 5;  // v5: sistema de validação de previsões (previsão vs realidade)
     
     // Carregar histórico e estatísticas do localStorage
     function loadForecastHistory() {
@@ -3951,6 +4092,8 @@
                 log('warning', `🔄 Nova versão de calibração (v${CALIBRATION_VERSION}) - resetando dados antigos...`);
                 localStorage.removeItem('forecastHistoryMulti');
                 localStorage.removeItem('modelStatsCumulative');
+                localStorage.removeItem('pendingForecasts');
+                localStorage.removeItem('modelForecastAccuracy');
                 localStorage.setItem('calibrationVersion', String(CALIBRATION_VERSION));
                 calculateDynamicWeights();
                 return;
@@ -3985,6 +4128,24 @@
                 log('info', `📊 Estatísticas carregadas: ${MODELS.map(m => MODEL_NAMES[m] + ' V:' + modelStats[m].speedScore.toFixed(0) + ' D:' + modelStats[m].dirScore.toFixed(0)).join(' | ')}`);
             }
             
+            // Carregar previsões pendentes
+            loadPendingForecasts();
+            
+            // Carregar acurácia de previsão
+            const savedAccuracy = localStorage.getItem('modelForecastAccuracy');
+            if (savedAccuracy) {
+                const parsed = JSON.parse(savedAccuracy);
+                MODELS.forEach(m => {
+                    if (parsed[m]) {
+                        modelForecastAccuracy[m] = {
+                            speedAccuracy: parsed[m].speedAccuracy || 1.0,
+                            dirAccuracy: parsed[m].dirAccuracy || 1.0
+                        };
+                    }
+                });
+                log('info', `🔮 Acurácia carregada: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelForecastAccuracy[m].speedAccuracy*100).toFixed(0) + '%').join(' ')}`);
+            }
+            
             calculateDynamicWeights();
         } catch (e) {
             forecastHistory = [];
@@ -3996,6 +4157,7 @@
         try {
             localStorage.setItem('forecastHistoryMulti', JSON.stringify(forecastHistory));
             localStorage.setItem('modelStatsCumulative', JSON.stringify(modelStats));
+            localStorage.setItem('modelForecastAccuracy', JSON.stringify(modelForecastAccuracy));
         } catch (e) {
             console.error('Erro ao salvar histórico:', e);
         }
@@ -4103,7 +4265,11 @@
         
         if (totalSpeedScore > 0) {
             MODELS.forEach(m => {
-                modelSpeedWeights[m] = modelStats[m].speedScore / totalSpeedScore;
+                // Peso base da calibração DMW/SCAT
+                let baseWeight = modelStats[m].speedScore / totalSpeedScore;
+                // MULTIPLICAR pela acurácia de previsão
+                baseWeight *= modelForecastAccuracy[m].speedAccuracy;
+                modelSpeedWeights[m] = baseWeight;
             });
             // Limitar entre 5% e 50%
             MODELS.forEach(m => {
@@ -4121,7 +4287,11 @@
         
         if (totalDirScore > 0) {
             MODELS.forEach(m => {
-                modelDirWeights[m] = modelStats[m].dirScore / totalDirScore;
+                // Peso base da calibração DMW/SCAT
+                let baseWeight = modelStats[m].dirScore / totalDirScore;
+                // MULTIPLICAR pela acurácia de previsão
+                baseWeight *= modelForecastAccuracy[m].dirAccuracy;
+                modelDirWeights[m] = baseWeight;
             });
             // Limitar entre 5% e 50%
             MODELS.forEach(m => {
@@ -4320,11 +4490,15 @@
             modelWeights[m] = 1 / MODELS.length;
             modelSpeedWeights[m] = 1 / MODELS.length;
             modelDirWeights[m] = 1 / MODELS.length;
+            modelForecastAccuracy[m] = { speedAccuracy: 1.0, dirAccuracy: 1.0 };
         });
         
         forecastHistory = [];
+        pendingForecasts = [];
         localStorage.removeItem('forecastHistoryMulti');
         localStorage.removeItem('modelStatsCumulative');
+        localStorage.removeItem('pendingForecasts');
+        localStorage.removeItem('modelForecastAccuracy');
         
         calculateDynamicWeights();
         updateForecastDisplay();  // Atualizar header com novos pesos
@@ -4655,6 +4829,9 @@
             
             // Atualizar display da hora selecionada
             updateForecastDisplay();
+            
+            // SALVAR PREVISÕES PENDENTES para validação futura
+            savePendingForecasts();
             
             // Atualizar status
             const now = new Date();
