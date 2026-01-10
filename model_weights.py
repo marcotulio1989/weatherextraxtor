@@ -404,7 +404,11 @@ class ModelWeightsManager:
         if avg_dir < 0:
             avg_dir += 360
         
-        return avg_speed, avg_dir
+        # IMPORTANTE: Subtrair 180° para calibração correta
+        # O scatterometer mede "de onde vem o vento", precisamos ajustar
+        avg_dir_calibrated = (avg_dir - 180.0) % 360.0
+        
+        return avg_speed, avg_dir_calibrated
     
     def check_and_reset_if_new_scat(self) -> bool:
         """
