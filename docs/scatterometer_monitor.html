@@ -1091,6 +1091,81 @@
         east: -30
     };
     
+    // Polígono simplificado da costa brasileira para filtrar pontos em terra
+    // Pontos com longitude menor (mais a oeste) que a costa são considerados em terra
+    // Formato: [lat, lon_costa] - se lon do ponto < lon_costa, está em terra
+    const COSTA_BRASIL = [
+        [-30.0, -51.0],   // RS - extremo sul
+        [-29.0, -49.5],   // SC
+        [-28.0, -48.5],   // SC
+        [-27.0, -48.5],   // SC - Florianópolis
+        [-26.0, -48.5],   // SC - Joinville
+        [-25.5, -48.5],   // PR - Paranaguá
+        [-25.0, -47.5],   // PR/SP
+        [-24.5, -46.5],   // SP - Santos
+        [-24.0, -46.0],   // SP
+        [-23.5, -45.0],   // SP - Ubatuba
+        [-23.0, -44.0],   // RJ - Angra
+        [-22.5, -43.0],   // RJ - Rio
+        [-22.0, -41.0],   // RJ - Cabo Frio
+        [-21.5, -40.5],   // RJ/ES
+        [-21.0, -40.0],   // ES - Vitória
+        [-20.0, -40.0],   // ES
+        [-19.0, -39.5],   // ES/BA
+        [-18.0, -39.0],   // BA - Porto Seguro
+        [-17.0, -39.0],   // BA
+        [-16.0, -38.5],   // BA
+        [-15.0, -38.5],   // BA - Salvador
+        [-14.0, -38.5],   // BA
+        [-13.0, -38.5],   // BA
+        [-12.0, -38.0],   // BA
+        [-11.0, -37.0],   // SE/AL
+        [-10.0, -36.0],   // AL
+        [-9.0, -35.0],    // PE
+        [-8.0, -34.5],    // PE - Recife
+        [-7.0, -34.5],    // PB - João Pessoa
+        [-6.0, -35.0],    // RN - Natal
+        [-5.0, -35.5],    // RN
+        [-4.0, -37.5],    // CE
+        [-3.0, -38.5],    // CE - Fortaleza
+        [-2.0, -42.0],    // PI/MA
+        [-1.0, -44.0],    // MA
+        [0.0, -48.0],     // PA - Belém
+    ];
+    
+    // Função para verificar se ponto está no oceano (não em terra)
+    function isOverOcean(lat, lon) {
+        // Se está muito a leste, certamente é oceano
+        if (lon > -30) return true;
+        
+        // Encontrar a latitude mais próxima na tabela da costa
+        let coastLon = -60; // Default: muito a oeste = terra
+        
+        for (let i = 0; i < COSTA_BRASIL.length - 1; i++) {
+            const [lat1, lon1] = COSTA_BRASIL[i];
+            const [lat2, lon2] = COSTA_BRASIL[i + 1];
+            
+            // Se a latitude está entre dois pontos da costa
+            if (lat >= lat1 && lat < lat2) {
+                // Interpolar a longitude da costa
+                const t = (lat - lat1) / (lat2 - lat1);
+                coastLon = lon1 + t * (lon2 - lon1);
+                break;
+            } else if (lat < COSTA_BRASIL[0][0]) {
+                // Abaixo do ponto mais ao sul
+                coastLon = COSTA_BRASIL[0][1];
+                break;
+            } else if (lat >= COSTA_BRASIL[COSTA_BRASIL.length - 1][0]) {
+                // Acima do ponto mais ao norte
+                coastLon = COSTA_BRASIL[COSTA_BRASIL.length - 1][1];
+                break;
+            }
+        }
+        
+        // Adicionar margem de 0.5 graus para evitar pontos muito próximos à costa
+        return lon > coastLon + 0.5;
+    }
+    
     let map;
     let windDataPoints = [];  // Armazena todos os dados de vento
     let windLayerGroup;
@@ -1392,6 +1467,9 @@
                 // Sempre filtrar por área (bounds da imagem de satélite)
                 if (w.lat < latMin || w.lat > latMax) continue;
                 if (w.lon < lonMin || w.lon > lonMax) continue;
+                
+                // Filtrar pontos em terra (continente)
+                if (!isOverOcean(w.lat, w.lon)) continue;
                 
                 // Filtrar por nível de pressão
                 if (w.pressure_hpa !== undefined) {
@@ -3372,6 +3450,9 @@
             
             // Aproximação simples de distância em graus
             if (latDiff <= radiusDeg && lonDiff <= radiusDeg) {
+                // Filtrar pontos em terra
+                if (!isOverOcean(w.lat, w.lon)) continue;
+                
                 speeds.push(w.speed_kt);
                 if (w.direction !== null && w.direction !== undefined) {
                     dirs.push(w.direction);
@@ -3413,6 +3494,9 @@
             
             // Aproximação simples de distância em graus
             if (latDiff <= radiusDeg && lonDiff <= radiusDeg) {
+                // Filtrar pontos em terra
+                if (!isOverOcean(w.lat, w.lon)) continue;
+                
                 speeds.push(w.speed_kt);
                 if (w.direction !== null && w.direction !== undefined) {
                     dirs.push(w.direction);
