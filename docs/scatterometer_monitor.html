@@ -1513,6 +1513,9 @@
             statusEl.className = 'status-indicator active';
             log('success', `✅ DMW: ${winds.length} vetores na área`);
             
+            // Atualizar contadores de vetores no raio (para UI)
+            updateObservedVectorsUI();
+            
         } catch (err) {
             console.error('❌ Erro DMW:', err);
             log('error', 'Erro DMW: ' + err.message);
@@ -1797,6 +1800,9 @@
             
             statusEl.className = 'status-indicator active';
             log('success', `✅ SCAT: ${displayedCount} vetores carregados | ${scatData.source || 'N/A'}`);
+            
+            // Atualizar contadores de vetores no raio (para UI)
+            updateObservedVectorsUI();
             
             // Iniciar timer de opacidade (fade out em 6 horas)
             startScatOpacityTimer();
@@ -3897,9 +3903,14 @@
     }
     
     // Atualizar UI de vetores observados (área separada)
+    // SEMPRE busca vetores atuais no raio, independente de calibração
     function updateObservedVectorsUI() {
-        const dmwCount = observedStats.dmw?.count || 0;
-        const scatCount = observedStats.scat?.count || 0;
+        // Buscar vetores DMW e SCAT atuais no raio
+        const dmwVectors = getDMWVectorsInRadius();
+        const scatVectors = getSCATVectorsInRadius();
+        
+        const dmwCount = dmwVectors.count;
+        const scatCount = scatVectors.count;
         const dmwWeight = calculateObservationWeight(dmwCount);
         const scatWeight = calculateObservationWeight(scatCount);
         
