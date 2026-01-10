@@ -769,6 +769,59 @@
             </div>
         </div>
         
+        <!-- CALIBRAÇÃO DE MODELOS (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>⚖️ CALIBRAÇÃO</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="section" style="border-left: 3px solid #ffcc00;">
+                <div class="section-title">
+                    <span class="status-indicator active"></span>
+                    Pesos Dinâmicos (Cumulativo)
+                </div>
+                
+                <!-- Info de vetores DMW/SCAT -->
+                <div id="weight-reason" style="font-size:9px; color:#888; margin-bottom:8px; background:#0a0a0a; padding:6px; border-radius:4px;">
+                    <div style="margin-bottom:4px;">
+                        🌬️ DMW: <b id="dmw-vectors-count">--</b> vetores (<span id="dmw-weight-pct">--</span>) | 
+                        🛰️ SCAT: <b id="scat-vectors-count">--</b> vetores (<span id="scat-weight-pct">--</span>)
+                    </div>
+                    <div style="color:#666;">Aguardando dados observados...</div>
+                </div>
+                
+                <!-- Tabela de estatísticas por modelo -->
+                <div style="background:#111; border:1px solid #333; border-radius:4px; overflow:hidden; margin-bottom:8px;">
+                    <table style="width:100%; font-size:9px; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#222;">
+                                <th style="padding:4px; text-align:left; color:#888;">Modelo</th>
+                                <th style="padding:4px; text-align:center; color:#00ff00;">✓</th>
+                                <th style="padding:4px; text-align:center; color:#ff6666;">✗</th>
+                                <th style="padding:4px; text-align:center; color:#ffcc00;">Score</th>
+                                <th style="padding:4px; text-align:center; color:#00ffcc;">Peso</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calibration-table">
+                            <tr><td style="padding:3px; color:#aaa;">GFS</td><td id="calib-correct-gfs_seamless" style="text-align:center; color:#00ff00;">0</td><td id="calib-wrong-gfs_seamless" style="text-align:center; color:#ff6666;">0</td><td id="calib-score-gfs_seamless" style="text-align:center; color:#ffcc00;">100</td><td id="calib-weight-gfs_seamless" style="text-align:center; color:#00ffcc;">20%</td></tr>
+                            <tr><td style="padding:3px; color:#aaa;">ECMWF</td><td id="calib-correct-ecmwf_ifs025" style="text-align:center; color:#00ff00;">0</td><td id="calib-wrong-ecmwf_ifs025" style="text-align:center; color:#ff6666;">0</td><td id="calib-score-ecmwf_ifs025" style="text-align:center; color:#ffcc00;">100</td><td id="calib-weight-ecmwf_ifs025" style="text-align:center; color:#00ffcc;">20%</td></tr>
+                            <tr><td style="padding:3px; color:#aaa;">ICON</td><td id="calib-correct-icon_seamless" style="text-align:center; color:#00ff00;">0</td><td id="calib-wrong-icon_seamless" style="text-align:center; color:#ff6666;">0</td><td id="calib-score-icon_seamless" style="text-align:center; color:#ffcc00;">100</td><td id="calib-weight-icon_seamless" style="text-align:center; color:#00ffcc;">20%</td></tr>
+                            <tr><td style="padding:3px; color:#aaa;">MeteoFR</td><td id="calib-correct-meteofrance_seamless" style="text-align:center; color:#00ff00;">0</td><td id="calib-wrong-meteofrance_seamless" style="text-align:center; color:#ff6666;">0</td><td id="calib-score-meteofrance_seamless" style="text-align:center; color:#ffcc00;">100</td><td id="calib-weight-meteofrance_seamless" style="text-align:center; color:#00ffcc;">20%</td></tr>
+                            <tr><td style="padding:3px; color:#aaa;">JMA</td><td id="calib-correct-jma_seamless" style="text-align:center; color:#00ff00;">0</td><td id="calib-wrong-jma_seamless" style="text-align:center; color:#ff6666;">0</td><td id="calib-score-jma_seamless" style="text-align:center; color:#ffcc00;">100</td><td id="calib-weight-jma_seamless" style="text-align:center; color:#00ffcc;">20%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="font-size:8px; color:#666; margin-bottom:8px;">
+                    ✓ = acerto (&lt;3kt, &lt;20°) | ✗ = erro | Score = cumulativo
+                </div>
+                
+                <button class="secondary" onclick="resetCalibration()" style="width:100%; font-size:10px;">
+                    🔄 Resetar Calibração
+                </button>
+            </div>
+        </div>
+        
         <!-- Satélite (Colapsável) -->
         <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
             <h2>🛰️ SATÉLITE</h2>
@@ -1360,6 +1413,9 @@
             statusEl.className = 'status-indicator active';
             log('success', `✅ DMW: ${winds.length} vetores na área`);
             
+            // Calibrar modelos com novos dados DMW
+            setTimeout(() => calibrateWithObservedData(), 500);
+            
         } catch (err) {
             console.error('❌ Erro DMW:', err);
             log('error', 'Erro DMW: ' + err.message);
@@ -1641,6 +1697,9 @@
             
             statusEl.className = 'status-indicator active';
             log('success', `✅ SCAT: ${displayedCount} vetores carregados | ${scatData.source || 'N/A'}`);
+            
+            // Calibrar modelos com novos dados SCAT
+            setTimeout(() => calibrateWithObservedData(), 500);
             
         } catch (err) {
             console.error('❌ Erro SCAT:', err);
@@ -3254,10 +3313,320 @@
     let modelWeights = {};
     MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
     
+    // =========================================================================
+    // SISTEMA DE CALIBRAÇÃO CUMULATIVA
+    // =========================================================================
+    // Estatísticas cumulativas por modelo
+    let modelStats = {};
+    MODELS.forEach(m => modelStats[m] = { 
+        totalErrors: 0,        // Soma de erros acumulados
+        totalComparisons: 0,   // Número de comparações
+        correctCount: 0,       // Número de acertos (erro < threshold)
+        wrongCount: 0,         // Número de erros (erro >= threshold)
+        cumulativeScore: 100   // Score cumulativo (inicia em 100, diminui com erros)
+    });
+    
+    // Threshold para considerar "acerto" vs "erro"
+    const ACCURACY_THRESHOLD_SPEED = 3;   // kt - diferença máxima para considerar acerto
+    const ACCURACY_THRESHOLD_DIR = 20;    // graus - diferença máxima para considerar acerto
+    
+    // Fator de penalidade para erros consecutivos
+    const ERROR_PENALTY_FACTOR = 1.5;     // Multiplicador de penalidade para erros
+    const CORRECT_REWARD_FACTOR = 0.8;    // Fator de recuperação para acertos
+    
     // Histórico de previsões para comparação
     let forecastHistory = [];
     
-    // Carregar histórico do localStorage
+    // =========================================================================
+    // CALIBRAÇÃO COM DADOS OBSERVADOS (DMW/SCAT)
+    // =========================================================================
+    // Timestamps da última calibração com DMW/SCAT
+    let lastDMWCalibrationTimestamp = 0;   // Timestamp do DMW usado para última calibração
+    let lastSCATCalibrationTimestamp = 0;  // Timestamp do SCAT usado para última calibração
+    
+    // Estatísticas de vetores observados
+    let observedStats = {
+        dmw: { count: 0, avgSpeed: null, avgDir: null, weight: 0 },
+        scat: { count: 0, avgSpeed: null, avgDir: null, weight: 0 }
+    };
+    
+    // Calcular vetores DMW dentro do raio de 100nm do navio
+    function getDMWVectorsInRadius() {
+        if (!dmwData || !dmwData.winds) return { count: 0, avgSpeed: null, avgDir: null };
+        
+        const winds = dmwData.winds;
+        const radiusDeg = RAIO_GRAUS;  // ~1.67 graus para 100nm
+        let speeds = [];
+        let dirs = [];
+        
+        for (const w of winds) {
+            const latDiff = Math.abs(w.lat - CONFIG.shipLat);
+            const lonDiff = Math.abs(w.lon - CONFIG.shipLon);
+            
+            // Aproximação simples de distância em graus
+            if (latDiff <= radiusDeg && lonDiff <= radiusDeg) {
+                speeds.push(w.speed_kt);
+                if (w.direction !== null && w.direction !== undefined) {
+                    dirs.push(w.direction);
+                }
+            }
+        }
+        
+        if (speeds.length === 0) return { count: 0, avgSpeed: null, avgDir: null };
+        
+        const avgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+        
+        // Média circular para direção
+        let avgDir = null;
+        if (dirs.length > 0) {
+            let sinSum = 0, cosSum = 0;
+            dirs.forEach(d => {
+                sinSum += Math.sin(d * Math.PI / 180);
+                cosSum += Math.cos(d * Math.PI / 180);
+            });
+            avgDir = Math.atan2(sinSum / dirs.length, cosSum / dirs.length) * 180 / Math.PI;
+            if (avgDir < 0) avgDir += 360;
+        }
+        
+        return { count: speeds.length, avgSpeed, avgDir };
+    }
+    
+    // Calcular vetores SCAT dentro do raio de 100nm do navio
+    function getSCATVectorsInRadius() {
+        if (!scatData || !scatData.winds) return { count: 0, avgSpeed: null, avgDir: null };
+        
+        const winds = scatData.winds;
+        const radiusDeg = RAIO_GRAUS;  // ~1.67 graus para 100nm
+        let speeds = [];
+        let dirs = [];
+        
+        for (const w of winds) {
+            const latDiff = Math.abs(w.lat - CONFIG.shipLat);
+            const lonDiff = Math.abs(w.lon - CONFIG.shipLon);
+            
+            // Aproximação simples de distância em graus
+            if (latDiff <= radiusDeg && lonDiff <= radiusDeg) {
+                speeds.push(w.speed_kt);
+                if (w.direction !== null && w.direction !== undefined) {
+                    dirs.push(w.direction);
+                }
+            }
+        }
+        
+        if (speeds.length === 0) return { count: 0, avgSpeed: null, avgDir: null };
+        
+        const avgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+        
+        // Média circular para direção
+        let avgDir = null;
+        if (dirs.length > 0) {
+            let sinSum = 0, cosSum = 0;
+            dirs.forEach(d => {
+                sinSum += Math.sin(d * Math.PI / 180);
+                cosSum += Math.cos(d * Math.PI / 180);
+            });
+            avgDir = Math.atan2(sinSum / dirs.length, cosSum / dirs.length) * 180 / Math.PI;
+            if (avgDir < 0) avgDir += 360;
+        }
+        
+        return { count: speeds.length, avgSpeed, avgDir };
+    }
+    
+    // Calcular peso do DMW/SCAT baseado na quantidade de vetores
+    // Mais vetores = mais confiável = maior peso
+    function calculateObservationWeight(count) {
+        // 0 vetores = peso 0
+        // 1 vetor = peso 0.1 (10%)
+        // 5 vetores = peso 0.5 (50%)
+        // 10+ vetores = peso 1.0 (100%)
+        if (count === 0) return 0;
+        if (count >= 10) return 1.0;
+        return Math.min(1.0, count * 0.1);
+    }
+    
+    // Calibrar modelos com dados OBSERVADOS (DMW ou SCAT)
+    function calibrateWithObservedData() {
+        // Verificar se há dados DMW novos
+        const dmwTimestamp = dmwData && dmwData.timestamp ? new Date(dmwData.timestamp).getTime() : 0;
+        const scatTimestamp = scatData && scatData.timestamp ? new Date(scatData.timestamp).getTime() : 0;
+        
+        let hasNewDMW = dmwTimestamp > lastDMWCalibrationTimestamp;
+        let hasNewSCAT = scatTimestamp > lastSCATCalibrationTimestamp;
+        
+        if (!hasNewDMW && !hasNewSCAT) {
+            log('info', '📊 Calibração: Sem dados novos de DMW/SCAT');
+            return;
+        }
+        
+        // Obter vetores no raio de 100nm
+        const dmwVectors = getDMWVectorsInRadius();
+        const scatVectors = getSCATVectorsInRadius();
+        
+        // Atualizar estatísticas de observação
+        observedStats.dmw = {
+            count: dmwVectors.count,
+            avgSpeed: dmwVectors.avgSpeed,
+            avgDir: dmwVectors.avgDir,
+            weight: calculateObservationWeight(dmwVectors.count)
+        };
+        observedStats.scat = {
+            count: scatVectors.count,
+            avgSpeed: scatVectors.avgSpeed,
+            avgDir: scatVectors.avgDir,
+            weight: calculateObservationWeight(scatVectors.count)
+        };
+        
+        // Log de vetores encontrados
+        log('info', `🌬️ DMW: ${dmwVectors.count} vetores (peso ${(observedStats.dmw.weight * 100).toFixed(0)}%) | ` +
+                    `SCAT: ${scatVectors.count} vetores (peso ${(observedStats.scat.weight * 100).toFixed(0)}%)`);
+        
+        // Se não tem vetores suficientes, não calibrar
+        const totalWeight = observedStats.dmw.weight + observedStats.scat.weight;
+        if (totalWeight < 0.1) {
+            log('warning', '⚠️ Calibração: Poucos vetores no raio de 100nm (peso < 10%)');
+            updateWeightReasonUI('Poucos vetores no raio 100nm', dmwVectors.count, scatVectors.count);
+            return;
+        }
+        
+        // Calcular valor observado médio (ponderado por peso de cada fonte)
+        let observedSpeed = null;
+        let observedDir = null;
+        
+        if (totalWeight > 0) {
+            // Calcular média ponderada
+            let speedSum = 0, speedWeightSum = 0;
+            let dirSin = 0, dirCos = 0, dirWeightSum = 0;
+            
+            if (hasNewDMW && observedStats.dmw.avgSpeed !== null) {
+                speedSum += observedStats.dmw.avgSpeed * observedStats.dmw.weight;
+                speedWeightSum += observedStats.dmw.weight;
+                if (observedStats.dmw.avgDir !== null) {
+                    dirSin += Math.sin(observedStats.dmw.avgDir * Math.PI / 180) * observedStats.dmw.weight;
+                    dirCos += Math.cos(observedStats.dmw.avgDir * Math.PI / 180) * observedStats.dmw.weight;
+                    dirWeightSum += observedStats.dmw.weight;
+                }
+            }
+            
+            if (hasNewSCAT && observedStats.scat.avgSpeed !== null) {
+                speedSum += observedStats.scat.avgSpeed * observedStats.scat.weight;
+                speedWeightSum += observedStats.scat.weight;
+                if (observedStats.scat.avgDir !== null) {
+                    dirSin += Math.sin(observedStats.scat.avgDir * Math.PI / 180) * observedStats.scat.weight;
+                    dirCos += Math.cos(observedStats.scat.avgDir * Math.PI / 180) * observedStats.scat.weight;
+                    dirWeightSum += observedStats.scat.weight;
+                }
+            }
+            
+            if (speedWeightSum > 0) {
+                observedSpeed = speedSum / speedWeightSum;
+            }
+            if (dirWeightSum > 0) {
+                observedDir = Math.atan2(dirSin / dirWeightSum, dirCos / dirWeightSum) * 180 / Math.PI;
+                if (observedDir < 0) observedDir += 360;
+            }
+        }
+        
+        if (observedSpeed === null) {
+            log('warning', '⚠️ Calibração: Sem velocidade observada');
+            return;
+        }
+        
+        log('success', `📍 Valor Observado: ${observedSpeed.toFixed(1)} kt, ${observedDir ? observedDir.toFixed(0) + '°' : 'N/A'}`);
+        
+        // Agora comparar cada modelo com o valor observado
+        let calibrationResults = [];
+        
+        MODELS.forEach(model => {
+            const modelValue = modelData[model];
+            if (!modelValue || modelValue.speed === null) return;
+            
+            // Calcular erros
+            const speedError = Math.abs(modelValue.speed - observedSpeed);
+            const dirError = observedDir !== null && modelValue.direction !== null ? 
+                             directionError(modelValue.direction, observedDir) : 0;
+            
+            // Erro combinado normalizado (0-1 scale)
+            // Peso da velocidade 60%, direção 40%
+            const normalizedError = (speedError / 30) * 0.6 + (dirError / 180) * 0.4;
+            
+            // Aplicar peso da observação (quanto mais vetores, mais certeza no erro)
+            const weightedError = normalizedError * totalWeight;
+            
+            // Atualizar contadores
+            modelStats[model].totalErrors += weightedError;
+            modelStats[model].totalComparisons++;
+            
+            // Verificar se é acerto ou erro
+            const isCorrect = speedError < ACCURACY_THRESHOLD_SPEED && dirError < ACCURACY_THRESHOLD_DIR;
+            
+            if (isCorrect) {
+                modelStats[model].correctCount++;
+                // Recuperar score levemente (proporcional ao peso da observação)
+                const reward = 2 * CORRECT_REWARD_FACTOR * totalWeight;
+                modelStats[model].cumulativeScore = Math.min(150, 
+                    modelStats[model].cumulativeScore + reward);
+            } else {
+                modelStats[model].wrongCount++;
+                // Penalizar score - quanto maior o erro, maior a penalidade
+                // CUMULATIVO: modelo que erra muito é mais punido
+                const wrongRatio = modelStats[model].wrongCount / Math.max(1, modelStats[model].totalComparisons);
+                const penaltyMultiplier = 1 + wrongRatio * 2;  // Até 3x mais penalidade para quem erra muito
+                const penalty = weightedError * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier;
+                modelStats[model].cumulativeScore = Math.max(10, 
+                    modelStats[model].cumulativeScore - penalty);
+            }
+            
+            calibrationResults.push({
+                model: MODEL_NAMES[model],
+                speedError: speedError.toFixed(1),
+                dirError: dirError.toFixed(0),
+                isCorrect,
+                score: modelStats[model].cumulativeScore.toFixed(0)
+            });
+        });
+        
+        // Log detalhado
+        calibrationResults.forEach(r => {
+            const emoji = r.isCorrect ? '✅' : '❌';
+            log('info', `${emoji} ${r.model}: Δspd=${r.speedError}kt Δdir=${r.dirError}° → score=${r.score}`);
+        });
+        
+        // Atualizar timestamps
+        if (hasNewDMW) lastDMWCalibrationTimestamp = dmwTimestamp;
+        if (hasNewSCAT) lastSCATCalibrationTimestamp = scatTimestamp;
+        
+        // Recalcular pesos
+        calculateDynamicWeights();
+        
+        // Salvar estatísticas
+        saveForecastHistory();
+        
+        // Atualizar UI
+        updateWeightReasonUI(
+            hasNewDMW && hasNewSCAT ? 'DMW + SCAT' : (hasNewDMW ? 'DMW' : 'SCAT'),
+            dmwVectors.count,
+            scatVectors.count
+        );
+    }
+    
+    // Atualizar UI de razão dos pesos
+    function updateWeightReasonUI(source, dmwCount, scatCount) {
+        const el = document.getElementById('weight-reason');
+        if (!el) return;
+        
+        const dmwWeight = calculateObservationWeight(dmwCount);
+        const scatWeight = calculateObservationWeight(scatCount);
+        
+        el.innerHTML = `
+            <div style="margin-bottom:4px;">
+                🌬️ DMW: <b>${dmwCount}</b> vetores (${(dmwWeight * 100).toFixed(0)}%) | 
+                🛰️ SCAT: <b>${scatCount}</b> vetores (${(scatWeight * 100).toFixed(0)}%)
+            </div>
+            <div style="color:#888;">Última calibração: ${source}</div>
+        `;
+    }
+    
+    // Carregar histórico e estatísticas do localStorage
     function loadForecastHistory() {
         try {
             const saved = localStorage.getItem('forecastHistoryMulti');
@@ -3266,17 +3635,41 @@
                 const cutoff = Date.now() - 24 * 60 * 60 * 1000;
                 forecastHistory = forecastHistory.filter(h => h.timestamp > cutoff);
                 log('info', `📊 Histórico carregado: ${forecastHistory.length} registros`);
-                calculateDynamicWeights();
             }
+            
+            // Carregar estatísticas cumulativas
+            const savedStats = localStorage.getItem('modelStatsCumulative');
+            if (savedStats) {
+                const parsed = JSON.parse(savedStats);
+                // Manter estrutura mesmo se novos campos forem adicionados
+                MODELS.forEach(m => {
+                    if (parsed[m]) {
+                        modelStats[m] = {
+                            totalErrors: parsed[m].totalErrors || 0,
+                            totalComparisons: parsed[m].totalComparisons || 0,
+                            correctCount: parsed[m].correctCount || 0,
+                            wrongCount: parsed[m].wrongCount || 0,
+                            cumulativeScore: parsed[m].cumulativeScore || 100
+                        };
+                    }
+                });
+                log('info', `📊 Estatísticas carregadas: ${MODELS.map(m => MODEL_NAMES[m] + ':' + modelStats[m].cumulativeScore.toFixed(0)).join(' | ')}`);
+            }
+            
+            calculateDynamicWeights();
         } catch (e) {
             forecastHistory = [];
+            console.error('Erro ao carregar histórico:', e);
         }
     }
     
     function saveForecastHistory() {
         try {
             localStorage.setItem('forecastHistoryMulti', JSON.stringify(forecastHistory));
-        } catch (e) {}
+            localStorage.setItem('modelStatsCumulative', JSON.stringify(modelStats));
+        } catch (e) {
+            console.error('Erro ao salvar histórico:', e);
+        }
     }
     
     function directionError(predicted, actual) {
@@ -3286,55 +3679,110 @@
         return diff;
     }
     
-    // Calcular pesos baseado no erro histórico de TODOS os modelos
+    // Calcular o "valor observado" (proxy) - média simples de todos os modelos disponíveis
+    function calculateObservedValue(historyRecord) {
+        let speeds = [];
+        let dirs = [];
+        
+        MODELS.forEach(m => {
+            if (historyRecord[m] && historyRecord[m].speed !== null) {
+                speeds.push(historyRecord[m].speed);
+                if (historyRecord[m].direction !== null) {
+                    dirs.push(historyRecord[m].direction);
+                }
+            }
+        });
+        
+        if (speeds.length === 0) return null;
+        
+        const avgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+        
+        // Média circular para direção
+        let avgDir = null;
+        if (dirs.length > 0) {
+            let sinSum = 0, cosSum = 0;
+            dirs.forEach(d => {
+                sinSum += Math.sin(d * Math.PI / 180);
+                cosSum += Math.cos(d * Math.PI / 180);
+            });
+            avgDir = Math.atan2(sinSum / dirs.length, cosSum / dirs.length) * 180 / Math.PI;
+            if (avgDir < 0) avgDir += 360;
+        }
+        
+        return { speed: avgSpeed, direction: avgDir };
+    }
+    
+    // Atualizar estatísticas cumulativas comparando previsão com valor observado
+    function updateCumulativeStats(prevRecord, currRecord) {
+        // O "valor observado" é a média simples do registro ATUAL
+        const observed = calculateObservedValue(currRecord);
+        if (!observed) return;
+        
+        MODELS.forEach(model => {
+            // A previsão é o valor do registro ANTERIOR (o que o modelo previa)
+            const prediction = prevRecord[model];
+            if (!prediction || prediction.speed === null) return;
+            
+            // Calcular erros
+            const speedError = Math.abs(prediction.speed - observed.speed);
+            const dirError = directionError(prediction.direction, observed.direction);
+            
+            // Erro combinado normalizado (0-1 scale)
+            const normalizedError = (speedError / 30) * 0.6 + (dirError / 180) * 0.4;
+            
+            // Atualizar contadores
+            modelStats[model].totalErrors += normalizedError;
+            modelStats[model].totalComparisons++;
+            
+            // Verificar se é acerto ou erro
+            const isCorrect = speedError < ACCURACY_THRESHOLD_SPEED && dirError < ACCURACY_THRESHOLD_DIR;
+            
+            if (isCorrect) {
+                modelStats[model].correctCount++;
+                // Recuperar score levemente
+                modelStats[model].cumulativeScore = Math.min(150, 
+                    modelStats[model].cumulativeScore + 2 * CORRECT_REWARD_FACTOR);
+            } else {
+                modelStats[model].wrongCount++;
+                // Penalizar score - quanto maior o erro, maior a penalidade
+                const penalty = normalizedError * 10 * ERROR_PENALTY_FACTOR;
+                modelStats[model].cumulativeScore = Math.max(10, 
+                    modelStats[model].cumulativeScore - penalty);
+            }
+        });
+    }
+    
+    // Calcular pesos baseado no SCORE CUMULATIVO de cada modelo
     function calculateDynamicWeights() {
-        if (forecastHistory.length < 2) {
+        const hasStats = MODELS.some(m => modelStats[m].totalComparisons > 0);
+        
+        if (!hasStats) {
             MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
             const weightReasonEl = document.getElementById('weight-reason');
             if (weightReasonEl) weightReasonEl.textContent = 'Pesos iguais (histórico insuficiente)';
+            updateCalibrationUI();
             return;
         }
         
-        let modelErrors = {};
-        MODELS.forEach(m => modelErrors[m] = 0);
-        let comparisons = 0;
+        // Usar score cumulativo diretamente como peso base
+        let totalScore = 0;
+        MODELS.forEach(m => {
+            totalScore += modelStats[m].cumulativeScore;
+        });
         
-        for (let i = 1; i < forecastHistory.length; i++) {
-            const prev = forecastHistory[i - 1];
-            const curr = forecastHistory[i];
-            
-            MODELS.forEach(model => {
-                if (prev[model] && curr[model] && prev[model].speed !== null && curr[model].speed !== null) {
-                    const speedErr = Math.abs(prev[model].speed - curr[model].speed) / 20;
-                    const dirErr = directionError(prev[model].direction, curr[model].direction) / 180;
-                    modelErrors[model] += (speedErr + dirErr) / 2;
-                }
-            });
-            comparisons++;
-        }
-        
-        if (comparisons === 0) {
+        if (totalScore === 0) {
             MODELS.forEach(m => modelWeights[m] = 1 / MODELS.length);
             return;
         }
         
-        // Normalizar erros
-        MODELS.forEach(m => modelErrors[m] /= comparisons);
-        
-        // Converter erros em pesos (menor erro = maior peso)
-        let totalInvError = 0;
+        // Converter scores em pesos
         MODELS.forEach(m => {
-            const invErr = 1 / (modelErrors[m] + 0.01); // +0.01 para evitar divisão por zero
-            modelWeights[m] = invErr;
-            totalInvError += invErr;
+            modelWeights[m] = modelStats[m].cumulativeScore / totalScore;
         });
         
-        // Normalizar pesos
-        MODELS.forEach(m => modelWeights[m] /= totalInvError);
-        
-        // Limitar entre 5% e 40%
+        // Limitar entre 5% e 50%
         MODELS.forEach(m => {
-            modelWeights[m] = Math.max(0.05, Math.min(0.40, modelWeights[m]));
+            modelWeights[m] = Math.max(0.05, Math.min(0.50, modelWeights[m]));
         });
         
         // Renormalizar
@@ -3342,23 +3790,91 @@
         MODELS.forEach(m => sum += modelWeights[m]);
         MODELS.forEach(m => modelWeights[m] /= sum);
         
-        // Encontrar melhor modelo
+        // Encontrar melhor e pior modelo
         let bestModel = MODELS[0];
-        let lowestError = modelErrors[MODELS[0]];
+        let worstModel = MODELS[0];
+        let highestScore = modelStats[MODELS[0]].cumulativeScore;
+        let lowestScore = modelStats[MODELS[0]].cumulativeScore;
+        
         MODELS.forEach(m => {
-            if (modelErrors[m] < lowestError) {
-                lowestError = modelErrors[m];
+            if (modelStats[m].cumulativeScore > highestScore) {
+                highestScore = modelStats[m].cumulativeScore;
                 bestModel = m;
+            }
+            if (modelStats[m].cumulativeScore < lowestScore) {
+                lowestScore = modelStats[m].cumulativeScore;
+                worstModel = m;
             }
         });
         
+        const totalComparisons = modelStats[MODELS[0]].totalComparisons;
         const weightReasonEl = document.getElementById('weight-reason');
         if (weightReasonEl) {
             weightReasonEl.innerHTML = 
-                `⚖️ ${comparisons} comparações | Melhor: <span style="color:#00ff00;">${MODEL_NAMES[bestModel]}</span>`;
+                `⚖️ ${totalComparisons} verificações | ` +
+                `Melhor: <span style="color:#00ff00;">${MODEL_NAMES[bestModel]}</span> | ` +
+                `Pior: <span style="color:#ff6666;">${MODEL_NAMES[worstModel]}</span>`;
         }
         
         log('info', `⚖️ Pesos: ${MODELS.map(m => MODEL_NAMES[m] + ':' + (modelWeights[m]*100).toFixed(0) + '%').join(' | ')}`);
+        
+        updateCalibrationUI();
+    }
+    
+    // Atualizar UI de calibração com estatísticas detalhadas
+    function updateCalibrationUI() {
+        MODELS.forEach(m => {
+            const stats = modelStats[m];
+            const score = stats.cumulativeScore.toFixed(0);
+            const weight = (modelWeights[m] * 100).toFixed(0);
+            
+            // Atualizar elementos se existirem
+            const scoreEl = document.getElementById(`calib-score-${m}`);
+            const correctEl = document.getElementById(`calib-correct-${m}`);
+            const wrongEl = document.getElementById(`calib-wrong-${m}`);
+            const weightEl = document.getElementById(`calib-weight-${m}`);
+            
+            if (scoreEl) scoreEl.textContent = score;
+            if (correctEl) correctEl.textContent = stats.correctCount;
+            if (wrongEl) wrongEl.textContent = stats.wrongCount;
+            if (weightEl) weightEl.textContent = weight + '%';
+            
+            // Colorir score baseado no valor
+            if (scoreEl) {
+                if (stats.cumulativeScore >= 100) {
+                    scoreEl.style.color = '#00ff00';
+                } else if (stats.cumulativeScore >= 50) {
+                    scoreEl.style.color = '#ffcc00';
+                } else {
+                    scoreEl.style.color = '#ff6666';
+                }
+            }
+        });
+    }
+    
+    // Resetar calibração (para recomeçar do zero)
+    function resetCalibration() {
+        if (!confirm('Resetar todas as estatísticas de calibração? Isso irá zerar os pesos acumulados.')) {
+            return;
+        }
+        
+        MODELS.forEach(m => {
+            modelStats[m] = {
+                totalErrors: 0,
+                totalComparisons: 0,
+                correctCount: 0,
+                wrongCount: 0,
+                cumulativeScore: 100
+            };
+            modelWeights[m] = 1 / MODELS.length;
+        });
+        
+        forecastHistory = [];
+        localStorage.removeItem('forecastHistoryMulti');
+        localStorage.removeItem('modelStatsCumulative');
+        
+        calculateDynamicWeights();
+        log('warning', '🔄 Calibração resetada - todos os modelos com peso igual');
     }
     
     function addToForecastHistory(data) {
@@ -3367,11 +3883,13 @@
             record[m] = data[m] ? { speed: data[m].speed, direction: data[m].direction } : { speed: null, direction: null };
         });
         
+        // NÃO comparar mais entre modelos - a calibração agora é feita
+        // pela função calibrateWithObservedData() que usa dados DMW/SCAT reais
+        
         forecastHistory.push(record);
         if (forecastHistory.length > 96) forecastHistory = forecastHistory.slice(-96);
         
         saveForecastHistory();
-        calculateDynamicWeights();
     }
     
     async function fetchOpenMeteoData() {
