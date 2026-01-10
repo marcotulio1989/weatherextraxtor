@@ -133,6 +133,18 @@
             50% { opacity: 0.5; }
         }
         
+        /* Animação DMW - movimento suave ondulante */
+        @keyframes dmw-wave {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            25% { transform: translateY(-3px) scale(1.05); }
+            50% { transform: translateY(0px) scale(1); }
+            75% { transform: translateY(3px) scale(0.95); }
+        }
+        
+        .dmw-wind-arrow {
+            animation: dmw-wave 2.5s ease-in-out infinite;
+        }
+        
         /* Inputs */
         label {
             display: block;
@@ -317,10 +329,11 @@
             margin-top: 5px;
         }
         
-        /* Estilos para setas de vento DMW */
+        /* Estilos para setas de vento DMW - com animação ondulante */
         .dmw-wind-arrow {
             background: transparent !important;
             border: none !important;
+            /* Animação aplicada via keyframes acima */
         }
         
         .source-info a {
@@ -1297,11 +1310,13 @@
     }
     
     function getDMWColor(speedKt) {
-        if (speedKt < 10) return '#00ff00';      // Verde - Calmo
-        if (speedKt < 20) return '#ffff00';      // Amarelo - Fraco
-        if (speedKt < 30) return '#ffa500';      // Laranja - Moderado
-        if (speedKt < 40) return '#ff6600';      // Laranja escuro - Forte
-        return '#ff0000';                         // Vermelho - Muito forte
+        // Escala de cores unificada (igual ao Scatterometer)
+        if (speedKt < 10) return '#00ff00';      // Verde - Calmo (0-10 kn)
+        if (speedKt < 15) return '#88ff00';      // Verde claro - Leve (10-15 kn)
+        if (speedKt < 20) return '#ffff00';      // Amarelo - Moderado (15-20 kn)
+        if (speedKt < 25) return '#ff9900';      // Laranja - Fresco (20-25 kn)
+        if (speedKt < 30) return '#ff0000';      // Vermelho - Forte (25-30 kn)
+        return '#ff00ff';                         // Roxo/Magenta - Muito forte (>30 kn)
     }
     
     function createDMWArrow(lat, lon, direction, speed, color, pressure, qualityFlag) {
@@ -3730,14 +3745,14 @@
     }
     
     function drawWindArrow(lat, lon, direction, speed, source) {
-        // Cor baseada na velocidade
+        // Cor baseada na velocidade - ESCALA UNIFICADA (igual ao DMW)
         let color;
-        if (speed < 10) color = '#00ff00';
-        else if (speed < 15) color = '#88ff00';
-        else if (speed < 20) color = '#ffff00';
-        else if (speed < 25) color = '#ff9900';
-        else if (speed < 30) color = '#ff0000';
-        else color = '#ff00ff';
+        if (speed < 10) color = '#00ff00';       // Verde - Calmo (0-10 kn)
+        else if (speed < 15) color = '#88ff00'; // Verde claro - Leve (10-15 kn)
+        else if (speed < 20) color = '#ffff00'; // Amarelo - Moderado (15-20 kn)
+        else if (speed < 25) color = '#ff9900'; // Laranja - Fresco (20-25 kn)
+        else if (speed < 30) color = '#ff0000'; // Vermelho - Forte (25-30 kn)
+        else color = '#ff00ff';                  // Roxo/Magenta - Muito forte (>30 kn)
         
         // ESCATERÔMETROS: ícone maior, borda destacada, zIndex alto
         const isScatterometer = source.includes('ASCAT') || source.includes('NOAA') || 
