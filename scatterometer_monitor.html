@@ -1345,8 +1345,6 @@
             
             const levelInfo = levelConfig[level] || levelConfig['low'];
             
-            // Tentar usar API do servidor primeiro, depois fallback para arquivo JSON
-            let dmwData = null;
             // Usar os mesmos bounds da imagem de satélite reprojetada
             // para garantir que os vetores fiquem dentro da área visível
             const latMin = REPROJECTION_BOUNDS.south;  // -30
