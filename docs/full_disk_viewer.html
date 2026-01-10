@@ -301,6 +301,22 @@
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.5; transform: scale(1.2); }
         }
+        
+        /* Animação DMW - movimento suave ondulante */
+        @keyframes dmw-wave {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            25% { transform: translateY(-3px) scale(1.05); }
+            50% { transform: translateY(0px) scale(1); }
+            75% { transform: translateY(3px) scale(0.95); }
+        }
+        
+        .dmw-wind-arrow {
+            animation: dmw-wave 2.5s ease-in-out infinite;
+        }
+        
+        .dmw-wind-line {
+            animation: dmw-wave 2.5s ease-in-out infinite;
+        }
     </style>
 </head>
 <body>
@@ -1290,11 +1306,13 @@
         }
         
         function getWindColor(speedKt) {
-            if (speedKt < 10) return '#00ff00';      // Verde - Calmo
-            if (speedKt < 20) return '#ffff00';      // Amarelo - Fraco
-            if (speedKt < 30) return '#ffa500';      // Laranja - Moderado
-            if (speedKt < 40) return '#ff6600';      // Laranja escuro - Forte
-            return '#ff0000';                         // Vermelho - Muito forte
+            // Escala de cores unificada (igual ao Scatterometer)
+            if (speedKt < 10) return '#00ff00';      // Verde - Calmo (0-10 kn)
+            if (speedKt < 15) return '#88ff00';      // Verde claro - Leve (10-15 kn)
+            if (speedKt < 20) return '#ffff00';      // Amarelo - Moderado (15-20 kn)
+            if (speedKt < 25) return '#ff9900';      // Laranja - Fresco (20-25 kn)
+            if (speedKt < 30) return '#ff0000';      // Vermelho - Forte (25-30 kn)
+            return '#ff00ff';                         // Roxo/Magenta - Muito forte (>30 kn)
         }
         
         function createWindArrow(lat, lon, direction, speed, color) {
@@ -1308,11 +1326,12 @@
             const endLat = lat + arrowLength * Math.cos(dirRad);
             const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
-            // Criar polyline com decorador de seta
+            // Criar polyline com decorador de seta - com classe para animação DMW
             const line = L.polyline([[lat, lon], [endLat, endLon]], {
                 color: color,
                 weight: 2,
-                opacity: 0.8
+                opacity: 0.8,
+                className: 'dmw-wind-line'
             });
             
             // Adicionar popup
@@ -1333,7 +1352,7 @@
         }
         
         function createArrowHead(lat, lon, direction, color) {
-            // Criar marcador com ícone de seta rotacionado
+            // Criar marcador com ícone de seta rotacionado - com classe para animação DMW
             const icon = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1347,7 +1366,7 @@
                 "></div>`,
                 iconSize: [10, 10],
                 iconAnchor: [5, 5],
-                className: 'wind-arrow-head'
+                className: 'wind-arrow-head dmw-wind-arrow'
             });
             
             return L.marker([lat, lon], { icon, interactive: false });
@@ -1682,12 +1701,13 @@
         }
         
         function getScatWindColor(speedKt) {
-            // Esquema de cores azul para diferenciar de DMW (que usa verde/amarelo/vermelho)
-            if (speedKt < 10) return '#00ffff';      // Ciano - Calmo
-            if (speedKt < 20) return '#00ccff';      // Azul claro - Fraco
-            if (speedKt < 30) return '#0099ff';      // Azul - Moderado
-            if (speedKt < 40) return '#0066ff';      // Azul médio - Forte
-            return '#0033ff';                         // Azul escuro - Muito forte
+            // Escala de cores unificada (igual ao DMW)
+            if (speedKt < 10) return '#00ff00';      // Verde - Calmo (0-10 kn)
+            if (speedKt < 15) return '#88ff00';      // Verde claro - Leve (10-15 kn)
+            if (speedKt < 20) return '#ffff00';      // Amarelo - Moderado (15-20 kn)
+            if (speedKt < 25) return '#ff9900';      // Laranja - Fresco (20-25 kn)
+            if (speedKt < 30) return '#ff0000';      // Vermelho - Forte (25-30 kn)
+            return '#ff00ff';                         // Roxo/Magenta - Muito forte (>30 kn)
         }
         
         function createScatWindMarker(wind, color) {
