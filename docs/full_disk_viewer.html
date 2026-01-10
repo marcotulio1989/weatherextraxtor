@@ -373,6 +373,12 @@
             <div class="toggle-indicator"></div>
         </div>
         
+        <!-- Toggle Scatterometer Winds -->
+        <div class="toggle-btn" id="toggleScat" onclick="toggleScatWinds()">
+            <span>🛰️ Ventos SCAT</span>
+            <div class="toggle-indicator"></div>
+        </div>
+        
         <div class="control-group">
             <label>🌬️ Nível de Vento</label>
             <select id="windLevel" onchange="if(dmwEnabled) loadDMWWinds()">
@@ -421,6 +427,48 @@
         <div style="margin-top: 8px; font-size: 0.7em; color: #888;">
             <span id="windInfo">-</span>
         </div>
+    </div>
+    
+    <!-- Scatterometer Legend -->
+    <div class="wind-legend" id="scatLegend" style="left: auto; right: 20px; bottom: 20px;">
+        <h4>🛰️ Ventos Scatterometer</h4>
+        <div style="font-size: 0.75em; color: #aaa; margin-bottom: 6px;">
+            ASCAT (MetOp-B/C)
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #00ffff;"></div>
+            <span>0-10 kt (Calmo)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #00ccff;"></div>
+            <span>10-20 kt (Fraco)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #0099ff;"></div>
+            <span>20-30 kt (Moderado)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #0066ff;"></div>
+            <span>30-40 kt (Forte)</span>
+        </div>
+        <div class="wind-legend-row">
+            <div class="wind-legend-color" style="background: #0033ff;"></div>
+            <span>&gt;40 kt (Muito Forte)</span>
+        </div>
+        <div style="margin-top: 8px; font-size: 0.7em; color: #888;">
+            <span id="scatInfo">-</span>
+        </div>
+        <div style="margin-top: 4px; font-size: 0.7em; color: #00d4ff;">
+            📅 <span id="scatTimestamp">--</span>
+        </div>
+        <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+            <label style="font-size: 0.7em; color: #888;">Auto-refresh (6h):</label>
+            <input type="checkbox" id="scatAutoRefresh" onclick="toggleScatAutoRefresh()">
+            <span id="scatNextUpdate" style="font-size: 0.65em; color: #666;"></span>
+        </div>
+        <button onclick="loadScatWinds()" style="margin-top: 8px; padding: 4px 8px; font-size: 0.7em; width: 100%;">
+            🔄 Atualizar Agora
+        </button>
     </div>
     
     <!-- DEBUG PANEL -->
@@ -1321,6 +1369,353 @@
         }
         
         // =========================================================
+        // SCATTEROMETER WINDS (CYGNSS, ASCAT via NASA Earthdata)
+        // =========================================================
+        
+        let scatEnabled = false;
+        let scatLayer = null;
+        let scatMarkers = [];
+        let scatData = null;
+        let scatAutoRefreshInterval = null;
+        
+        function toggleScatAutoRefresh() {
+            const checkbox = document.getElementById('scatAutoRefresh');
+            const nextUpdateSpan = document.getElementById('scatNextUpdate');
+            
+            if (checkbox.checked) {
+                // Iniciar auto-refresh a cada 6 horas
+                const SIX_HOURS = 6 * 60 * 60 * 1000;
+                
+                scatAutoRefreshInterval = setInterval(() => {
+                    console.log('🔄 SCAT Auto-refresh: Atualizando dados...');
+                    loadScatWinds();
+                    updateScatNextUpdateTime();
+                }, SIX_HOURS);
+                
+                updateScatNextUpdateTime();
+                console.log('⏰ SCAT Auto-refresh ativado (a cada 6h)');
+            } else {
+                // Parar auto-refresh
+                if (scatAutoRefreshInterval) {
+                    clearInterval(scatAutoRefreshInterval);
+                    scatAutoRefreshInterval = null;
+                }
+                nextUpdateSpan.textContent = '';
+                console.log('⏸️ SCAT Auto-refresh desativado');
+            }
+        }
+        
+        function updateScatNextUpdateTime() {
+            const nextUpdateSpan = document.getElementById('scatNextUpdate');
+            const now = new Date();
+            const nextUpdate = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+            nextUpdateSpan.textContent = `Próx: ${nextUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+        }
+        
+        function toggleScatWinds() {
+            const btn = document.getElementById('toggleScat');
+            scatEnabled = !scatEnabled;
+            
+            if (scatEnabled) {
+                btn.classList.add('active');
+                document.getElementById('scatLegend').classList.add('show');
+                loadScatWinds();
+            } else {
+                btn.classList.remove('active');
+                document.getElementById('scatLegend').classList.remove('show');
+                clearScatLayer();
+            }
+        }
+        
+        function clearScatLayer() {
+            scatMarkers.forEach(m => map.removeLayer(m));
+            scatMarkers = [];
+            if (scatLayer) {
+                map.removeLayer(scatLayer);
+                scatLayer = null;
+            }
+        }
+        
+        async function loadScatWinds() {
+            if (!scatEnabled) return;
+            
+            showLoading('Carregando ventos de Scatterômetros...');
+            setProgress(10);
+            
+            try {
+                // Obter bounds do mapa para filtrar
+                const bounds = map.getBounds();
+                const latMin = bounds.getSouth();
+                const latMax = bounds.getNorth();
+                const lonMin = bounds.getWest();
+                const lonMax = bounds.getEast();
+                
+                console.log(`🛰️ Buscando SCAT para área: lat ${latMin.toFixed(1)} a ${latMax.toFixed(1)}, lon ${lonMin.toFixed(1)} a ${lonMax.toFixed(1)}`);
+                
+                // Tentar buscar do servidor local primeiro
+                let scatData = null;
+                
+                try {
+                    // Tentar API local (com dados via earthdata)
+                    const apiUrl = `/api/scatterometer?lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`;
+                    console.log('📥 Tentando API local:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, { timeout: 30000 });
+                    if (response.ok) {
+                        scatData = await response.json();
+                        console.log('✅ Dados da API local:', scatData);
+                    }
+                } catch (apiErr) {
+                    console.log('⚠️ API local não disponível, tentando arquivo JSON...');
+                }
+                
+                // Fallback: tentar arquivo JSON pré-gerado
+                if (!scatData || !scatData.winds || scatData.winds.length === 0) {
+                    try {
+                        const jsonUrl = 'scatterometer_latest.json';
+                        const response = await fetch(jsonUrl);
+                        if (response.ok) {
+                            scatData = await response.json();
+                            console.log('✅ Dados do arquivo JSON:', scatData);
+                        }
+                    } catch (jsonErr) {
+                        console.log('⚠️ Arquivo JSON não disponível');
+                    }
+                }
+                
+                // Fallback: NOAA ERDDAP direto (via proxy)
+                if (!scatData || !scatData.winds || scatData.winds.length === 0) {
+                    console.log('🔄 Usando NOAA ERDDAP como fallback...');
+                    scatData = await fetchNoaaErddap(latMin, latMax, lonMin, lonMax);
+                }
+                
+                if (!scatData || !scatData.winds || scatData.winds.length === 0) {
+                    throw new Error('Nenhum dado de scatterômetro disponível');
+                }
+                
+                setProgress(50);
+                
+                // Limpar camada anterior
+                clearScatLayer();
+                scatLayer = L.layerGroup().addTo(map);
+                
+                const winds = scatData.winds || [];
+                let displayedCount = 0;
+                
+                for (let i = 0; i < winds.length; i++) {
+                    const w = winds[i];
+                    
+                    // Filtrar por área visível
+                    if (w.lat < latMin || w.lat > latMax) continue;
+                    if (w.lon < lonMin || w.lon > lonMax) continue;
+                    
+                    displayedCount++;
+                    
+                    // Cor baseada na velocidade (esquema azul para diferenciar de DMW)
+                    const color = getScatWindColor(w.speed_kt);
+                    
+                    // Criar marcador de vento
+                    const marker = createScatWindMarker(w, color);
+                    marker.addTo(scatLayer);
+                    scatMarkers.push(marker);
+                    
+                    // Progress
+                    if (i % 20 === 0) {
+                        setProgress(50 + (i / winds.length) * 45);
+                    }
+                }
+                
+                // Atualizar info
+                const satellites = scatData.satellites ? scatData.satellites.join(', ') : 'ASCAT';
+                document.getElementById('scatInfo').textContent = 
+                    `${displayedCount} vetores | ${satellites}`;
+                
+                // Atualizar timestamp
+                if (scatData.timestamp) {
+                    const ts = new Date(scatData.timestamp);
+                    const tsStr = ts.toLocaleString('pt-BR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                    document.getElementById('scatTimestamp').textContent = tsStr;
+                }
+                
+                setProgress(100);
+                setTimeout(hideLoading, 300);
+                
+                document.getElementById('statusText').textContent = 
+                    `Ventos SCAT: ${displayedCount} vetores | ${scatData.source || 'N/A'}`;
+                
+            } catch (err) {
+                console.error('❌ Erro SCAT:', err);
+                document.getElementById('scatInfo').textContent = 'Erro ao carregar';
+                document.getElementById('statusText').textContent = 'Erro SCAT: ' + err.message;
+                hideLoading();
+            }
+        }
+        
+        async function fetchNoaaErddap(latMin, latMax, lonMin, lonMax) {
+            // Buscar dados ASCAT do NOAA ERDDAP via proxy
+            const now = new Date();
+            const endDate = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 1 dia atrás
+            const startDate = new Date(endDate.getTime() - 3 * 24 * 60 * 60 * 1000); // 3 dias antes
+            
+            const startStr = startDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+            const endStr = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z');
+            
+            const dataset = 'erdQCwindproducts1day';
+            const erddapUrl = `https://coastwatch.pfeg.noaa.gov/erddap/griddap/${dataset}.json?` +
+                `wind_speed[(${startStr}):1:(${endStr})][(10.0)][((${latMax})):1:((${latMin}))][((${lonMin})):1:((${lonMax}))]` +
+                `,wind_direction[(${startStr}):1:(${endStr})][(10.0)][((${latMax})):1:((${latMin}))][((${lonMin})):1:((${lonMax}))]`;
+            
+            console.log('📡 NOAA ERDDAP URL:', erddapUrl);
+            
+            try {
+                const proxyUrl = `/api/noaa?url=${encodeURIComponent(erddapUrl)}`;
+                const response = await fetch(proxyUrl, { timeout: 60000 });
+                
+                if (!response.ok) {
+                    throw new Error(`NOAA returned ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ NOAA ERDDAP response:', data);
+                
+                // Parsear resposta ERDDAP
+                const winds = [];
+                if (data.table && data.table.rows) {
+                    for (const row of data.table.rows) {
+                        // [time, altitude, lat, lon, wind_speed, wind_direction]
+                        if (row.length >= 6 && row[4] !== null && row[5] !== null) {
+                            const speedMs = row[4];
+                            const direction = row[5];
+                            winds.push({
+                                lat: row[2],
+                                lon: row[3],
+                                speed_ms: speedMs,
+                                speed_kt: speedMs * 1.94384,
+                                direction: direction,
+                                satellite: 'ASCAT',
+                                source: 'NOAA_ERDDAP'
+                            });
+                        }
+                    }
+                }
+                
+                return {
+                    timestamp: new Date().toISOString(),
+                    source: 'NOAA_ERDDAP',
+                    satellites: ['ASCAT-MetOp'],
+                    total_points: winds.length,
+                    winds: winds
+                };
+                
+            } catch (err) {
+                console.error('❌ NOAA ERDDAP falhou:', err);
+                return null;
+            }
+        }
+        
+        function getScatWindColor(speedKt) {
+            // Esquema de cores azul para diferenciar de DMW (que usa verde/amarelo/vermelho)
+            if (speedKt < 10) return '#00ffff';      // Ciano - Calmo
+            if (speedKt < 20) return '#00ccff';      // Azul claro - Fraco
+            if (speedKt < 30) return '#0099ff';      // Azul - Moderado
+            if (speedKt < 40) return '#0066ff';      // Azul médio - Forte
+            return '#0033ff';                         // Azul escuro - Muito forte
+        }
+        
+        function createScatWindMarker(wind, color) {
+            const lat = wind.lat;
+            const lon = wind.lon;
+            const speed = wind.speed_kt;
+            const direction = wind.direction;
+            const satellite = wind.satellite || 'SCAT';
+            
+            // Se não tem direção (CYGNSS), usar círculo
+            if (direction === null || direction === undefined) {
+                // Círculo simples para CYGNSS (só velocidade)
+                const circle = L.circleMarker([lat, lon], {
+                    radius: 4 + speed * 0.1,
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.7,
+                    weight: 1
+                });
+                
+                circle.bindPopup(`
+                    <div style="text-align:center;">
+                        <b>🛰️ ${satellite}</b><br>
+                        <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
+                        Direção: N/A (somente velocidade)<br>
+                        Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
+                    </div>
+                `, { className: 'wind-popup' });
+                
+                return circle;
+            }
+            
+            // Seta de vento com direção (ASCAT)
+            const arrowLength = Math.min(0.25 + speed * 0.008, 0.6);
+            
+            // Converter direção meteorológica para vetorial
+            const dirRad = (direction + 180) * Math.PI / 180;
+            
+            const endLat = lat + arrowLength * Math.cos(dirRad);
+            const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+            
+            const line = L.polyline([[lat, lon], [endLat, endLon]], {
+                color: color,
+                weight: 2,
+                opacity: 0.9
+            });
+            
+            line.bindPopup(`
+                <div style="text-align:center;">
+                    <b>🛰️ ${satellite}</b><br>
+                    <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
+                    Direção: ${direction.toFixed(0)}°<br>
+                    Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
+                </div>
+            `, { className: 'wind-popup' });
+            
+            // Cabeça da seta
+            const arrowHead = L.divIcon({
+                html: `<div style="
+                    width: 0;
+                    height: 0;
+                    border-left: 4px solid transparent;
+                    border-right: 4px solid transparent;
+                    border-bottom: 8px solid ${color};
+                    transform: rotate(${direction + 180}deg);
+                    transform-origin: center center;
+                    filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+                "></div>`,
+                iconSize: [8, 8],
+                iconAnchor: [4, 4],
+                className: 'scat-arrow-head'
+            });
+            
+            const head = L.marker([endLat, endLon], { icon: arrowHead, interactive: false });
+            
+            return L.layerGroup([line, head]);
+        }
+        
+        // Recarregar SCAT quando mover o mapa
+        let scatReloadTimeout = null;
+        
+        function setupScatAutoReload() {
+            map.on('moveend', () => {
+                if (scatEnabled) {
+                    clearTimeout(scatReloadTimeout);
+                    scatReloadTimeout = setTimeout(() => {
+                        loadScatWinds();
+                    }, 1500);
+                }
+            });
+        }
+        
+        // =========================================================
         // AUTO-REFRESH SYSTEM
         // =========================================================
         
@@ -1388,6 +1783,7 @@
         
         init();
         setupDMWAutoReload();
+        setupScatAutoReload();
         startAutoRefresh();
         
         // Carregar imagem automaticamente na primeira vez

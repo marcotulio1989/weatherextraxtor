@@ -7,3 +7,6 @@ xarray
 netCDF4
 boto3
 s3fs
+earthdata
+h5netcdf
+aiohttp

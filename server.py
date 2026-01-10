@@ -25,6 +25,12 @@ DMW_CACHE = {
     'level': None
 }
 
+# Cache global para Scatterometer
+SCAT_CACHE = {
+    'data': None,
+    'timestamp': None
+}
+
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     
     def do_GET(self):
@@ -55,6 +61,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         # API para dados L2 (CAPE, LI, Cloud Height, TPW)
         if parsed.path == '/api/l2':
             self.get_l2_data(parsed.query)
+            return
+        
+        # API para dados de Scatterometer (CYGNSS, ASCAT via Earthdata)
+        if parsed.path == '/api/scatterometer':
+            self.get_scatterometer_data(parsed.query)
             return
         
         # Servir arquivos estáticos normalmente
@@ -294,6 +305,118 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 'error': str(e),
                 'traceback': traceback.format_exc()
             }).encode())
+    
+    def get_scatterometer_data(self, query_string):
+        """
+        Retorna dados de ventos de satélites scatterômetros.
+        
+        Parâmetros:
+        - satellites: Lista de satélites separados por vírgula (cygnss_l2_nrt,ascat_nrt)
+        - lat_min, lat_max, lon_min, lon_max: Bounding box
+        - force_refresh: Forçar atualização ignorando cache
+        """
+        global SCAT_CACHE
+        
+        params = parse_qs(query_string)
+        satellites_str = params.get('satellites', ['ascat_c_coastal,ascat_b_coastal'])[0]
+        satellites = satellites_str.split(',')
+        force_refresh = params.get('force_refresh', ['false'])[0].lower() == 'true'
+        
+        # Bbox opcional
+        bbox = None
+        if 'lat_min' in params:
+            try:
+                bbox = {
+                    'lat_min': float(params.get('lat_min', ['-35'])[0]),
+                    'lat_max': float(params.get('lat_max', ['-5'])[0]),
+                    'lon_min': float(params.get('lon_min', ['-55'])[0]),
+                    'lon_max': float(params.get('lon_max', ['-25'])[0])
+                }
+            except ValueError:
+                pass
+        
+        try:
+            from datetime import datetime, timedelta
+            
+            # Verificar cache (válido por 30 minutos para scatterometer)
+            cache_valid = False
+            if not force_refresh and SCAT_CACHE['data'] and SCAT_CACHE['timestamp']:
+                age = (datetime.utcnow() - SCAT_CACHE['timestamp']).total_seconds()
+                if age < 1800:  # 30 minutos
+                    cache_valid = True
+            
+            if cache_valid:
+                print(f"📦 SCAT: Usando cache")
+                data = SCAT_CACHE['data']
+            else:
+                print(f"🛰️ SCAT: Buscando dados frescos ({satellites_str})")
+                
+                # Tentar usar earthdata primeiro
+                try:
+                    from earthdata_scatterometer import EarthdataScatterometer
+                    
+                    extractor = EarthdataScatterometer()
+                    data = extractor.fetch_latest(satellites=satellites, bbox=bbox)
+                    
+                except ImportError:
+                    # Fallback para NOAA ERDDAP
+                    print("⚠️ earthdata não disponível, usando NOAA ERDDAP")
+                    from scatterometer_fetcher import NOAAErddapSource
+                    
+                    source = NOAAErddapSource()
+                    source.fetch(bbox or {
+                        'lat_min': -35, 'lat_max': -5,
+                        'lon_min': -55, 'lon_max': -25
+                    })
+                    
+                    winds = []
+                    for row in source.data:
+                        winds.append({
+                            'lat': row.get('latitude'),
+                            'lon': row.get('longitude'),
+                            'speed_ms': row.get('wind_speed_ms', 0),
+                            'speed_kt': row.get('wind_speed_kn', 0),
+                            'direction': row.get('wind_direction'),
+                            'satellite': 'ASCAT',
+                            'source': 'NOAA_ERDDAP'
+                        })
+                    
+                    data = {
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'source': 'NOAA_ERDDAP',
+                        'satellites': ['ASCAT-MetOp'],
+                        'bbox': bbox,
+                        'total_points': len(winds),
+                        'winds': winds
+                    }
+                
+                # Atualizar cache
+                SCAT_CACHE['data'] = data
+                SCAT_CACHE['timestamp'] = datetime.utcnow()
+                
+                # Salvar JSON para uso offline
+                output_file = '/workspaces/weatherextraxtor/docs/scatterometer_latest.json'
+                with open(output_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+                print(f"💾 Dados salvos em: {output_file}")
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Cache-Control', 'max-age=1800')
+            self.end_headers()
+            self.wfile.write(json.dumps(data).encode())
+            
+        except Exception as e:
+            import traceback
+            self.send_response(500)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }).encode())
 
 def run():
     os.chdir('/workspaces/weatherextraxtor')
@@ -303,6 +426,7 @@ def run():
         print(f"📡 Proxy NOAA: http://localhost:{PORT}/api/noaa?url=...")
         print(f"🌬️ DMW API: http://localhost:{PORT}/api/dmw?satellite=goes19&level=low")
         print(f"📊 L2 API: http://localhost:{PORT}/api/l2?satellite=goes19&products=DSIF,TPWF")
+        print(f"🛰️ SCAT API: http://localhost:{PORT}/api/scatterometer?satellites=cygnss_l2_nrt,ascat_nrt")
         print(f"🌐 Viewer: http://localhost:{PORT}/docs/full_disk_viewer.html")
         httpd.serve_forever()
 
