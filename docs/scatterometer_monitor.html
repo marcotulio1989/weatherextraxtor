@@ -821,6 +821,10 @@
                     ✓ = acerto (&lt;3kt, &lt;20°) | ✗ = erro | Score = cumulativo
                 </div>
                 
+                <button class="secondary" onclick="testCalibration()" style="width:100%; font-size:10px; margin-bottom:5px; background:#ff9900; color:#000;">
+                    🧪 TEST CALIBRATION
+                </button>
+                
                 <button class="secondary" onclick="resetCalibration()" style="width:100%; font-size:10px;">
                     🔄 Resetar Calibração
                 </button>
@@ -1024,8 +1028,8 @@
     <!-- Scatterometer Legend (posicionado no mapa) -->
     <div id="scatLegend" style="
         position: fixed;
-        bottom: 230px;
-        right: 400px;
+        bottom: 20px;
+        right: 20px;
         background: rgba(0,0,0,0.9);
         padding: 12px;
         border-radius: 8px;
@@ -1369,6 +1373,8 @@
                 lastDMWHour = hour;
                 log('info', `🔄 DMW: Atualização automática (${hour}:05)`);
                 loadDMWWinds();
+                // Calibrar modelos APENAS quando há dados realmente novos
+                setTimeout(() => calibrateWithObservedData(), 500);
             }
         }, 60 * 1000);  // Verificar a cada 1 minuto
         
@@ -1497,9 +1503,6 @@
             
             statusEl.className = 'status-indicator active';
             log('success', `✅ DMW: ${winds.length} vetores na área`);
-            
-            // Calibrar modelos com novos dados DMW
-            setTimeout(() => calibrateWithObservedData(), 500);
             
         } catch (err) {
             console.error('❌ Erro DMW:', err);
@@ -1633,6 +1636,8 @@
             if (newTimestamp > currentTimestamp) {
                 log('info', `✅ SCAT: Dados mais novos encontrados!`);
                 loadScatWinds();  // Baixar e renderizar
+                // Calibrar modelos APENAS quando há dados realmente novos
+                setTimeout(() => calibrateWithObservedData(), 500);
             } else {
                 log('info', `ℹ️ SCAT: Dados atuais são os mais recentes`);
             }
@@ -1783,9 +1788,6 @@
             statusEl.className = 'status-indicator active';
             log('success', `✅ SCAT: ${displayedCount} vetores carregados | ${scatData.source || 'N/A'}`);
             
-            // Calibrar modelos com novos dados SCAT
-            setTimeout(() => calibrateWithObservedData(), 500);
-            
         } catch (err) {
             console.error('❌ Erro SCAT:', err);
             log('error', 'Erro SCAT: ' + err.message);
@@ -1856,7 +1858,7 @@
             <div style="text-align:center;">
                 <b>🛰️ ${satellite}</b><br>
                 <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
-                Vem de: ${direction.toFixed(0)}°<br>
+                Vem de: ${adjustedDir.toFixed(0)}°<br>
                 Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
             </div>
         `, { className: 'wind-popup' });
@@ -3601,7 +3603,7 @@
         
         // Se não tem fonte válida, sair
         if (!useSource || observedSpeed === null) {
-            log('warning', '⚠️ Calibração: Fonte sem vetores válidos no raio de 100nm');
+            log('warning', `⚠️ Calibração: Fonte sem vetores válidos no raio de ${RAIO_OBSERVACAO_NM}nm`);
             updateObservedVectorsUI();  // Atualizar contagens na UI
             return;
         }
@@ -3935,6 +3937,97 @@
                 }
             }
         });
+    }
+    
+    // TESTE DE CALIBRAÇÃO - Botão temporário para debug
+    function testCalibration() {
+        log('warning', '🧪 ========== TEST CALIBRATION ==========');
+        
+        // 1. Mostrar dados SCAT disponíveis
+        if (scatData && scatData.winds) {
+            log('info', `📊 SCAT: ${scatData.winds.length} vetores totais`);
+            log('info', `📅 SCAT timestamp: ${scatData.timestamp}`);
+        } else {
+            log('error', '❌ SCAT: Sem dados carregados');
+        }
+        
+        // 2. Buscar vetores no raio de observação (20nm)
+        const scatVectors = getSCATVectorsInRadius();
+        log('info', `🎯 SCAT no raio de ${RAIO_OBSERVACAO_NM}nm: ${scatVectors.count} vetores`);
+        
+        if (scatVectors.count > 0) {
+            log('success', `📍 SCAT média: ${scatVectors.avgSpeed?.toFixed(1)} kt, ${scatVectors.avgDir?.toFixed(0)}°`);
+            
+            // 3. Mostrar vetores individuais encontrados
+            const radiusDeg = RAIO_OBSERVACAO_GRAUS;
+            let foundVectors = [];
+            
+            if (scatData && scatData.winds) {
+                for (const w of scatData.winds) {
+                    const latDiff = Math.abs(w.lat - CONFIG.shipLat);
+                    const lonDiff = Math.abs(w.lon - CONFIG.shipLon);
+                    
+                    if (latDiff <= radiusDeg && lonDiff <= radiusDeg) {
+                        if (!isOverOcean(w.lat, w.lon)) continue;
+                        
+                        // Calcular adjustedDir (igual ao popup)
+                        const adjustedDir = (w.direction - 180 + 360) % 360;
+                        foundVectors.push({
+                            lat: w.lat,
+                            lon: w.lon,
+                            speed: w.speed_kt,
+                            dirOriginal: w.direction,
+                            dirAdjusted: adjustedDir
+                        });
+                    }
+                }
+            }
+            
+            log('info', `🔍 Vetores encontrados no raio:`);
+            foundVectors.forEach((v, i) => {
+                log('info', `   [${i+1}] Lat:${v.lat.toFixed(2)} Lon:${v.lon.toFixed(2)} | ${v.speed.toFixed(1)}kt | Original:${v.dirOriginal?.toFixed(0)}° -> Adjusted:${v.dirAdjusted?.toFixed(0)}°`);
+            });
+        }
+        
+        // 4. Mostrar dados DMW
+        if (dmwData && dmwData.winds) {
+            const dmwVectors = getDMWVectorsInRadius();
+            log('info', `🌀 DMW no raio de ${RAIO_OBSERVACAO_NM}nm: ${dmwVectors.count} vetores`);
+            if (dmwVectors.count > 0) {
+                log('success', `📍 DMW média: ${dmwVectors.avgSpeed?.toFixed(1)} kt, ${dmwVectors.avgDir?.toFixed(0)}°`);
+            }
+        }
+        
+        // 5. Mostrar valores dos modelos
+        log('info', '📈 Valores dos modelos:');
+        MODELS.forEach(m => {
+            const val = modelData[m];
+            if (val && val.speed !== null) {
+                log('info', `   ${m}: ${val.speed.toFixed(1)} kt, ${val.direction?.toFixed(0)}°`);
+            } else {
+                log('info', `   ${m}: sem dados`);
+            }
+        });
+        
+        // 6. Forçar calibração (ignorando timestamp)
+        log('warning', '🔧 Forçando calibração...');
+        
+        // Salvar timestamps atuais
+        const savedDMW = lastDMWCalibrationTimestamp;
+        const savedSCAT = lastSCATCalibrationTimestamp;
+        
+        // Zerar timestamps para forçar calibração
+        lastDMWCalibrationTimestamp = 0;
+        lastSCATCalibrationTimestamp = 0;
+        
+        // Executar calibração
+        calibrateWithObservedData();
+        
+        // Restaurar timestamps (para não calibrar novamente sem dados novos)
+        lastDMWCalibrationTimestamp = savedDMW;
+        lastSCATCalibrationTimestamp = savedSCAT;
+        
+        log('warning', '🧪 ========== FIM TEST CALIBRATION ==========');
     }
     
     // Resetar calibração (para recomeçar do zero)
