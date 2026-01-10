@@ -1,0 +1,54 @@
+{
+  "scat_timestamp": "2026-01-10T12:52:11.075727",
+  "scat_file_hash": "1768049531.7825515_14427530",
+  "cycle_start": "2026-01-10T18:38:33.724460",
+  "reference_speed_kt": 12.637006210462335,
+  "reference_direction": 219.54991562161212,
+  "weights": {
+    "ecmwf_ifs025": {
+      "model_name": "ecmwf_ifs025",
+      "initial_weight": 0.8093665357899614,
+      "current_weight": 0.8162814411357241,
+      "direction_error": 59.11675104505455,
+      "speed_error": 1.0296604562043317,
+      "comparison_count": 3,
+      "last_updated": "2026-01-10T18:39:04.564289+00:00"
+    },
+    "icon_seamless": {
+      "model_name": "icon_seamless",
+      "initial_weight": 0.7982554246788504,
+      "current_weight": 0.7982554246788504,
+      "direction_error": 55.450084378387885,
+      "speed_error": 2.862993789537665,
+      "comparison_count": 1,
+      "last_updated": "2026-01-10T18:38:33.734262"
+    },
+    "gfs_seamless": {
+      "model_name": "gfs_seamless",
+      "initial_weight": 0.7982554246788502,
+      "current_weight": 0.7982554246788502,
+      "direction_error": 70.45008437838788,
+      "speed_error": 0.3629937895376649,
+      "comparison_count": 1,
+      "last_updated": "2026-01-10T18:38:33.734285"
+    },
+    "meteofrance_seamless": {
+      "model_name": "meteofrance_seamless",
+      "initial_weight": 0.7871443135677393,
+      "current_weight": 0.7871443135677393,
+      "direction_error": 65.45008437838788,
+      "speed_error": 1.862993789537665,
+      "comparison_count": 1,
+      "last_updated": "2026-01-10T18:38:33.734303"
+    },
+    "jma_seamless": {
+      "model_name": "jma_seamless",
+      "initial_weight": 0.8038109802344059,
+      "current_weight": 0.8038109802344059,
+      "direction_error": 50.450084378387885,
+      "speed_error": 3.362993789537665,
+      "comparison_count": 1,
+      "last_updated": "2026-01-10T18:38:33.734321"
+    }
+  }
+}

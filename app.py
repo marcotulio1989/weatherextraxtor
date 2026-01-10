@@ -25,6 +25,14 @@ except ImportError:
     CPTEC_AVAILABLE = False
     CONDICOES_CPTEC = {}
 
+# Import Model Weights Manager (Scatterometer-based)
+try:
+    from model_weights import ModelWeightsManager, get_weighted_average, get_weighted_circular_average
+    WEIGHTS_MANAGER_AVAILABLE = True
+except ImportError:
+    WEIGHTS_MANAGER_AVAILABLE = False
+    ModelWeightsManager = None
+
 
 # --------------------------------------------------------------------------
 # FUNÇÕES DE MÉDIA CIRCULAR (para direções em graus)
@@ -165,6 +173,68 @@ def calcular_pesos_modelos(valores):
         pesos_normalizados = [p / soma_final for p in pesos_normalizados]
     
     return pesos_normalizados
+
+
+# Instância global do gerenciador de pesos (scatterometer-based)
+_weights_manager = None
+
+def get_scatterometer_weights_manager():
+    """
+    Retorna a instância global do gerenciador de pesos baseado em scatterometer.
+    Inicializa se necessário e verifica por novos dados SCAT.
+    """
+    global _weights_manager
+    
+    if not WEIGHTS_MANAGER_AVAILABLE:
+        return None
+    
+    if _weights_manager is None:
+        _weights_manager = ModelWeightsManager()
+    
+    # Verificar se há novo arquivo SCAT e resetar pesos se necessário
+    if _weights_manager.check_and_reset_if_new_scat():
+        print("🔄 [SCAT] Novo arquivo detectado - pesos resetados!")
+    
+    return _weights_manager
+
+
+def calcular_pesos_com_scatterometer(valores_dict, direcoes_dict=None):
+    """
+    Calcula pesos combinando o sistema de concordância com os pesos do scatterometer.
+    
+    Args:
+        valores_dict: Dict com {model_name: velocidade}
+        direcoes_dict: Dict com {model_name: direção} (opcional)
+    
+    Returns:
+        Dict com {model_name: peso_normalizado}
+    """
+    manager = get_scatterometer_weights_manager()
+    
+    if manager is None:
+        # Fallback: pesos iguais
+        n = len(valores_dict)
+        return {k: 1.0/n for k in valores_dict.keys()}
+    
+    # Se temos direções, atualizar os pesos do manager
+    if direcoes_dict:
+        ref_speed = manager.state.reference_speed_kt
+        ref_dir = manager.state.reference_direction
+        
+        for model_name in valores_dict.keys():
+            if model_name in direcoes_dict:
+                model_speed = valores_dict.get(model_name, 0)
+                model_dir = direcoes_dict.get(model_name, 0)
+                
+                if model_speed and model_dir:
+                    manager.update_model_weight(
+                        model_name=model_name,
+                        model_dir=model_dir,
+                        model_speed_kt=model_speed
+                    )
+    
+    # Retornar pesos normalizados
+    return manager.get_normalized_weights()
 
 
 def media_ponderada(valores, pesos=None):
@@ -819,19 +889,55 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
     wind_meteofrance = round(get_safe_value(df, 'wind_speed_10m_meteofrance_seamless', current_idx, 0) * KMH_TO_KT, 1)
     wind_jma = round(get_safe_value(df, 'wind_speed_10m_jma_seamless', current_idx, 0) * KMH_TO_KT, 1)
     
-    # Calcular pesos para cada modelo baseado na concordância
-    wind_speeds = [wind_ecmwf, wind_icon, wind_gfs, wind_meteofrance, wind_jma]
-    pesos_modelos = calcular_pesos_modelos(wind_speeds)
-    
-    # Média ponderada de velocidades (usando mesmos pesos da direção)
-    wind_media = media_ponderada(wind_speeds, pesos_modelos)
-    
-    # Direções por modelo (para média circular)
+    # Direções por modelo
     wind_dir_ecmwf = get_safe_value(df, 'wind_direction_10m_ecmwf_ifs025', current_idx, 0)
     wind_dir_icon = get_safe_value(df, 'wind_direction_10m_icon_seamless', current_idx, 0)
     wind_dir_gfs = get_safe_value(df, 'wind_direction_10m_gfs_seamless', current_idx, 0)
     wind_dir_meteofrance = get_safe_value(df, 'wind_direction_10m_meteofrance_seamless', current_idx, 0)
     wind_dir_jma = get_safe_value(df, 'wind_direction_10m_jma_seamless', current_idx, 0)
+    
+    # Dicts para o sistema de pesos
+    wind_speeds_dict = {
+        "ecmwf_ifs025": wind_ecmwf,
+        "icon_seamless": wind_icon,
+        "gfs_seamless": wind_gfs,
+        "meteofrance_seamless": wind_meteofrance,
+        "jma_seamless": wind_jma,
+    }
+    wind_dirs_dict = {
+        "ecmwf_ifs025": wind_dir_ecmwf,
+        "icon_seamless": wind_dir_icon,
+        "gfs_seamless": wind_dir_gfs,
+        "meteofrance_seamless": wind_dir_meteofrance,
+        "jma_seamless": wind_dir_jma,
+    }
+    
+    # Calcular pesos usando sistema de scatterometer (se disponível)
+    weights_manager = get_scatterometer_weights_manager()
+    scat_weights_status = None
+    
+    if weights_manager is not None:
+        # Usar pesos do scatterometer
+        pesos_scat = calcular_pesos_com_scatterometer(wind_speeds_dict, wind_dirs_dict)
+        pesos_modelos = [
+            pesos_scat.get("ecmwf_ifs025", 0.2),
+            pesos_scat.get("icon_seamless", 0.2),
+            pesos_scat.get("gfs_seamless", 0.2),
+            pesos_scat.get("meteofrance_seamless", 0.2),
+            pesos_scat.get("jma_seamless", 0.2),
+        ]
+        scat_weights_status = weights_manager.get_status()
+        print(f"📊 [SCAT Weights] Usando pesos do scatterometer:")
+        for model, peso in pesos_scat.items():
+            print(f"   {model}: {peso*100:.1f}%")
+    else:
+        # Fallback: calcular pesos baseado na concordância
+        wind_speeds = [wind_ecmwf, wind_icon, wind_gfs, wind_meteofrance, wind_jma]
+        pesos_modelos = calcular_pesos_modelos(wind_speeds)
+    
+    # Média ponderada de velocidades
+    wind_speeds = [wind_ecmwf, wind_icon, wind_gfs, wind_meteofrance, wind_jma]
+    wind_media = media_ponderada(wind_speeds, pesos_modelos)
     
     # Média circular das direções (ponderada pelos mesmos pesos)
     wind_directions = [wind_dir_ecmwf, wind_dir_icon, wind_dir_gfs, wind_dir_meteofrance, wind_dir_jma]
@@ -958,6 +1064,16 @@ def gerar_html(df, agora, timezone, lat, lon, outdir=None, csv_filename=None, ci
         wind_dir_jma=int(wind_dir_jma),
         wind_dir_media=int(wind_dir_media),
         wind_dir_media_text=wind_dir_media_text,
+        # Pesos do Scatterometer
+        scat_weights=scat_weights_status,
+        scat_weights_json=json.dumps(scat_weights_status) if scat_weights_status else 'null',
+        model_weights_pct={
+            'ecmwf': round(pesos_modelos[0] * 100, 1),
+            'icon': round(pesos_modelos[1] * 100, 1),
+            'gfs': round(pesos_modelos[2] * 100, 1),
+            'meteofrance': round(pesos_modelos[3] * 100, 1),
+            'jma': round(pesos_modelos[4] * 100, 1),
+        },
         # CPTEC/INPE
         cptec_data=dados_cptec,
         cptec_json=json.dumps(dados_cptec) if dados_cptec else 'null',
