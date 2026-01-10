@@ -2446,6 +2446,69 @@
         }
     }
     
+    // Calcular opacidade baseada na intensidade do valor (valores maiores = mais opaco)
+    function getL2IntensityOpacity(variable, value) {
+        // Retorna um fator de 0.1 a 1.0 baseado na intensidade
+        let normalized = 0;
+        
+        switch(variable) {
+            case 'CAPE':
+                // CAPE: 0-5000 J/kg, valores acima de 1000 são significativos
+                if (value < 100) normalized = 0.1;
+                else if (value < 300) normalized = 0.2;
+                else if (value < 500) normalized = 0.3;
+                else if (value < 800) normalized = 0.4;
+                else if (value < 1000) normalized = 0.5;
+                else if (value < 1500) normalized = 0.6;
+                else if (value < 2000) normalized = 0.75;
+                else if (value < 3000) normalized = 0.9;
+                else normalized = 1.0;
+                break;
+            
+            case 'LI':
+                // LI: valores negativos são instáveis (mais importante)
+                // -10 a +10, valores < -2 são significativos
+                if (value > 2) normalized = 0.1;       // Estável
+                else if (value > 0) normalized = 0.2;  // Marginalmente estável
+                else if (value > -2) normalized = 0.4; // Marginalmente instável
+                else if (value > -4) normalized = 0.6; // Instável
+                else if (value > -6) normalized = 0.8; // Muito instável
+                else normalized = 1.0;                  // Extremamente instável
+                break;
+            
+            case 'TPW':
+                // TPW: 0-100 mm, valores acima de 40 são significativos
+                if (value < 10) normalized = 0.1;
+                else if (value < 20) normalized = 0.2;
+                else if (value < 30) normalized = 0.35;
+                else if (value < 40) normalized = 0.5;
+                else if (value < 50) normalized = 0.65;
+                else if (value < 60) normalized = 0.8;
+                else normalized = 1.0;
+                break;
+            
+            case 'HT':
+                // Altura de nuvem: 0-16000 m
+                if (value < 1000) normalized = 0.15;
+                else if (value < 2000) normalized = 0.25;
+                else if (value < 4000) normalized = 0.4;
+                else if (value < 6000) normalized = 0.55;
+                else if (value < 8000) normalized = 0.7;
+                else if (value < 10000) normalized = 0.85;
+                else normalized = 1.0;
+                break;
+            
+            case 'Phase':
+                normalized = 0.7; // Fase de nuvem - opacidade fixa
+                break;
+            
+            default:
+                normalized = 0.5;
+        }
+        
+        return normalized;
+    }
+    
     function formatL2Value(variable, value) {
         switch(variable) {
             case 'CAPE':
@@ -2708,9 +2771,14 @@
                 
                 if (r === undefined) continue;
                 
-                // Calcular opacidade baseada no slider e distância do centro (fade nas bordas)
-                const baseAlpha = Math.round(l2Opacity * 2.55); // Converter 0-100 para 0-255
+                // Calcular opacidade baseada na INTENSIDADE do valor
+                const intensityFactor = getL2IntensityOpacity(selectedVar, value);
+                
+                // Opacidade final = slider * intensidade (valores baixos ficam mais transparentes)
+                const baseAlpha = Math.round(l2Opacity * 2.55 * intensityFactor);
                 let alpha = baseAlpha;
+                
+                // Fade nas bordas do círculo
                 if (distFromCenter > radiusDeg * 0.8) {
                     const fadeFactor = (radiusDeg * 1.1 - distFromCenter) / (radiusDeg * 0.3);
                     alpha = Math.max(0, Math.min(baseAlpha, baseAlpha * fadeFactor));
