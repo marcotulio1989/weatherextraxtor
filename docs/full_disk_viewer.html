@@ -302,20 +302,10 @@
             50% { opacity: 0.5; transform: scale(1.2); }
         }
         
-        /* Animação DMW - movimento suave ondulante */
-        @keyframes dmw-wave {
-            0%, 100% { transform: translateY(0px) scale(1); }
-            25% { transform: translateY(-3px) scale(1.05); }
-            50% { transform: translateY(0px) scale(1); }
-            75% { transform: translateY(3px) scale(0.95); }
-        }
-        
-        .dmw-wind-arrow {
-            animation: dmw-wave 2.5s ease-in-out infinite;
-        }
-        
-        .dmw-wind-line {
-            animation: dmw-wave 2.5s ease-in-out infinite;
+        /* Estilo para setas DMW - círculo com seta */
+        .dmw-wind-marker {
+            background: transparent !important;
+            border: none !important;
         }
     </style>
 </head>
@@ -1316,26 +1306,44 @@
         }
         
         function createWindArrow(lat, lon, direction, speed, color) {
-            // Tamanho da seta baseado na velocidade (normalizado para visualização)
-            const arrowLength = Math.min(0.3 + speed * 0.01, 0.8);
+            // DMW usa CÍRCULO com seta SVG dentro (diferente do Scatterometer que usa linha+triângulo)
+            const size = 24 + Math.min(speed * 0.3, 12);
             
-            // Converter direção meteorológica (de onde vem) para direção vetorial (para onde vai)
-            const dirRad = (direction + 180) * Math.PI / 180;
+            // Direção: rotacionar para onde o vento VAI (convenção: +180° do valor meteorológico)
+            const arrowRotation = (direction + 180) % 360;
             
-            // Calcular ponto final da seta
-            const endLat = lat + arrowLength * Math.cos(dirRad);
-            const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+            // SVG de QUADRADO com seta estilizada - DIFERENTE DO SCATTEROMETER
+            const arrowHtml = `
+                <div style="
+                    width: ${size}px;
+                    height: ${size}px;
+                    transform: rotate(${arrowRotation}deg);
+                ">
+                    <svg viewBox="0 0 24 24" width="${size}" height="${size}">
+                        <rect x="2" y="2" width="20" height="20" rx="2" fill="rgba(0,0,0,0.6)" stroke="${color}" stroke-width="2"/>
+                        <path fill="${color}" d="M12 4 L8 14 L12 12 L16 14 Z"/>
+                    </svg>
+                </div>
+                <div style="
+                    text-align: center;
+                    font-size: 10px;
+                    font-weight: bold;
+                    color: ${color};
+                    text-shadow: 1px 1px 2px black;
+                    margin-top: -2px;
+                ">${speed.toFixed(0)}</div>
+            `;
             
-            // Criar polyline com decorador de seta - com classe para animação DMW
-            const line = L.polyline([[lat, lon], [endLat, endLon]], {
-                color: color,
-                weight: 2,
-                opacity: 0.8,
-                className: 'dmw-wind-line'
+            const icon = L.divIcon({
+                className: 'dmw-wind-marker',
+                html: arrowHtml,
+                iconSize: [size, size + 14],
+                iconAnchor: [size/2, (size + 14)/2]
             });
             
-            // Adicionar popup
-            line.bindPopup(`
+            const marker = L.marker([lat, lon], { icon: icon });
+            
+            marker.bindPopup(`
                 <div style="text-align:center;">
                     <b>🌬️ Vento DMW</b><br>
                     <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
@@ -1344,32 +1352,7 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Adicionar cabeça da seta como triângulo
-            const arrowHead = createArrowHead(endLat, endLon, direction, color);
-            
-            // Retornar grupo
-            return L.layerGroup([line, arrowHead]);
-        }
-        
-        function createArrowHead(lat, lon, direction, color) {
-            // Criar marcador com ícone de seta rotacionado - com classe para animação DMW
-            const icon = L.divIcon({
-                html: `<div style="
-                    width: 0;
-                    height: 0;
-                    border-left: 5px solid transparent;
-                    border-right: 5px solid transparent;
-                    border-bottom: 10px solid ${color};
-                    transform: rotate(${direction + 180}deg);
-                    transform-origin: center center;
-                    filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
-                "></div>`,
-                iconSize: [10, 10],
-                iconAnchor: [5, 5],
-                className: 'wind-arrow-head dmw-wind-arrow'
-            });
-            
-            return L.marker([lat, lon], { icon, interactive: false });
+            return marker;
         }
         
         // Recarregar ventos quando mover o mapa
