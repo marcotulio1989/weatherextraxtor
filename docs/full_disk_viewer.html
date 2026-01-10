@@ -1443,21 +1443,34 @@
             setProgress(10);
             
             try {
-                // Obter bounds do mapa para filtrar
-                const bounds = map.getBounds();
-                const latMin = bounds.getSouth();
-                const latMax = bounds.getNorth();
-                const lonMin = bounds.getWest();
-                const lonMax = bounds.getEast();
+                // Usar bounds FIXOS da imagem do satélite (não do mapa visível)
+                // A imagem cobre aproximadamente: 15°N a 60°S, 90°W a 25°W
+                const IMAGE_BOUNDS = {
+                    latMin: -60,
+                    latMax: 15,
+                    lonMin: -90,
+                    lonMax: -25
+                };
+                
+                // Para filtro visual, usar interseção com mapa visível
+                const mapBounds = map.getBounds();
+                const latMin = Math.max(IMAGE_BOUNDS.latMin, mapBounds.getSouth());
+                const latMax = Math.min(IMAGE_BOUNDS.latMax, mapBounds.getNorth());
+                const lonMin = Math.max(IMAGE_BOUNDS.lonMin, mapBounds.getWest());
+                const lonMax = Math.min(IMAGE_BOUNDS.lonMax, mapBounds.getEast());
                 
                 console.log(`🛰️ Buscando SCAT para área: lat ${latMin.toFixed(1)} a ${latMax.toFixed(1)}, lon ${lonMin.toFixed(1)} a ${lonMax.toFixed(1)}`);
+                
+                // Grid de amostragem para reduzir densidade (~0.5° = ~50km)
+                const GRID_SIZE = 0.5;  // graus
+                const sampledGrid = new Map();  // key: "lat_lon" -> wind data
                 
                 // Tentar buscar do servidor local primeiro
                 let scatData = null;
                 
                 try {
                     // Tentar API local (com dados via earthdata)
-                    const apiUrl = `/api/scatterometer?lat_min=${latMin}&lat_max=${latMax}&lon_min=${lonMin}&lon_max=${lonMax}`;
+                    const apiUrl = `/api/scatterometer?lat_min=${IMAGE_BOUNDS.latMin}&lat_max=${IMAGE_BOUNDS.latMax}&lon_min=${IMAGE_BOUNDS.lonMin}&lon_max=${IMAGE_BOUNDS.lonMax}`;
                     console.log('📥 Tentando API local:', apiUrl);
                     
                     const response = await fetch(apiUrl, { timeout: 30000 });
@@ -1501,11 +1514,35 @@
                 
                 const winds = scatData.winds || [];
                 let displayedCount = 0;
+                let totalInBounds = 0;
                 
+                // Primeiro passo: filtrar e amostrar por grid
                 for (let i = 0; i < winds.length; i++) {
                     const w = winds[i];
                     
-                    // Filtrar por área visível
+                    // Filtrar por área da imagem do satélite
+                    if (w.lat < IMAGE_BOUNDS.latMin || w.lat > IMAGE_BOUNDS.latMax) continue;
+                    if (w.lon < IMAGE_BOUNDS.lonMin || w.lon > IMAGE_BOUNDS.lonMax) continue;
+                    
+                    totalInBounds++;
+                    
+                    // Amostrar por grid (1 vetor por célula de GRID_SIZE x GRID_SIZE graus)
+                    const gridLat = Math.floor(w.lat / GRID_SIZE);
+                    const gridLon = Math.floor(w.lon / GRID_SIZE);
+                    const gridKey = `${gridLat}_${gridLon}`;
+                    
+                    // Se já tem um vetor nessa célula, pular (manter o primeiro)
+                    if (sampledGrid.has(gridKey)) continue;
+                    
+                    // Guardar este vetor para a célula
+                    sampledGrid.set(gridKey, w);
+                }
+                
+                console.log(`📊 Grid: ${totalInBounds} pontos -> ${sampledGrid.size} amostrados (grid ${GRID_SIZE}°)`);
+                
+                // Segundo passo: renderizar apenas os vetores amostrados
+                for (const [gridKey, w] of sampledGrid) {
+                    // Filtrar por área visível do mapa (para não renderizar fora da tela)
                     if (w.lat < latMin || w.lat > latMax) continue;
                     if (w.lon < lonMin || w.lon > lonMax) continue;
                     
@@ -1518,11 +1555,6 @@
                     const marker = createScatWindMarker(w, color);
                     marker.addTo(scatLayer);
                     scatMarkers.push(marker);
-                    
-                    // Progress
-                    if (i % 20 === 0) {
-                        setProgress(50 + (i / winds.length) * 45);
-                    }
                 }
                 
                 // Atualizar info
