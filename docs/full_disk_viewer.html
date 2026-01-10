@@ -1444,12 +1444,12 @@
             
             try {
                 // Usar bounds FIXOS da imagem do satélite (não do mapa visível)
-                // A imagem cobre aproximadamente: 15°N a 60°S, 90°W a 25°W
+                // A imagem cobre: 0°N a 30°S, 60°W a 30°W
                 const IMAGE_BOUNDS = {
-                    latMin: -60,
-                    latMax: 15,
-                    lonMin: -90,
-                    lonMax: -25
+                    latMin: -30,
+                    latMax: 0,
+                    lonMin: -60,
+                    lonMax: -30
                 };
                 
                 // Para filtro visual, usar interseção com mapa visível
@@ -1688,12 +1688,17 @@
             }
             
             // Seta de vento com direção (ASCAT)
+            // Direção meteorológica = de onde o vento VEM
+            // Queremos mostrar para onde o vento SOPRA (oposto)
             const arrowLength = Math.min(0.25 + speed * 0.008, 0.6);
             
-            // Converter direção meteorológica para vetorial
-            const dirRad = (direction + 180) * Math.PI / 180;
+            // Direção de onde vem -> converter para onde vai (adicionar 180°)
+            // Em coordenadas: Norte=0°, Leste=90°, Sul=180°, Oeste=270°
+            const blowToDir = (direction + 180) % 360;
+            const dirRad = blowToDir * Math.PI / 180;
             
-            const endLat = lat + arrowLength * Math.cos(dirRad);
+            // cos(dir) = componente Norte/Sul, sin(dir) = componente Leste/Oeste
+            const endLat = lat - arrowLength * Math.cos(dirRad);
             const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
             const line = L.polyline([[lat, lon], [endLat, endLon]], {
@@ -1711,7 +1716,7 @@
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta
+            // Cabeça da seta - apontar na direção para onde o vento sopra
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1719,7 +1724,7 @@
                     border-left: 4px solid transparent;
                     border-right: 4px solid transparent;
                     border-bottom: 8px solid ${color};
-                    transform: rotate(${direction + 180}deg);
+                    transform: rotate(${blowToDir}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
