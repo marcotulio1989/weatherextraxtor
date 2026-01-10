@@ -856,6 +856,36 @@
             </div>
         </div>
         
+        <!-- VENTOS SCATTEROMETER (Colapsável) -->
+        <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
+            <h2>🛰️ VENTOS SCAT</h2>
+            <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content collapsed">
+            <div class="section" style="border-left: 3px solid #00aaff;">
+                <div class="section-title">
+                    <span class="status-indicator" id="scat-status"></span>
+                    Scatterometer (ASCAT)
+                </div>
+                
+                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                    <button id="btn-scat-on" class="toggle-btn" onclick="toggleSCAT(true)" style="flex:1;">✅ ON</button>
+                    <button id="btn-scat-off" class="toggle-btn active" onclick="toggleSCAT(false)" style="flex:1;">❌ OFF</button>
+                </div>
+                
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                    <label style="font-size:10px; color:#888;">Auto-check (1h):</label>
+                    <input type="checkbox" id="scat-auto-refresh" onclick="toggleScatAutoRefresh()">
+                    <span id="scat-next-update" style="font-size:9px; color:#00aaff;"></span>
+                </div>
+                
+                <button onclick="loadScatWinds()" style="width:100%; margin-bottom:6px;">🔄 ATUALIZAR</button>
+                
+                <div id="scat-info" style="font-size:9px; color:#888;">📅 Aguardando...</div>
+                <div id="scat-timestamp" style="font-size:9px; color:#00aaff;"></div>
+            </div>
+        </div>
+        
         <!-- PRODUTOS L2 (Colapsável) -->
         <div class="collapsible-header collapsed" onclick="toggleCollapsible(this)">
             <h2>📊 PRODUTOS L2</h2>
@@ -932,6 +962,34 @@
     
     <!-- MAPA -->
     <div id="map"></div>
+    
+    <!-- Scatterometer Legend (posicionado no mapa) -->
+    <div id="scatLegend" style="
+        position: fixed;
+        bottom: 230px;
+        right: 400px;
+        background: rgba(0,0,0,0.9);
+        padding: 12px;
+        border-radius: 8px;
+        z-index: 1000;
+        border: 1px solid #00aaff;
+        display: none;
+        font-size: 11px;
+        color: #e0e0e0;
+    ">
+        <h4 style="color: #00aaff; margin: 0 0 8px 0; font-size: 12px;">🛰️ Ventos Scatterometer</h4>
+        <div style="font-size: 10px; color: #aaa; margin-bottom: 6px;">ASCAT (MetOp-B/C)</div>
+        <div style="display:flex; align-items:center; gap:6px; padding:2px 0;"><div style="width:25px;height:4px;background:#00ff00;border-radius:2px;"></div><span>0-10 kt (Calmo)</span></div>
+        <div style="display:flex; align-items:center; gap:6px; padding:2px 0;"><div style="width:25px;height:4px;background:#88ff00;border-radius:2px;"></div><span>10-15 kt (Leve)</span></div>
+        <div style="display:flex; align-items:center; gap:6px; padding:2px 0;"><div style="width:25px;height:4px;background:#ffff00;border-radius:2px;"></div><span>15-20 kt (Moderado)</span></div>
+        <div style="display:flex; align-items:center; gap:6px; padding:2px 0;"><div style="width:25px;height:4px;background:#ff9900;border-radius:2px;"></div><span>20-25 kt (Fresco)</span></div>
+        <div style="display:flex; align-items:center; gap:6px; padding:2px 0;"><div style="width:25px;height:4px;background:#ff0000;border-radius:2px;"></div><span>25-30 kt (Forte)</span></div>
+        <div style="display:flex; align-items:center; gap:6px; padding:2px 0;"><div style="width:25px;height:4px;background:#ff00ff;border-radius:2px;"></div><span>&gt;30 kt (Muito Forte)</span></div>
+        <div style="margin-top:8px; padding-top:6px; border-top:1px solid #333;">
+            <span id="scatInfoLegend" style="color:#888;">-</span>
+        </div>
+        <div style="margin-top:4px; color:#00aaff;">📅 <span id="scatTimestampLegend">--</span></div>
+    </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1031,6 +1089,9 @@
         // Carregar credenciais salvas
         loadSavedCredentials();
         
+        // Configurar auto-reload de Scatterometer
+        setupScatAutoReload();
+        
         log('success', '✅ Mapa inicializado');
         log('info', `📏 Área visual: ${RAIO_VISUAL_NM} NM | Grid dados: ${RAIO_NM} NM`);
         
@@ -1098,6 +1159,16 @@
     let dmwMarkers = [];
     let dmwAutoRefreshInterval = null;
     let lastDMWHour = -1;  // Para controlar atualização por hora
+    
+    // =========================================================================
+    // CAMADA SCATTEROMETER (ASCAT, CYGNSS)
+    // =========================================================================
+    let scatEnabled = false;
+    let scatLayer = null;
+    let scatMarkers = [];
+    let scatData = null;
+    let scatAutoRefreshInterval = null;
+    let scatLastTimestamp = null;  // Timestamp dos dados atuais
     
     // ============ FUNÇÃO TOGGLE COLLAPSIBLE ============
     function toggleCollapsible(header) {
@@ -1351,6 +1422,335 @@
 
         return L.marker([lat, lon], { icon: icon })
             .bindPopup(popup);
+    }
+
+    // =========================================================================
+    // SCATTEROMETER WINDS (ASCAT, CYGNSS via NASA Earthdata)
+    // =========================================================================
+    
+    function toggleSCAT(enabled) {
+        scatEnabled = enabled;
+        
+        // Atualizar botões
+        document.getElementById('btn-scat-on').classList.toggle('active', enabled);
+        document.getElementById('btn-scat-off').classList.toggle('active', !enabled);
+        
+        // Atualizar status
+        const statusEl = document.getElementById('scat-status');
+        
+        if (enabled) {
+            log('success', '✅ SCAT LIGADO - Carregando ventos de scatterômetro...');
+            statusEl.className = 'status-indicator loading';
+            document.getElementById('scatLegend').style.display = 'block';
+            loadScatWinds();
+        } else {
+            log('info', '❌ SCAT DESLIGADO');
+            statusEl.className = 'status-indicator';
+            document.getElementById('scatLegend').style.display = 'none';
+            clearScatLayer();
+        }
+    }
+    
+    function toggleScatAutoRefresh() {
+        const checkbox = document.getElementById('scat-auto-refresh');
+        const nextUpdateSpan = document.getElementById('scat-next-update');
+        
+        if (checkbox.checked) {
+            // Verificar a cada 1 hora se há dados mais novos
+            const ONE_HOUR = 60 * 60 * 1000;
+            
+            scatAutoRefreshInterval = setInterval(() => {
+                console.log('🔍 SCAT: Verificando se há dados mais novos...');
+                checkAndUpdateScatWinds();
+                updateScatNextUpdateTime();
+            }, ONE_HOUR);
+            
+            updateScatNextUpdateTime();
+            log('info', '⏰ SCAT Auto-refresh ativado (verifica a cada 1h)');
+        } else {
+            // Parar auto-refresh
+            if (scatAutoRefreshInterval) {
+                clearInterval(scatAutoRefreshInterval);
+                scatAutoRefreshInterval = null;
+            }
+            nextUpdateSpan.textContent = '';
+            log('info', '⏸️ SCAT Auto-refresh desativado');
+        }
+    }
+    
+    async function checkAndUpdateScatWinds() {
+        // Verificar se há dados mais novos antes de baixar
+        try {
+            // Tentar buscar o JSON para comparar timestamp
+            const jsonResponse = await fetch('scatterometer_latest.json');
+            if (!jsonResponse.ok) return;
+            
+            const newData = await jsonResponse.json();
+            const newTimestamp = newData.timestamp ? new Date(newData.timestamp).getTime() : 0;
+            const currentTimestamp = scatLastTimestamp ? new Date(scatLastTimestamp).getTime() : 0;
+            
+            if (newTimestamp > currentTimestamp) {
+                log('info', `✅ SCAT: Dados mais novos encontrados!`);
+                loadScatWinds();  // Baixar e renderizar
+            } else {
+                log('info', `ℹ️ SCAT: Dados atuais são os mais recentes`);
+            }
+            
+        } catch (err) {
+            console.error('❌ Erro ao verificar atualizações SCAT:', err);
+        }
+    }
+    
+    function updateScatNextUpdateTime() {
+        const nextUpdateSpan = document.getElementById('scat-next-update');
+        const now = new Date();
+        const nextUpdate = new Date(now.getTime() + 60 * 60 * 1000);  // 1 hora
+        nextUpdateSpan.textContent = `Próx: ${nextUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    
+    function clearScatLayer() {
+        scatMarkers.forEach(m => map.removeLayer(m));
+        scatMarkers = [];
+        if (scatLayer) {
+            map.removeLayer(scatLayer);
+            scatLayer = null;
+        }
+    }
+    
+    async function loadScatWinds() {
+        if (!scatEnabled) return;
+        
+        const statusEl = document.getElementById('scat-status');
+        const infoEl = document.getElementById('scat-info');
+        
+        statusEl.className = 'status-indicator loading';
+        log('info', '🛰️ Carregando ventos de Scatterômetros...');
+        
+        try {
+            // Usar bounds FIXOS da imagem do satélite
+            const IMAGE_BOUNDS = {
+                latMin: REPROJECTION_BOUNDS.south,  // -30
+                latMax: REPROJECTION_BOUNDS.north,  // 0
+                lonMin: REPROJECTION_BOUNDS.west,   // -60
+                lonMax: REPROJECTION_BOUNDS.east    // -30
+            };
+            
+            // Grid de amostragem para reduzir densidade (~0.25° = ~25km)
+            const GRID_SIZE = 0.25;
+            const sampledGrid = new Map();
+            
+            // Tentar buscar do servidor local primeiro
+            let scatDataLocal = null;
+            
+            try {
+                // Tentar API local
+                const apiUrl = `/api/scatterometer?lat_min=${IMAGE_BOUNDS.latMin}&lat_max=${IMAGE_BOUNDS.latMax}&lon_min=${IMAGE_BOUNDS.lonMin}&lon_max=${IMAGE_BOUNDS.lonMax}`;
+                console.log('[SCAT] Tentando API local:', apiUrl);
+                
+                const response = await fetch(apiUrl, { timeout: 30000 });
+                if (response.ok) {
+                    scatDataLocal = await response.json();
+                    console.log('[SCAT] Dados da API local:', scatDataLocal);
+                }
+            } catch (apiErr) {
+                console.log('[SCAT] API local não disponível, tentando arquivo JSON...');
+            }
+            
+            // Fallback: tentar arquivo JSON pré-gerado
+            if (!scatDataLocal || !scatDataLocal.winds || scatDataLocal.winds.length === 0) {
+                try {
+                    const jsonUrl = 'scatterometer_latest.json';
+                    const response = await fetch(jsonUrl + '?' + Date.now());
+                    if (response.ok) {
+                        scatDataLocal = await response.json();
+                        console.log('[SCAT] Dados do arquivo JSON:', scatDataLocal);
+                    }
+                } catch (jsonErr) {
+                    console.log('[SCAT] Arquivo JSON não disponível');
+                }
+            }
+            
+            if (!scatDataLocal || !scatDataLocal.winds || scatDataLocal.winds.length === 0) {
+                throw new Error('Nenhum dado de scatterômetro disponível');
+            }
+            
+            // Salvar dados globalmente
+            scatData = scatDataLocal;
+            
+            // Limpar camada anterior
+            clearScatLayer();
+            scatLayer = L.layerGroup().addTo(map);
+            
+            const winds = scatData.winds || [];
+            let displayedCount = 0;
+            let totalInBounds = 0;
+            
+            // Primeiro passo: filtrar e amostrar por grid
+            for (let i = 0; i < winds.length; i++) {
+                const w = winds[i];
+                
+                // Filtrar por área da imagem do satélite
+                if (w.lat < IMAGE_BOUNDS.latMin || w.lat > IMAGE_BOUNDS.latMax) continue;
+                if (w.lon < IMAGE_BOUNDS.lonMin || w.lon > IMAGE_BOUNDS.lonMax) continue;
+                
+                totalInBounds++;
+                
+                // Amostrar por grid (1 vetor por célula de GRID_SIZE x GRID_SIZE graus)
+                const gridLat = Math.floor(w.lat / GRID_SIZE);
+                const gridLon = Math.floor(w.lon / GRID_SIZE);
+                const gridKey = `${gridLat}_${gridLon}`;
+                
+                // Se já tem um vetor nessa célula, pular (manter o primeiro)
+                if (sampledGrid.has(gridKey)) continue;
+                
+                // Guardar este vetor para a célula
+                sampledGrid.set(gridKey, w);
+            }
+            
+            console.log(`[SCAT] Grid: ${totalInBounds} pontos -> ${sampledGrid.size} amostrados (grid ${GRID_SIZE}°)`);
+            
+            // Segundo passo: renderizar apenas os vetores amostrados
+            for (const [gridKey, w] of sampledGrid) {
+                displayedCount++;
+                
+                // Cor baseada na velocidade
+                const color = getScatWindColor(w.speed_kt);
+                
+                // Criar marcador de vento
+                const marker = createScatWindMarker(w, color);
+                marker.addTo(scatLayer);
+                scatMarkers.push(marker);
+            }
+            
+            // Atualizar info
+            const satellites = scatData.satellites ? scatData.satellites.join(', ') : 'ASCAT';
+            infoEl.textContent = `${displayedCount} vetores | ${satellites}`;
+            document.getElementById('scatInfoLegend').textContent = `${displayedCount} vetores | ${satellites}`;
+            
+            // Atualizar timestamp
+            if (scatData.timestamp) {
+                scatLastTimestamp = scatData.timestamp;
+                const ts = new Date(scatData.timestamp);
+                const tsStr = ts.toLocaleString('pt-BR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                document.getElementById('scat-timestamp').textContent = `📅 ${tsStr}`;
+                document.getElementById('scatTimestampLegend').textContent = tsStr;
+            }
+            
+            statusEl.className = 'status-indicator active';
+            log('success', `✅ SCAT: ${displayedCount} vetores carregados | ${scatData.source || 'N/A'}`);
+            
+        } catch (err) {
+            console.error('❌ Erro SCAT:', err);
+            log('error', 'Erro SCAT: ' + err.message);
+            statusEl.className = 'status-indicator error';
+            infoEl.textContent = '❌ Erro ao carregar';
+        }
+    }
+    
+    function getScatWindColor(speedKt) {
+        // Escala de cores unificada (igual ao DMW)
+        if (speedKt < 10) return '#00ff00';      // Verde - Calmo (0-10 kn)
+        if (speedKt < 15) return '#88ff00';      // Verde claro - Leve (10-15 kn)
+        if (speedKt < 20) return '#ffff00';      // Amarelo - Moderado (15-20 kn)
+        if (speedKt < 25) return '#ff9900';      // Laranja - Fresco (20-25 kn)
+        if (speedKt < 30) return '#ff0000';      // Vermelho - Forte (25-30 kn)
+        return '#ff00ff';                         // Roxo/Magenta - Muito forte (>30 kn)
+    }
+    
+    function createScatWindMarker(wind, color) {
+        const lat = wind.lat;
+        const lon = wind.lon;
+        const speed = wind.speed_kt;
+        const direction = wind.direction;
+        const satellite = wind.satellite || 'SCAT';
+        
+        // Se não tem direção (CYGNSS), usar círculo
+        if (direction === null || direction === undefined) {
+            // Círculo simples para CYGNSS (só velocidade)
+            const circle = L.circleMarker([lat, lon], {
+                radius: 4 + speed * 0.1,
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.7,
+                weight: 1
+            });
+            
+            circle.bindPopup(`
+                <div style="text-align:center;">
+                    <b>🛰️ ${satellite}</b><br>
+                    <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
+                    Direção: N/A (somente velocidade)<br>
+                    Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
+                </div>
+            `, { className: 'wind-popup' });
+            
+            return circle;
+        }
+        
+        // Seta de vento (linha + cabeça)
+        const arrowLength = Math.min(0.15 + speed * 0.005, 0.4);
+        
+        // Converter direção meteorológica (de onde vem) para onde vai
+        const adjustedDir = (direction - 180 + 360) % 360;
+        const mathAngle = (90 - adjustedDir + 360) % 360;
+        const dirRad = mathAngle * Math.PI / 180;
+        
+        // Calcular ponto final
+        const endLat = lat - arrowLength * Math.sin(dirRad);
+        const endLon = lon - arrowLength * Math.cos(dirRad) / Math.cos(lat * Math.PI / 180);
+        
+        const line = L.polyline([[lat, lon], [endLat, endLon]], {
+            color: color,
+            weight: 2,
+            opacity: 0.9
+        });
+        
+        line.bindPopup(`
+            <div style="text-align:center;">
+                <b>🛰️ ${satellite}</b><br>
+                <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
+                Vem de: ${direction.toFixed(0)}°<br>
+                Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
+            </div>
+        `, { className: 'wind-popup' });
+        
+        // Cabeça da seta
+        const arrowHead = L.divIcon({
+            html: `<div style="
+                width: 0;
+                height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-bottom: 10px solid ${color};
+                transform: rotate(${(adjustedDir + 180) % 360}deg);
+                transform-origin: center center;
+                filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
+            "></div>`,
+            iconSize: [10, 10],
+            iconAnchor: [5, 5],
+            className: 'scat-arrow-head'
+        });
+        
+        const head = L.marker([endLat, endLon], { icon: arrowHead, interactive: false });
+        
+        return L.layerGroup([line, head]);
+    }
+    
+    // Recarregar SCAT quando mover o mapa
+    let scatReloadTimeout = null;
+    
+    function setupScatAutoReload() {
+        map.on('moveend', () => {
+            if (scatEnabled) {
+                clearTimeout(scatReloadTimeout);
+                scatReloadTimeout = setTimeout(() => {
+                    loadScatWinds();
+                }, 1500);
+            }
+        });
     }
 
     // =========================================================================
@@ -3845,12 +4245,17 @@
             loadDMWWinds();
         }
         
+        // Atualizar dados SCAT (scatterômetro) se habilitado
+        if (scatEnabled) {
+            loadScatWinds();
+        }
+        
         // Atualizar dados L2 (CAPE, LI, TPW) se habilitado
         if (l2Enabled) {
             loadL2Data();
         }
         
-        log('info', '✅ Fontes atualizadas: Open-Meteo, Satélite, DMW, L2');
+        log('info', '✅ Fontes atualizadas: Open-Meteo, Satélite, DMW, SCAT, L2');
     }
     
     function clearData() {
