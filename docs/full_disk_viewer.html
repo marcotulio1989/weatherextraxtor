@@ -373,6 +373,14 @@
         <button onclick="fitBounds()">📍 Ver Tudo</button>
         <button onclick="zoomShip()">🚢 Ir ao Navio</button>
         
+        <div class="control-group">
+            <label>🔎 Zoom</label>
+            <div style="display: flex; gap: 5px; align-items: center;">
+                <input type="number" id="zoomInput" min="2" max="18" value="4" style="width: 60px; padding: 6px; background: #222; border: 1px solid #444; color: #fff; border-radius: 3px; text-align: center;">
+                <button onclick="setZoomLevel()" style="padding: 6px 10px;">Ir</button>
+            </div>
+        </div>
+        
         <!-- Toggle DMW Winds -->
         <div class="toggle-btn" id="toggleDMW" onclick="toggleDMWWinds()">
             <span>🌬️ Ventos DMW</span>
@@ -685,7 +693,7 @@
                 center: [-20, -50],
                 zoom: 4,
                 minZoom: 2,
-                maxZoom: 10
+                maxZoom: 18
             });
             
             // Mapa base
@@ -701,6 +709,18 @@
             
             // Eventos
             document.getElementById('opacity').addEventListener('input', updateOpacity);
+            
+            // Atualizar input de zoom quando zoom mudar
+            map.on('zoomend', function() {
+                document.getElementById('zoomInput').value = map.getZoom();
+            });
+        }
+        
+        function setZoomLevel() {
+            const zoom = parseInt(document.getElementById('zoomInput').value);
+            if (zoom >= 2 && zoom <= 18) {
+                map.setZoom(zoom);
+            }
         }
         
         function addGrid() {
