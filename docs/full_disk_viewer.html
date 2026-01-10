@@ -1720,20 +1720,15 @@
                 return circle;
             }
             
-            // Seta de vento com direção (ASCAT)
-            // O valor no arquivo JÁ É de onde vem, usar direto
+            // Seta de vento - direção original do arquivo
             const arrowLength = Math.min(0.15 + speed * 0.005, 0.4);
             
-            // Usar direção original do arquivo (já é de onde vem)
-            const fromDir = direction;
+            // Usar direção original (não mexer)
+            const dirRad = direction * Math.PI / 180;
             
-            // O vetor aponta NA direção de onde vem, então girar 180° para desenhar
-            const drawDir = (direction + 180) % 360;
-            const dirRad = drawDir * Math.PI / 180;
-            
-            // Calcular ponto final da seta
-            const endLat = lat + arrowLength * Math.cos(dirRad);
-            const endLon = lon + arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
+            // Calcular ponto final - INVERTER sinais para girar 180°
+            const endLat = lat - arrowLength * Math.cos(dirRad);
+            const endLon = lon - arrowLength * Math.sin(dirRad) / Math.cos(lat * Math.PI / 180);
             
             const line = L.polyline([[lat, lon], [endLat, endLon]], {
                 color: color,
@@ -1745,12 +1740,12 @@
                 <div style="text-align:center;">
                     <b>🛰️ ${satellite}</b><br>
                     <b>${speed.toFixed(1)} kt</b> (${(speed * 0.514444).toFixed(1)} m/s)<br>
-                    Vem de: ${fromDir.toFixed(0)}°<br>
+                    Vem de: ${direction.toFixed(0)}°<br>
                     Lat: ${lat.toFixed(2)}° | Lon: ${lon.toFixed(2)}°
                 </div>
             `, { className: 'wind-popup' });
             
-            // Cabeça da seta - girada 180° do valor original
+            // Cabeça da seta - rotação = direction + 180
             const arrowHead = L.divIcon({
                 html: `<div style="
                     width: 0;
@@ -1758,7 +1753,7 @@
                     border-left: 5px solid transparent;
                     border-right: 5px solid transparent;
                     border-bottom: 10px solid ${color};
-                    transform: rotate(${drawDir}deg);
+                    transform: rotate(${(direction + 180) % 360}deg);
                     transform-origin: center center;
                     filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
                 "></div>`,
