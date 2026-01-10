@@ -1247,7 +1247,11 @@
         log('info', '🛰️ Iniciando carregamento de satélite...');
         setTimeout(() => loadSatelliteLayer(), 500);
         
-        // Buscar dados Open-Meteo (1 segundo)
+        // Carregar dados SCAT em background (1 segundo) - não exibe vetores, só carrega dados
+        log('info', '🛰️ Iniciando carregamento de SCAT em background...');
+        setTimeout(() => loadScatDataSilently(), 1000);
+        
+        // Buscar dados Open-Meteo (1.5 segundos)
         log('info', '🌬️ Iniciando busca de dados de vento...');
         setTimeout(() => fetchOpenMeteoData(), 1500);
         
@@ -1267,6 +1271,12 @@
                 }
             }
         }, 5 * 60 * 1000);  // 5 minutos
+        
+        // Verificação automática de novos dados SCAT a cada 30 minutos
+        setInterval(async () => {
+            log('info', '🛰️ Verificando novos dados SCAT...');
+            await loadScatDataSilently();
+        }, 30 * 60 * 1000);  // 30 minutos
     }
     
     // ============ TOGGLE FORECAST INFO ============
@@ -1595,17 +1605,88 @@
         const statusEl = document.getElementById('scat-status');
         
         if (enabled) {
-            log('success', '✅ SCAT LIGADO - Carregando ventos de scatterômetro...');
-            statusEl.className = 'status-indicator loading';
-            document.getElementById('scatLegend').style.display = 'block';
-            loadScatWinds();
+            // Apenas MOSTRAR vetores (dados já carregados em background)
+            if (scatData && scatData.winds && scatData.winds.length > 0) {
+                log('success', '👁️ SCAT VISÍVEL - Exibindo vetores...');
+                statusEl.className = 'status-indicator active';
+                document.getElementById('scatLegend').style.display = 'block';
+                drawScatVectors();  // Desenhar vetores dos dados já carregados
+            } else {
+                // Se não há dados, carregar
+                log('success', '✅ SCAT LIGADO - Carregando ventos de scatterômetro...');
+                statusEl.className = 'status-indicator loading';
+                document.getElementById('scatLegend').style.display = 'block';
+                loadScatWinds();
+            }
         } else {
-            log('info', '❌ SCAT DESLIGADO');
+            // ESCONDER vetores (dados permanecem em memória)
+            log('info', '🙈 SCAT OCULTO');
             statusEl.className = 'status-indicator';
             document.getElementById('scatLegend').style.display = 'none';
             clearScatLayer();
-            stopScatOpacityTimer();  // Parar timer de opacidade
+            stopScatOpacityTimer();
         }
+    }
+    
+    // Desenhar vetores SCAT dos dados já carregados
+    function drawScatVectors() {
+        if (!scatData || !scatData.winds) return;
+        
+        const statusEl = document.getElementById('scat-status');
+        const infoEl = document.getElementById('scat-info');
+        
+        const IMAGE_BOUNDS = {
+            latMin: REPROJECTION_BOUNDS.south,
+            latMax: REPROJECTION_BOUNDS.north,
+            lonMin: REPROJECTION_BOUNDS.west,
+            lonMax: REPROJECTION_BOUNDS.east
+        };
+        
+        const GRID_SIZE = 0.25;
+        const sampledGrid = new Map();
+        
+        const winds = scatData.winds || [];
+        let totalInBounds = 0;
+        
+        // Amostrar por grid
+        for (let i = 0; i < winds.length; i++) {
+            const w = winds[i];
+            if (w.lat < IMAGE_BOUNDS.latMin || w.lat > IMAGE_BOUNDS.latMax) continue;
+            if (w.lon < IMAGE_BOUNDS.lonMin || w.lon > IMAGE_BOUNDS.lonMax) continue;
+            
+            totalInBounds++;
+            
+            const gridLat = Math.floor(w.lat / GRID_SIZE);
+            const gridLon = Math.floor(w.lon / GRID_SIZE);
+            const gridKey = `${gridLat}_${gridLon}`;
+            
+            if (sampledGrid.has(gridKey)) continue;
+            sampledGrid.set(gridKey, w);
+        }
+        
+        // Limpar e criar camada
+        clearScatLayer();
+        scatLayer = L.layerGroup().addTo(map);
+        
+        let displayedCount = 0;
+        for (const [gridKey, w] of sampledGrid) {
+            displayedCount++;
+            const color = getScatWindColor(w.speed_kt);
+            const marker = createScatWindMarker(w, color);
+            marker.addTo(scatLayer);
+            scatMarkers.push(marker);
+        }
+        
+        // Atualizar info
+        const satellites = scatData.satellites ? scatData.satellites.join(', ') : 'ASCAT';
+        infoEl.textContent = `${displayedCount} vetores | ${satellites}`;
+        document.getElementById('scatInfoLegend').textContent = `${displayedCount} vetores | ${satellites}`;
+        
+        statusEl.className = 'status-indicator active';
+        log('success', `✅ SCAT: ${displayedCount} vetores exibidos`);
+        
+        // Iniciar timer de opacidade
+        startScatOpacityTimer();
     }
     
     function toggleScatAutoRefresh() {
@@ -1676,6 +1757,95 @@
         }
     }
     
+    // Carregar dados SCAT silenciosamente (sem desenhar vetores)
+    // Usado na inicialização para ter os dados prontos e atualizar contadores
+    async function loadScatDataSilently() {
+        const statusEl = document.getElementById('scat-status');
+        const infoEl = document.getElementById('scat-info');
+        
+        log('info', '🛰️ Carregando dados SCAT em background...');
+        
+        try {
+            // Usar bounds FIXOS da imagem do satélite
+            const IMAGE_BOUNDS = {
+                latMin: REPROJECTION_BOUNDS.south,
+                latMax: REPROJECTION_BOUNDS.north,
+                lonMin: REPROJECTION_BOUNDS.west,
+                lonMax: REPROJECTION_BOUNDS.east
+            };
+            
+            let scatDataLocal = null;
+            
+            // Tentar API local primeiro
+            try {
+                const apiUrl = `/api/scatterometer?lat_min=${IMAGE_BOUNDS.latMin}&lat_max=${IMAGE_BOUNDS.latMax}&lon_min=${IMAGE_BOUNDS.lonMin}&lon_max=${IMAGE_BOUNDS.lonMax}`;
+                const response = await fetch(apiUrl, { timeout: 30000 });
+                if (response.ok) {
+                    scatDataLocal = await response.json();
+                }
+            } catch (apiErr) {
+                console.log('[SCAT] API local não disponível, tentando arquivo JSON...');
+            }
+            
+            // Fallback: arquivo JSON
+            if (!scatDataLocal || !scatDataLocal.winds || scatDataLocal.winds.length === 0) {
+                try {
+                    const jsonUrl = 'scatterometer_latest.json';
+                    const response = await fetch(jsonUrl + '?' + Date.now());
+                    if (response.ok) {
+                        scatDataLocal = await response.json();
+                    }
+                } catch (jsonErr) {
+                    console.log('[SCAT] Arquivo JSON não disponível');
+                }
+            }
+            
+            if (!scatDataLocal || !scatDataLocal.winds || scatDataLocal.winds.length === 0) {
+                log('warning', '⚠️ SCAT: Nenhum dado disponível');
+                return;
+            }
+            
+            // Salvar dados globalmente (sem desenhar)
+            scatData = scatDataLocal;
+            
+            // Contar vetores na área
+            const winds = scatData.winds || [];
+            let totalInBounds = 0;
+            for (let i = 0; i < winds.length; i++) {
+                const w = winds[i];
+                if (w.lat >= IMAGE_BOUNDS.latMin && w.lat <= IMAGE_BOUNDS.latMax &&
+                    w.lon >= IMAGE_BOUNDS.lonMin && w.lon <= IMAGE_BOUNDS.lonMax) {
+                    totalInBounds++;
+                }
+            }
+            
+            // Atualizar info
+            const satellites = scatData.satellites ? scatData.satellites.join(', ') : 'ASCAT';
+            infoEl.textContent = `${totalInBounds} vetores | ${satellites}`;
+            
+            // Atualizar timestamp
+            if (scatData.timestamp) {
+                scatLastTimestamp = scatData.timestamp;
+                const ts = new Date(scatData.timestamp);
+                const tsStr = ts.toLocaleString('pt-BR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit'
+                });
+                document.getElementById('scat-timestamp').textContent = `📅 ${tsStr}`;
+                document.getElementById('scatTimestampLegend').textContent = tsStr;
+            }
+            
+            // Atualizar contadores de vetores no raio de 20nm
+            updateObservedVectorsUI();
+            
+            log('success', `✅ SCAT: ${totalInBounds} vetores carregados (background) | ${scatData.source || 'N/A'}`);
+            
+        } catch (err) {
+            console.error('❌ Erro SCAT (background):', err);
+            log('error', 'Erro SCAT: ' + err.message);
+        }
+    }
+
     async function loadScatWinds() {
         if (!scatEnabled) return;
         
@@ -3964,40 +4134,76 @@
         }
         
         // =====================================================================
-        // PARTE 2: COMPARAR MODELOS COM OBSERVADO ATUAL (sistema original)
+        // PARTE 2: COMPARAR MODELOS COM OBSERVADO ATUAL
+        // SISTEMA PROPORCIONAL - quanto menor o erro, maior o score
         // =====================================================================
         let calibrationResults = [];
         
+        // Primeiro, calcular erros de todos os modelos
+        let modelErrors = {};
         MODELS.forEach(model => {
             const modelValue = modelData[model];
             if (!modelValue || modelValue.speed === null) return;
             
-            // Calcular erros SEPARADOS
             const speedError = Math.abs(modelValue.speed - observedSpeed);
             const dirError = observedDir !== null && modelValue.direction !== null ? 
                              directionError(modelValue.direction, observedDir) : null;
             
+            modelErrors[model] = { speedError, dirError };
+        });
+        
+        // Encontrar o maior e menor erro para normalização
+        let maxSpeedError = 0, minSpeedError = Infinity;
+        let maxDirError = 0, minDirError = Infinity;
+        
+        Object.values(modelErrors).forEach(e => {
+            if (e.speedError > maxSpeedError) maxSpeedError = e.speedError;
+            if (e.speedError < minSpeedError) minSpeedError = e.speedError;
+            if (e.dirError !== null) {
+                if (e.dirError > maxDirError) maxDirError = e.dirError;
+                if (e.dirError < minDirError) minDirError = e.dirError;
+            }
+        });
+        
+        // Agora calcular scores PROPORCIONAIS ao erro
+        MODELS.forEach(model => {
+            const errors = modelErrors[model];
+            if (!errors) return;
+            
+            const speedError = errors.speedError;
+            const dirError = errors.dirError;
+            
             // Atualizar contadores
             modelStats[model].totalComparisons++;
             
-            // === VELOCIDADE ===
+            // === VELOCIDADE - PROPORCIONAL ===
+            // Score baseado em quão perto do melhor modelo este está
+            // Modelo com menor erro = score mais alto
+            // Fórmula: score proporcional = 1 - (erro / erroMáximo)
+            // Se erroMáximo = 0, todos são perfeitos
+            
+            const speedRange = Math.max(1, maxSpeedError - minSpeedError);
+            // Quanto menor o erro em relação ao pior, maior o multiplicador (0.5 a 1.5)
+            const speedMultiplier = 1.5 - (speedError - minSpeedError) / speedRange;
+            
             const speedCorrect = speedError < ACCURACY_THRESHOLD_SPEED;
             if (speedCorrect) {
                 modelStats[model].speedCorrectCount++;
-                // Recuperar score de velocidade
-                const reward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
+                // Bonus PROPORCIONAL - modelo com menor erro ganha mais
+                const baseReward = 2 * CORRECT_REWARD_FACTOR * sourceWeight;
+                const reward = baseReward * speedMultiplier;
                 modelStats[model].speedScore = Math.min(150, modelStats[model].speedScore + reward);
             } else {
                 modelStats[model].speedWrongCount++;
-                // Penalizar score de velocidade
+                // Penalidade PROPORCIONAL - modelo com maior erro perde mais
                 const wrongRatio = modelStats[model].speedWrongCount / Math.max(1, modelStats[model].totalComparisons);
                 const penaltyMultiplier = 1 + wrongRatio * 2;
                 const penalty = (speedError / 30) * sourceWeight * 10 * ERROR_PENALTY_FACTOR * penaltyMultiplier;
                 modelStats[model].speedScore = Math.max(10, modelStats[model].speedScore - penalty);
             }
             
-            // === DIREÇÃO ===
-            let dirCorrect = true;  // Se não tem direção, considera correto
+            // === DIREÇÃO - PROPORCIONAL ===
+            let dirCorrect = true;
             if (dirError !== null) {
                 dirCorrect = dirError < ACCURACY_THRESHOLD_DIR;
                 if (dirCorrect) {
