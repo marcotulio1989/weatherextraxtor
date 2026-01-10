@@ -1725,8 +1725,9 @@
             
             // Converter direção meteorológica (0=N, 90=E, sentido horário)
             // para matemática (0=E, 90=N, sentido anti-horário)
-            // mathAngle = 90 - meteoAngle
-            const mathAngle = (90 - direction + 360) % 360;
+            // Subtrair 180° da direção
+            const adjustedDir = (direction - 180 + 360) % 360;
+            const mathAngle = (90 - adjustedDir + 360) % 360;
             const dirRad = mathAngle * Math.PI / 180;
             
             // Calcular ponto final - agora girado 180° (sinais negativos)
