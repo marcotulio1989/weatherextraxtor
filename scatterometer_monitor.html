@@ -1310,6 +1310,8 @@
     let scatData = null;
     let scatAutoRefreshInterval = null;
     let scatLastTimestamp = null;  // Timestamp dos dados atuais
+    let scatOpacityInterval = null;  // Intervalo para atualizar opacidade
+    const SCAT_MAX_AGE_HOURS = 6;  // Dados expiram após 6 horas
     
     // ============ FUNÇÃO TOGGLE COLLAPSIBLE ============
     function toggleCollapsible(header) {
@@ -1592,6 +1594,7 @@
             statusEl.className = 'status-indicator';
             document.getElementById('scatLegend').style.display = 'none';
             clearScatLayer();
+            stopScatOpacityTimer();  // Parar timer de opacidade
         }
     }
     
@@ -1788,6 +1791,9 @@
             statusEl.className = 'status-indicator active';
             log('success', `✅ SCAT: ${displayedCount} vetores carregados | ${scatData.source || 'N/A'}`);
             
+            // Iniciar timer de opacidade (fade out em 6 horas)
+            startScatOpacityTimer();
+            
         } catch (err) {
             console.error('❌ Erro SCAT:', err);
             log('error', 'Erro SCAT: ' + err.message);
@@ -1897,6 +1903,112 @@
                 }, 1500);
             }
         });
+    }
+    
+    // =========================================================================
+    // OPACIDADE SCAT BASEADA NA IDADE DOS DADOS
+    // =========================================================================
+    
+    // Calcular opacidade baseada na idade (0-1)
+    // 0 horas = 1.0 (100%), 6 horas = 0.0 (0%)
+    function getScatOpacity() {
+        if (!scatLastTimestamp) return 1.0;
+        
+        const dataTime = new Date(scatLastTimestamp).getTime();
+        const now = Date.now();
+        const ageMs = now - dataTime;
+        const ageHours = ageMs / (1000 * 60 * 60);
+        
+        // Se mais de 6 horas, opacidade 0
+        if (ageHours >= SCAT_MAX_AGE_HOURS) return 0;
+        
+        // Opacidade linear: 1.0 em 0h, 0.0 em 6h
+        return Math.max(0, 1.0 - (ageHours / SCAT_MAX_AGE_HOURS));
+    }
+    
+    // Atualizar opacidade de todos os vetores SCAT
+    function updateScatOpacity() {
+        const opacity = getScatOpacity();
+        
+        // Se opacidade zero, esconder camada e legenda
+        if (opacity <= 0) {
+            if (scatLayer) {
+                scatLayer.eachLayer(layer => {
+                    if (layer.setStyle) layer.setStyle({ opacity: 0, fillOpacity: 0 });
+                    if (layer.setOpacity) layer.setOpacity(0);
+                    if (layer.eachLayer) {
+                        layer.eachLayer(sublayer => {
+                            if (sublayer.setStyle) sublayer.setStyle({ opacity: 0, fillOpacity: 0 });
+                            if (sublayer.setOpacity) sublayer.setOpacity(0);
+                        });
+                    }
+                });
+            }
+            document.getElementById('scatLegend').style.display = 'none';
+            log('warning', '⚠️ SCAT: Dados expiraram (mais de 6h)');
+            
+            // Parar o intervalo
+            if (scatOpacityInterval) {
+                clearInterval(scatOpacityInterval);
+                scatOpacityInterval = null;
+            }
+            return;
+        }
+        
+        // Aplicar opacidade a todos os vetores
+        if (scatLayer) {
+            scatLayer.eachLayer(layer => {
+                // Para polylines (setas)
+                if (layer.setStyle) {
+                    layer.setStyle({ opacity: opacity * 0.9 });
+                }
+                // Para LayerGroups (seta + cabeça)
+                if (layer.eachLayer) {
+                    layer.eachLayer(sublayer => {
+                        if (sublayer.setStyle) sublayer.setStyle({ opacity: opacity * 0.9 });
+                        if (sublayer.setOpacity) sublayer.setOpacity(opacity);
+                        // Para markers (cabeça da seta)
+                        if (sublayer._icon) {
+                            sublayer._icon.style.opacity = opacity;
+                        }
+                    });
+                }
+                // Para circle markers
+                if (layer.setStyle && layer.options && layer.options.fillOpacity !== undefined) {
+                    layer.setStyle({ opacity: opacity * 0.9, fillOpacity: opacity * 0.7 });
+                }
+            });
+        }
+        
+        // Atualizar legenda com indicação de idade
+        const ageHours = (Date.now() - new Date(scatLastTimestamp).getTime()) / (1000 * 60 * 60);
+        const ageStr = ageHours < 1 ? `${Math.round(ageHours * 60)}min` : `${ageHours.toFixed(1)}h`;
+        const opacityPct = Math.round(opacity * 100);
+        document.getElementById('scatInfoLegend').textContent = `${scatMarkers.length} vetores | ${opacityPct}% (${ageStr})`;
+    }
+    
+    // Iniciar timer de atualização de opacidade (a cada 1 minuto)
+    function startScatOpacityTimer() {
+        // Limpar intervalo anterior se existir
+        if (scatOpacityInterval) {
+            clearInterval(scatOpacityInterval);
+        }
+        
+        // Atualizar imediatamente
+        updateScatOpacity();
+        
+        // Atualizar a cada 1 minuto
+        scatOpacityInterval = setInterval(() => {
+            updateScatOpacity();
+        }, 60 * 1000);
+    }
+    
+    // Parar timer de opacidade
+    function stopScatOpacityTimer() {
+        if (scatOpacityInterval) {
+            clearInterval(scatOpacityInterval);
+            scatOpacityInterval = null;
+        }
     }
 
     // =========================================================================
